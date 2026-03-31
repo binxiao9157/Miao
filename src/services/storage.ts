@@ -68,8 +68,7 @@ export const storage = {
   },
   
   getUserInfo: (): UserInfo | null => {
-    const data = localStorage.getItem(STORAGE_KEYS.USER_INFO);
-    return data ? JSON.parse(data) : null;
+    return storage.safeParse<UserInfo | null>(STORAGE_KEYS.USER_INFO, null);
   },
   
   saveToken: (token: string) => {
@@ -77,17 +76,37 @@ export const storage = {
   },
   
   getToken: () => {
-    return localStorage.getItem(STORAGE_KEYS.TOKEN);
+    try {
+      return localStorage.getItem(STORAGE_KEYS.TOKEN);
+    } catch (e) {
+      return null;
+    }
   },
   
   clearAll: () => {
-    Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+    Object.values(STORAGE_KEYS).forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {}
+    });
+  },
+
+  // Helper for safe JSON parsing
+  safeParse: <T>(key: string, defaultValue: T): T => {
+    try {
+      const data = localStorage.getItem(key);
+      if (!data) return defaultValue;
+      const parsed = JSON.parse(data);
+      return parsed === null ? defaultValue : (parsed as T);
+    } catch (e) {
+      console.error(`Error parsing storage key "${key}":`, e);
+      return defaultValue;
+    }
   },
 
   // Cat Management
   getCatList: (): CatInfo[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.CAT_LIST);
-    return data ? JSON.parse(data) : [];
+    return storage.safeParse<CatInfo[]>(STORAGE_KEYS.CAT_LIST, []);
   },
 
   saveCatList: (cats: CatInfo[]) => {
@@ -105,7 +124,8 @@ export const storage = {
   getActiveCat: (): CatInfo | null => {
     const list = storage.getCatList();
     const activeId = storage.getActiveCatId();
-    return list.find(c => c.id === activeId) || list[0] || null;
+    const active = list.find(c => c.id === activeId) || list[0] || null;
+    return active;
   },
 
   // Legacy support for single cat info
@@ -127,15 +147,14 @@ export const storage = {
 
   // Points Management
   getPoints: (): PointsInfo => {
-    const data = localStorage.getItem(STORAGE_KEYS.POINTS);
-    return data ? JSON.parse(data) : {
+    return storage.safeParse<PointsInfo>(STORAGE_KEYS.POINTS, {
       total: 0,
       lastLoginDate: null,
       dailyInteractionPoints: 0,
       lastInteractionDate: null,
       onlineMinutes: 0,
       lastOnlineUpdate: Date.now()
-    };
+    });
   },
 
   savePoints: (points: PointsInfo) => {
@@ -154,14 +173,15 @@ export const storage = {
   },
 
   getSettings: (): AppSettings => {
-    const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return data ? JSON.parse(data) : { greetingsEnabled: true, pushNotifications: true };
+    return storage.safeParse<AppSettings>(STORAGE_KEYS.SETTINGS, { 
+      greetingsEnabled: true, 
+      pushNotifications: true 
+    });
   },
 
   // Diary storage
   getDiaries: (): DiaryEntry[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.DIARIES);
-    return data ? JSON.parse(data) : [];
+    return storage.safeParse<DiaryEntry[]>(STORAGE_KEYS.DIARIES, []);
   },
 
   saveDiaries: (diaries: DiaryEntry[]) => {
@@ -170,8 +190,7 @@ export const storage = {
 
   // Time Letters storage
   getTimeLetters: (): TimeLetter[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.TIME_LETTERS);
-    return data ? JSON.parse(data) : [];
+    return storage.safeParse<TimeLetter[]>(STORAGE_KEYS.TIME_LETTERS, []);
   },
 
   saveTimeLetters: (letters: TimeLetter[]) => {

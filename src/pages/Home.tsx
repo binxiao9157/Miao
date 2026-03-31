@@ -29,6 +29,11 @@ export default function Home() {
     const info = storage.getActiveCat();
     setCat(info);
 
+    // 如果是 AI 生成的猫咪，默认播放其生成的视频
+    if (info && info.source === 'uploaded' && info.videoPath) {
+      setCurrentVideo(info.videoPath);
+    }
+
     // Points logic: Daily Login
     const pointsInfo = storage.getPoints();
     const today = new Date().toLocaleDateString();
@@ -108,8 +113,9 @@ export default function Home() {
   };
 
   const handleVideoEnd = () => {
-    if (currentVideo !== VIDEOS.DEFAULT) {
-      setCurrentVideo(VIDEOS.DEFAULT);
+    const defaultSource = (cat?.source === 'uploaded' && cat.videoPath) ? cat.videoPath : VIDEOS.DEFAULT;
+    if (currentVideo !== defaultSource) {
+      setCurrentVideo(defaultSource);
     }
   };
 
@@ -125,9 +131,9 @@ export default function Home() {
     }
   };
 
-  if (!cat) {
+  if (!cat || !cat.name) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-12 text-center bg-background">
+      <div className="flex-grow flex flex-col items-center justify-center p-12 text-center bg-background">
         <div className="w-32 h-32 bg-primary/5 rounded-full flex items-center justify-center text-primary mb-8">
           <Sparkles size={64} />
         </div>
@@ -144,7 +150,7 @@ export default function Home() {
   }
 
   return (
-    <div className="h-full relative overflow-hidden bg-black">
+    <div className="flex-grow relative overflow-hidden bg-black">
       {/* 视频播放器区域 */}
       <div className="absolute inset-0 flex items-center justify-center">
         <video
@@ -152,7 +158,7 @@ export default function Home() {
           src={currentVideo}
           autoPlay
           muted
-          loop={currentVideo === VIDEOS.DEFAULT}
+          loop={currentVideo === (cat?.source === 'uploaded' ? cat.videoPath : VIDEOS.DEFAULT)}
           onEnded={handleVideoEnd}
           className="w-full h-full object-cover"
           playsInline

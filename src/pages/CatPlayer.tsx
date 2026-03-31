@@ -61,7 +61,7 @@ export default function CatPlayer() {
     <div className="h-screen bg-black relative overflow-hidden flex flex-col">
       {/* 顶部栏 */}
       <header className="absolute top-0 left-0 right-0 z-30 p-6 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent">
-        <button onClick={() => navigate(-1)} className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white">
+        <button onClick={() => navigate("/")} className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white">
           <ArrowLeft size={24} />
         </button>
         <div className="text-center">

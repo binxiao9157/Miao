@@ -50,8 +50,11 @@ export default function GenerationProgress() {
         setStatus("生成成功！");
         setProgress(100);
         
+        // 确保活跃 ID 已设置
+        storage.setActiveCatId(taskId);
+        
         setTimeout(() => {
-          navigate(`/cat-player/${taskId}`);
+          navigate(`/cat-player/${taskId}`, { replace: true });
         }, 1500);
 
       } catch (err: any) {
