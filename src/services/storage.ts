@@ -27,6 +27,7 @@ export interface CatInfo {
   color: string;
   avatar: string;
   source: 'created' | 'uploaded';
+  videoPath?: string; // 视频本地路径
 }
 
 export interface AppSettings {

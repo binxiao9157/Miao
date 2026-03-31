@@ -29,30 +29,8 @@ export default function UploadMaterial() {
   const handleAnalyze = async () => {
     if (!selectedImage) return;
     
-    setIsAnalyzing(true);
-    try {
-      const result = await catService.mockAnalyzeCatImage(selectedImage);
-      setAnalysisResult(result);
-      
-      // 自动保存并跳转
-      catService.saveCat({
-        id: 'cat_' + Date.now(),
-        name: result.name || "小可爱",
-        breed: result.breed || "中华田园猫",
-        color: result.color || "狸花",
-        avatar: selectedImage,
-        source: 'uploaded'
-      });
-      
-      playMeow();
-      setTimeout(() => {
-        setIsAnalyzing(false);
-        navigate("/");
-      }, 1000);
-    } catch (error) {
-      console.error("Analysis failed", error);
-      setIsAnalyzing(false);
-    }
+    // 跳转到生成进度页，并传递图片数据
+    navigate("/generation-progress", { state: { image: selectedImage } });
   };
 
   return (

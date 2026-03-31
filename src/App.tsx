@@ -20,6 +20,9 @@ import Notifications from "./pages/Notifications";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import SwitchCompanion from "./pages/SwitchCompanion";
 import UploadMaterial from "./pages/UploadMaterial";
+import GenerationProgress from "./pages/GenerationProgress";
+import CatPlayer from "./pages/CatPlayer";
+import CatHistory from "./pages/CatHistory";
 import CreateCompanion from "./pages/CreateCompanion";
 
 export default function App() {
@@ -34,6 +37,9 @@ export default function App() {
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/upload-material" element={<UploadMaterial />} />
         <Route path="/create-companion" element={<CreateCompanion />} />
+        <Route path="/generation-progress" element={<GenerationProgress />} />
+        <Route path="/cat-player/:id" element={<CatPlayer />} />
+        <Route path="/cat-history" element={<CatHistory />} />
 
         {/* Main App Routes (with Bottom Nav) */}
         <Route element={<MainLayout />}>
