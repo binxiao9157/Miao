@@ -1,0 +1,8 @@
+{
+  "name": "Miao",
+  "description": "一款温暖的宠物陪伴与记录应用，开启您与猫咪的数字治愈之旅。",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

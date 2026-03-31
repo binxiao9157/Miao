@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-background: #fff8f4;
+  --color-primary: #8b4f22;
+  --color-primary-container: #e69b67;
+  --color-on-primary-container: #ffffff;
+  --color-surface-container-low: #fcf2eb;
+  --color-on-surface: #1f1b17;
+  --color-on-surface-variant: #52443b;
+  --color-outline-variant: #d8c2b6;
+  --color-outline: #857469;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-on-surface font-sans;
+    -webkit-font-smoothing: antialiased;
+  }
+}
