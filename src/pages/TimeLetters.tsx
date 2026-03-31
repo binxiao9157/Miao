@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send } from "lucide-react";
+import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send, Clock, ChevronRight } from "lucide-react";
 import { storage, TimeLetter } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -9,6 +9,7 @@ export default function TimeLetters() {
   const [letters, setLetters] = useState<TimeLetter[]>([]);
   const [view, setView] = useState<ViewState>('list');
   const [selectedLetter, setSelectedLetter] = useState<TimeLetter | null>(null);
+  const [showToast, setShowToast] = useState<string | null>(null);
   
   // Write state
   const [content, setContent] = useState("");
@@ -17,6 +18,11 @@ export default function TimeLetters() {
   useEffect(() => {
     setLetters(storage.getTimeLetters());
   }, []);
+
+  const triggerToast = (msg: string) => {
+    setShowToast(msg);
+    setTimeout(() => setShowToast(null), 3000);
+  };
 
   const handleSaveLetter = () => {
     if (!content.trim()) return;
@@ -32,7 +38,6 @@ export default function TimeLetters() {
     setLetters(updated);
     storage.saveTimeLetters(updated);
     
-    // Reset
     setContent("");
     setDays(1);
     setView('list');
@@ -45,29 +50,46 @@ export default function TimeLetters() {
       setView('detail');
     } else {
       const daysLeft = Math.ceil((letter.unlockAt - Date.now()) / (1000 * 60 * 60 * 24));
-      alert(`时间未到喵～ 还有 ${daysLeft} 天才能开启这封信。`);
+      triggerToast(`时间未到喵～ 还有 ${daysLeft} 天才能开启这封信。`);
     }
   };
 
   const renderList = () => (
-    <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-outline-variant/30">
-        <h1 className="text-2xl font-black tracking-tight text-on-surface">时光信件</h1>
+    <div className="min-h-screen bg-background pb-32">
+      <AnimatePresence>
+        {showToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-primary text-white px-6 py-3 rounded-full shadow-2xl font-black text-sm"
+          >
+            {showToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 py-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-on-surface">时光信件</h1>
+          <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest mt-1">Time Capsules</p>
+        </div>
         <button 
           onClick={() => setView('write')}
-          className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+          className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all"
         >
-          <Plus size={24} />
+          <Plus size={28} />
         </button>
       </header>
 
-      <div className="p-6 space-y-4">
+      <div className="px-6 space-y-6">
         {letters.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
-            <div className="w-20 h-20 bg-outline-variant rounded-full flex items-center justify-center mb-4">
-              <Calendar size={32} />
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
+              <Clock size={40} />
             </div>
-            <p className="text-sm font-medium">还没有写过信，给未来的自己留句话吧</p>
+            <h3 className="text-xl font-black text-on-surface mb-2">还没有信件</h3>
+            <p className="text-sm text-on-surface-variant max-w-[200px]">写一封信给未来的自己，让时光见证温暖</p>
           </div>
         ) : (
           letters.map((letter) => {
@@ -80,29 +102,29 @@ export default function TimeLetters() {
                 animate={{ opacity: 1, x: 0 }}
                 key={letter.id}
                 onClick={() => handleLetterClick(letter)}
-                className={`p-6 rounded-3xl border transition-all active:scale-95 ${
-                  isUnlocked 
-                    ? "bg-white border-primary/20 shadow-sm" 
-                    : "bg-surface-container-low border-transparent opacity-80"
-                }`}
+                className={`miao-card flex items-center gap-6 group active:scale-[0.98] transition-all ${!isUnlocked && 'opacity-70 grayscale-[0.5]'}`}
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isUnlocked ? "bg-primary/10 text-primary" : "bg-outline-variant/20 text-on-surface-variant"}`}>
-                    {isUnlocked ? <Unlock size={24} /> : <Lock size={24} />}
-                  </div>
-                  <span className="text-[10px] font-bold text-on-surface-variant opacity-50">
-                    {new Date(letter.createdAt).toLocaleDateString()}
-                  </span>
+                <div className={`w-16 h-16 rounded-3xl flex items-center justify-center flex-shrink-0 ${isUnlocked ? "bg-primary/10 text-primary" : "bg-surface-container text-on-surface-variant/40"}`}>
+                  {isUnlocked ? <Unlock size={28} /> : <Lock size={28} />}
                 </div>
                 
-                <h3 className={`font-bold mb-1 ${isUnlocked ? "text-on-surface" : "text-on-surface-variant"}`}>
-                  {isUnlocked ? "一封已开启的信件" : "封存中的信件"}
-                </h3>
-                <p className="text-xs text-on-surface-variant">
-                  {isUnlocked 
-                    ? "点击阅读信件内容..." 
-                    : `封存中，${daysLeft} 天后解锁`}
-                </p>
+                <div className="flex-grow">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-lg font-black text-on-surface">
+                      {isUnlocked ? "时光回响" : "封存中"}
+                    </h3>
+                    <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest">
+                      {new Date(letter.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-on-surface-variant font-medium">
+                    {isUnlocked 
+                      ? "这封信已经可以开启了喵～" 
+                      : `距离解锁还有 ${daysLeft} 天`}
+                  </p>
+                </div>
+                
+                <ChevronRight className="text-on-surface-variant/20 group-hover:text-primary transition-colors" />
               </motion.div>
             );
           })
@@ -115,57 +137,67 @@ export default function TimeLetters() {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="min-h-screen bg-background p-6 flex flex-col"
+      className="min-h-screen bg-background p-8 flex flex-col"
     >
-      <header className="flex items-center mb-8">
-        <button onClick={() => setView('list')} className="p-2 -ml-2 text-on-surface-variant">
+      <header className="flex items-center justify-between mb-12">
+        <button onClick={() => setView('list')} className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold text-on-surface ml-2">写给未来</h1>
+        <div className="text-center">
+          <h1 className="text-xl font-black text-on-surface">写给未来</h1>
+          <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Write to future</p>
+        </div>
+        <div className="w-12" />
       </header>
 
-      <div className="flex-grow space-y-8">
-        <div className="space-y-2">
-          <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">信件内容</label>
+      <div className="flex-grow space-y-10">
+        <div className="space-y-4">
+          <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-2">信件内容</label>
           <textarea 
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="写下你想对未来自己或猫咪说的话..."
-            className="w-full h-64 p-6 bg-white rounded-[32px] border-none shadow-sm focus:ring-2 focus:ring-primary/20 outline-none resize-none"
+            className="w-full h-80 p-8 bg-surface-container rounded-[48px] border-none outline-none resize-none text-on-surface font-medium placeholder:text-on-surface-variant/30 leading-relaxed"
           />
         </div>
 
-        <div className="space-y-4">
-          <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">封存时长 (天)</label>
-          <div className="flex items-center gap-4">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">封存时长</label>
+            <span className="text-sm font-black text-primary">{days} 天后开启</span>
+          </div>
+          
+          <div className="grid grid-cols-5 gap-3">
             {[1, 3, 7, 30, 100].map(d => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
-                className={`flex-grow py-3 rounded-2xl font-bold text-sm transition-all ${
-                  days === d ? "bg-primary text-white shadow-lg" : "bg-white text-on-surface-variant"
+                className={`py-4 rounded-2xl font-black text-xs transition-all ${
+                  days === d ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-surface-container text-on-surface-variant"
                 }`}
               >
-                {d}天
+                {d}D
               </button>
             ))}
           </div>
-          <input 
-            type="range" 
-            min="1" 
-            max="365" 
-            value={days} 
-            onChange={(e) => setDays(parseInt(e.target.value))}
-            className="w-full accent-primary"
-          />
-          <p className="text-center text-sm font-bold text-primary">{days} 天后开启</p>
+          
+          <div className="px-2">
+            <input 
+              type="range" 
+              min="1" 
+              max="365" 
+              value={days} 
+              onChange={(e) => setDays(parseInt(e.target.value))}
+              className="w-full h-2 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+          </div>
         </div>
       </div>
 
       <button 
         onClick={handleSaveLetter}
         disabled={!content.trim()}
-        className="mt-8 w-full py-5 bg-primary text-white rounded-full font-bold text-lg shadow-2xl flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
+        className="miao-btn-primary mt-12 disabled:opacity-30 disabled:scale-100"
       >
         <Send size={20} />
         封存信件
@@ -177,35 +209,46 @@ export default function TimeLetters() {
     <motion.div 
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="min-h-screen bg-primary p-6 flex flex-col"
+      className="min-h-screen bg-on-primary-container p-8 flex flex-col"
     >
-      <header className="flex items-center mb-12">
-        <button onClick={() => setView('list')} className="p-2 -ml-2 text-white/80">
+      <header className="flex items-center justify-between mb-12">
+        <button onClick={() => setView('list')} className="w-12 h-12 bg-white/10 backdrop-blur-xl rounded-2xl flex items-center justify-center text-white/80">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold text-white ml-2">时光回响</h1>
+        <div className="text-center">
+          <h1 className="text-xl font-black text-white">时光回响</h1>
+          <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Echo from past</p>
+        </div>
+        <div className="w-12" />
       </header>
 
-      <div className="flex-grow bg-white rounded-[40px] p-10 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary/5 rounded-full -ml-12 -mb-12" />
+      <div className="flex-grow bg-background rounded-[56px] p-10 shadow-2xl relative overflow-hidden flex flex-col">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full -mr-24 -mt-24" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full -ml-16 -mb-16" />
         
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 text-primary/40 mb-8">
-            <Calendar size={16} />
-            <span className="text-xs font-bold tracking-widest uppercase">
+        <div className="relative z-10 flex flex-col h-full">
+          <div className="flex items-center gap-3 text-primary/40 mb-10">
+            <Calendar size={20} />
+            <span className="text-xs font-black tracking-widest uppercase">
               写于 {new Date(selectedLetter?.createdAt || 0).toLocaleDateString()}
             </span>
           </div>
           
-          <p className="text-lg text-on-surface leading-loose whitespace-pre-wrap font-serif italic">
-            {selectedLetter?.content}
-          </p>
+          <div className="flex-grow overflow-y-auto">
+            <p className="text-xl text-on-surface leading-[2] font-serif italic">
+              {selectedLetter?.content}
+            </p>
+          </div>
+
+          <div className="mt-12 pt-8 border-t border-outline-variant/30 flex flex-col items-center gap-2">
+            <div className="w-12 h-1 bg-primary/20 rounded-full" />
+            <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-[0.2em]">Miao Sanctuary</p>
+          </div>
         </div>
       </div>
 
       <div className="mt-12 text-center">
-        <p className="text-white/60 text-xs font-medium">这封信在时光中沉淀了很久，希望能带给你温暖。</p>
+        <p className="text-white/40 text-xs font-bold leading-relaxed">这封信在时光中沉淀了很久，<br />希望能带给你温暖与力量。</p>
       </div>
     </motion.div>
   );

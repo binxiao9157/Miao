@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, Sparkles } from "lucide-react";
 import { catService } from "../services/catService";
+import { motion, AnimatePresence } from "motion/react";
 
 export default function CreateCompanion() {
   const navigate = useNavigate();
@@ -10,9 +11,21 @@ export default function CreateCompanion() {
   const [catName, setCatName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const [showToast, setShowToast] = useState<string | null>(null);
+
+  const triggerToast = (msg: string) => {
+    setShowToast(msg);
+    setTimeout(() => setShowToast(null), 3000);
+  };
+
+  const playMeow = () => {
+    const audio = new Audio("https://www.myinstants.com/media/sounds/meow.mp3");
+    audio.play().catch(e => console.error("Audio play failed", e));
+  };
+
   const handleGenerate = () => {
     if (!catName.trim()) {
-      alert("请给您的猫咪起个名字吧！");
+      triggerToast("请给您的猫咪起个名字吧！");
       return;
     }
     
@@ -32,6 +45,7 @@ export default function CreateCompanion() {
         source: 'created'
       });
       
+      playMeow();
       setIsGenerating(false);
       navigate("/");
     }, 1500);
@@ -39,6 +53,18 @@ export default function CreateCompanion() {
 
   return (
     <div className="min-h-screen bg-background p-6 flex flex-col">
+      <AnimatePresence>
+        {showToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white px-6 py-3 rounded-full shadow-2xl font-bold text-sm"
+          >
+            {showToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <header className="flex items-center mb-8">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant">
           <ArrowLeft size={24} />

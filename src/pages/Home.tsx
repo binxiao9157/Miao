@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, MessageCircle, Sparkles, Coins } from "lucide-react";
+import { Heart, MessageCircle, Sparkles, Coins, Plus, Share2 } from "lucide-react";
 import { storage, CatInfo, PointsInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -19,6 +19,7 @@ export default function Home() {
   const [greeting, setGreeting] = useState<string | null>(null);
   const [points, setPoints] = useState<number>(0);
   const [showPointToast, setShowPointToast] = useState<string | null>(null);
+  const [isLiked, setIsLiked] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -48,7 +49,7 @@ export default function Home() {
       const hour = new Date().getHours();
       if (hour >= 7 && hour < 10) {
         setGreeting("早上好～");
-      } else if (hour >= 22 || hour < 24 || hour < 1) { // 22:00-00:00
+      } else if (hour >= 22 && hour < 24) {
         setGreeting("该休息啦～");
       }
     }
@@ -67,7 +68,7 @@ export default function Home() {
         setPoints(newTotal);
         triggerPointToast("+10 在线时长奖励");
       }
-    }, 60000); // Check every minute
+    }, 60000);
 
     return () => {
       if (onlineTimerRef.current) clearInterval(onlineTimerRef.current);
@@ -126,15 +127,15 @@ export default function Home() {
 
   if (!cat) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-12 text-center">
-        <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center text-primary mb-6">
-          <Sparkles size={48} />
+      <div className="flex flex-col items-center justify-center h-full p-12 text-center bg-background">
+        <div className="w-32 h-32 bg-primary/5 rounded-full flex items-center justify-center text-primary mb-8">
+          <Sparkles size={64} />
         </div>
-        <h2 className="text-2xl font-bold text-on-surface mb-2">还没有猫咪伙伴</h2>
-        <p className="text-on-surface-variant text-sm opacity-70 mb-8">快去捏一只或者上传照片生成吧！</p>
+        <h2 className="text-3xl font-black text-on-surface mb-3">还没有猫咪伙伴</h2>
+        <p className="text-on-surface-variant text-base mb-12">快去捏一只或者上传照片生成吧！</p>
         <button 
           onClick={() => navigate("/welcome")}
-          className="px-8 py-4 bg-primary text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform"
+          className="miao-btn-primary max-w-xs"
         >
           开启缘分
         </button>
@@ -162,21 +163,36 @@ export default function Home() {
           className="absolute inset-0 z-10"
           onClick={(e) => {
             if (e.detail === 1) {
-              // 单击
               playAction(VIDEOS.PETTING);
             } else if (e.detail === 2) {
-              // 双击
               playAction(VIDEOS.PLAYING);
             }
           }}
           onPointerDown={handleLongPressStart}
           onPointerUp={handleLongPressEnd}
-          onPanEnd={(_, info) => {
-            if (Math.abs(info.offset.x) > 50 || Math.abs(info.offset.y) > 50) {
-              playAction(VIDEOS.EATING);
-            }
-          }}
         />
+      </div>
+
+      {/* 顶部状态栏 */}
+      <div className="absolute top-12 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <div className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center text-white overflow-hidden">
+            <img src={cat.avatar || "https://picsum.photos/seed/cat-avatar/100/100"} alt="Avatar" className="w-full h-full object-cover" />
+          </div>
+          <div className="bg-white/20 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/20">
+            <span className="text-xs font-black text-white">{cat.name}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <div className="bg-white/20 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/20 flex items-center gap-2">
+            <Coins size={14} className="text-primary" />
+            <span className="text-xs font-black text-white">{points}</span>
+          </div>
+          <button onClick={() => navigate("/settings")} className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center text-white">
+            <Plus size={20} />
+          </button>
+        </div>
       </div>
 
       {/* 积分奖励提示 */}
@@ -186,10 +202,10 @@ export default function Home() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-12 left-1/2 -translate-x-1/2 z-50 bg-primary text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2"
+            className="absolute top-28 left-1/2 -translate-x-1/2 z-50 bg-primary text-white px-6 py-2 rounded-full shadow-2xl flex items-center gap-2"
           >
             <Coins size={16} />
-            <span className="text-xs font-bold">{showPointToast}</span>
+            <span className="text-sm font-black">{showPointToast}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -198,57 +214,62 @@ export default function Home() {
       <AnimatePresence>
         {greeting && (
           <motion.div 
-            initial={{ opacity: 0, y: 20, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            initial={{ opacity: 0, x: -20, scale: 0.8 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute top-24 left-8 z-20 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl rounded-bl-none shadow-lg border border-white/20"
+            className="absolute top-32 left-8 z-20 bg-white/90 backdrop-blur-md px-5 py-3 rounded-3xl rounded-bl-none shadow-xl border border-white/20"
           >
-            <p className="text-sm font-bold text-primary">{greeting}</p>
+            <p className="text-sm font-black text-on-primary-container">{greeting}</p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 顶部积分显示 */}
-      <div className="absolute top-12 right-6 z-20">
-        <div className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
-          <Coins size={14} className="text-primary" />
-          <span className="text-xs font-bold text-white">{points}</span>
-        </div>
+      {/* 右侧操作栏 */}
+      <div className="absolute right-6 bottom-40 flex flex-col gap-6 z-20">
+        <button 
+          onClick={() => setIsLiked(!isLiked)}
+          className="flex flex-col items-center gap-1 group"
+        >
+          <div className={`w-14 h-14 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/20 transition-all ${isLiked ? 'bg-red-500 text-white border-red-500' : 'bg-white/10 text-white'}`}>
+            <Heart size={28} fill={isLiked ? "currentColor" : "none"} />
+          </div>
+          <span className="text-[10px] text-white font-black drop-shadow-md">1.2k</span>
+        </button>
+        
+        <button className="flex flex-col items-center gap-1">
+          <div className="w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/20">
+            <MessageCircle size={28} />
+          </div>
+          <span className="text-[10px] text-white font-black drop-shadow-md">86</span>
+        </button>
+
+        <button className="flex flex-col items-center gap-1">
+          <div className="w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/20">
+            <Share2 size={28} />
+          </div>
+          <span className="text-[10px] text-white font-black drop-shadow-md">分享</span>
+        </button>
       </div>
 
       {/* 底部信息 */}
-      <div className="absolute bottom-32 left-6 right-6 text-white z-20 pointer-events-none">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="px-3 py-1 bg-primary/80 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest">
+      <div className="absolute bottom-32 left-6 right-24 text-white z-20 pointer-events-none">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="px-4 py-1 bg-primary/90 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest">
             {cat.breed}
           </span>
           {cat.source === 'uploaded' && (
-            <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+            <span className="px-4 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
               <Sparkles size={10} /> AI 生成
             </span>
           )}
         </div>
-        <h1 className="text-4xl font-black tracking-tight mb-1">{cat.name}</h1>
-        <p className="text-sm opacity-80 font-medium">今天也是元气满满的一天喵~</p>
+        <h1 className="text-4xl font-black tracking-tight mb-2 drop-shadow-lg">{cat.name}</h1>
+        <p className="text-base opacity-90 font-bold drop-shadow-md leading-relaxed">
+          今天也是元气满满的一天喵~ 快来和我一起玩耍吧！✨
+        </p>
       </div>
 
-      {/* 右侧操作栏 */}
-      <div className="absolute right-6 bottom-48 flex flex-col gap-6 z-20">
-        <button className="flex flex-col items-center gap-1">
-          <div className="w-12 h-12 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/20">
-            <Heart size={24} />
-          </div>
-          <span className="text-[10px] text-white font-bold">1.2k</span>
-        </button>
-        <button className="flex flex-col items-center gap-1">
-          <div className="w-12 h-12 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/20">
-            <MessageCircle size={24} />
-          </div>
-          <span className="text-[10px] text-white font-bold">互动</span>
-        </button>
-      </div>
-
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60 pointer-events-none z-10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 pointer-events-none z-10" />
     </div>
   );
 }

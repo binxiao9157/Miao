@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { BookOpen, Mail, Home, Star, User } from "lucide-react";
+import { motion } from "motion/react";
 
 export default function MainLayout() {
   const navigate = useNavigate();
@@ -15,11 +16,11 @@ export default function MainLayout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-grow pb-24">
+      <main className="flex-grow pb-28">
         <Outlet />
       </main>
       
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-white/90 backdrop-blur-lg rounded-full shadow-2xl flex justify-around items-center px-2 py-2 z-50">
+      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/80 backdrop-blur-xl rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex justify-around items-center px-4 py-3 z-50 border border-white/50">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
@@ -29,12 +30,21 @@ export default function MainLayout() {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className={`flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all ${
-                  isActive ? "bg-primary text-white" : "text-on-surface-variant hover:bg-primary/10"
-                }`}
+                className="relative flex flex-col items-center justify-center w-14 h-14 -mt-10"
               >
-                <Icon size={24} />
-                <span className="text-[10px] font-bold mt-0.5">{item.label}</span>
+                <div className={`absolute inset-0 rounded-full shadow-lg transition-all duration-300 ${
+                  isActive ? "bg-primary scale-110 rotate-12" : "bg-primary/80"
+                }`}></div>
+                <div className="relative z-10 text-white flex flex-col items-center">
+                  <Icon size={24} strokeWidth={2.5} />
+                  <span className="text-[8px] font-black mt-0.5 uppercase tracking-tighter">{item.label}</span>
+                </div>
+                {isActive && (
+                  <motion.div 
+                    layoutId="nav-glow"
+                    className="absolute -inset-2 bg-primary/20 rounded-full blur-xl -z-10"
+                  />
+                )}
               </button>
             );
           }
@@ -43,12 +53,20 @@ export default function MainLayout() {
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center justify-center p-2 rounded-full transition-all ${
-                isActive ? "text-primary" : "text-on-surface-variant opacity-70 hover:opacity-100"
+              className={`relative flex flex-col items-center justify-center p-2 transition-all duration-300 ${
+                isActive ? "text-primary scale-110" : "text-on-surface-variant opacity-40 hover:opacity-100"
               }`}
             >
-              <Icon size={20} />
-              <span className="text-[10px] font-medium mt-1">{item.label}</span>
+              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+              <span className={`text-[9px] mt-1 font-black uppercase tracking-tighter ${isActive ? "opacity-100" : "opacity-0"}`}>
+                {item.label}
+              </span>
+              {isActive && (
+                <motion.div 
+                  layoutId="nav-dot"
+                  className="absolute -bottom-1 w-1 h-1 bg-primary rounded-full"
+                />
+              )}
             </button>
           );
         })}

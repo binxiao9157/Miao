@@ -3,20 +3,49 @@
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   
-  --color-background: #fff8f4;
-  --color-primary: #8b4f22;
-  --color-primary-container: #e69b67;
-  --color-on-primary-container: #ffffff;
-  --color-surface-container-low: #fcf2eb;
-  --color-on-surface: #1f1b17;
-  --color-on-surface-variant: #52443b;
-  --color-outline-variant: #d8c2b6;
-  --color-outline: #857469;
+  --color-primary: #E89F71;
+  --color-primary-container: #FDF2E9;
+  --color-on-primary-container: #633E1D;
+  --color-background: #FFF9F5;
+  --color-surface: #FFFFFF;
+  --color-surface-container: #FEF6F0;
+  --color-surface-container-low: #FFFBF8;
+  --color-on-surface: #633E1D;
+  --color-on-surface-variant: #8E8E8E;
+  --color-outline: #E5D5C8;
+  --color-outline-variant: #F2E6DD;
+  
+  --radius-3xl: 24px;
+  --radius-4xl: 32px;
+  --radius-5xl: 40px;
 }
 
 @layer base {
   body {
     @apply bg-background text-on-surface font-sans;
     -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .miao-card {
+    @apply bg-surface rounded-4xl shadow-sm border border-outline-variant/50 p-6;
+  }
+  
+  .miao-input {
+    @apply w-full px-6 py-4 bg-surface-container rounded-full border-none outline-none text-on-surface placeholder:text-on-surface-variant/50 transition-all focus:ring-2 focus:ring-primary/20;
+  }
+  
+  .miao-btn-primary {
+    @apply w-full py-4 bg-primary text-white rounded-full font-bold text-lg shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2;
+  }
+  
+  .miao-btn-secondary {
+    @apply w-full py-4 bg-transparent text-on-surface rounded-full font-bold text-lg border border-outline active:scale-95 transition-all flex items-center justify-center gap-2;
+  }
+
+  .dot-pattern {
+    background-image: radial-gradient(circle, #E5D5C8 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 }

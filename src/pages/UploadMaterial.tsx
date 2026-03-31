@@ -10,6 +10,11 @@ export default function UploadMaterial() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
 
+  const playMeow = () => {
+    const audio = new Audio("https://www.myinstants.com/media/sounds/meow.mp3");
+    audio.play().catch(e => console.error("Audio play failed", e));
+  };
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -39,6 +44,7 @@ export default function UploadMaterial() {
         source: 'uploaded'
       });
       
+      playMeow();
       setTimeout(() => {
         setIsAnalyzing(false);
         navigate("/");

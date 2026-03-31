@@ -2,12 +2,18 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Trash2, ChevronRight, ShieldCheck } from "lucide-react";
 import { storage } from "../services/storage";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 
 export default function PrivacySettings() {
   const navigate = useNavigate();
   const [cacheSize, setCacheSize] = useState("124.8 MB");
   const [isClearing, setIsClearing] = useState(false);
+  const [showToast, setShowToast] = useState<string | null>(null);
+
+  const triggerToast = (msg: string) => {
+    setShowToast(msg);
+    setTimeout(() => setShowToast(null), 3000);
+  };
 
   const handleClearCache = () => {
     setIsClearing(true);
@@ -16,12 +22,24 @@ export default function PrivacySettings() {
       storage.clearMediaCache();
       setCacheSize("0 KB");
       setIsClearing(false);
-      alert("缓存已清除喵～");
+      triggerToast("缓存已清除喵～");
     }, 1500);
   };
 
   return (
     <div className="min-h-screen bg-background">
+      <AnimatePresence>
+        {showToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-primary text-white px-6 py-3 rounded-full shadow-2xl font-bold text-sm"
+          >
+            {showToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-md px-6 py-4 flex items-center border-b border-outline-variant/30">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant">
           <ArrowLeft size={24} />
