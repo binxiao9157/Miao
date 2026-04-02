@@ -27,9 +27,9 @@ export default function Login() {
     <div className="min-h-screen flex flex-col items-center justify-between p-8 bg-background dot-pattern">
       <div className="w-full flex flex-col items-center pt-8">
         {/* Logo Section */}
-        <div className="flex items-center gap-3 mb-10">
-          <PawPrint size={36} className="text-on-surface" fill="currentColor" />
-          <span className="text-4xl font-black text-on-surface tracking-tighter">Miao</span>
+        <div className="flex items-center gap-3 mb-10 group">
+          <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={36} />
+          <span className="text-4xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter">Miao</span>
         </div>
         
         {/* Title Section */}

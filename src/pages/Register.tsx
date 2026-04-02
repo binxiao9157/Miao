@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { ArrowLeft, User, Lock, ShieldCheck } from "lucide-react";
+import { ArrowLeft, User, Lock, ShieldCheck, PawPrint } from "lucide-react";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -45,7 +45,10 @@ export default function Register() {
           <ArrowLeft size={20} />
         </button>
         
-        <h1 className="text-4xl font-black text-on-surface mb-2 tracking-tight">加入 <span className="text-primary">Miao</span></h1>
+        <div className="flex items-center gap-2 mb-8 group">
+          <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={32} />
+          <h1 className="text-4xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">加入 Miao</h1>
+        </div>
         <p className="text-on-surface-variant text-sm opacity-60 leading-relaxed">开启您与宠物的精致陪伴之旅，记录每一个温暖瞬间。</p>
       </header>
 

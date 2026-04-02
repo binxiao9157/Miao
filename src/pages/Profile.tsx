@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2 } from "lucide-react";
+import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, PawPrint } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { storage } from "../services/storage";
 import { useState, useEffect } from "react";
@@ -51,9 +51,9 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-background p-6 pb-24 flex flex-col">
       <header className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-2">
-          <img src="/assets/images/logo_paw.png" alt="Logo" className="w-8 h-8 object-contain" />
-          <h1 className="text-2xl font-bold text-primary">Miao</h1>
+        <div className="flex items-center gap-2 group">
+          <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={28} />
+          <h1 className="text-2xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">Miao</h1>
         </div>
         <button 
           onClick={() => navigate("/notifications")}

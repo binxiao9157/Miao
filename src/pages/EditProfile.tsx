@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Check, Image as ImageIcon, Camera as CameraIcon, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
@@ -22,7 +22,7 @@ export default function EditProfile() {
     }, 800);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
