@@ -12,25 +12,21 @@ export class FileManager {
    * @param taskId 任务 ID，作为文件名
    * @param catName 猫咪名字
    */
-  public static async downloadVideo(videoUrl: string, taskId: string, catName: string): Promise<string> {
+  public static async downloadVideo(videoUrl: string, taskId: string, catName: string, avatarUrl: string): Promise<string> {
     let finalUrl = videoUrl;
     try {
       // 1. 尝试发起请求获取视频二进制数据 (可能会因为 CORS 失败)
-      const response = await axios.get(videoUrl, {
+      await axios.get(videoUrl, {
         responseType: 'blob',
         timeout: 10000, // 设置超时
-        onDownloadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
-          console.log(`正在下载视频: ${percentCompleted}%`);
-        }
       });
 
-      // 2. 创建本地 Blob URL
-      const blob = new Blob([response.data], { type: 'video/mp4' });
-      finalUrl = URL.createObjectURL(blob);
+      // 2. 在 Web 环境下，Blob URL 在页面刷新后会失效
+      // 因此我们不应该将其作为持久化路径保存。
+      // 我们直接使用原始的远程地址作为 videoPath。
+      finalUrl = videoUrl;
     } catch (error) {
       console.warn('下载视频到本地失败 (可能是跨域限制)，将直接使用远程地址:', error);
-      // 失败时保持使用原始 videoUrl
       finalUrl = videoUrl;
     }
 
@@ -40,9 +36,10 @@ export class FileManager {
       name: catName,
       breed: 'AI 生成',
       color: '未知',
-      avatar: finalUrl, // 使用最终确定的 URL
+      avatar: avatarUrl, // 使用原始图片作为头像
       source: 'uploaded',
       videoPath: finalUrl,
+      remoteVideoUrl: videoUrl, // 记录原始远程地址作为备份
     };
 
     storage.saveCatInfo(newCat);

@@ -28,11 +28,13 @@ export interface CatInfo {
   avatar: string;
   source: 'created' | 'uploaded';
   videoPath?: string; // 视频本地路径
+  remoteVideoUrl?: string; // 视频远程路径 (Fallback)
 }
 
 export interface AppSettings {
   greetingsEnabled: boolean;
   pushNotifications: boolean;
+  timeLetterReminder: boolean;
 }
 
 export interface DiaryEntry {
@@ -175,7 +177,8 @@ export const storage = {
   getSettings: (): AppSettings => {
     return storage.safeParse<AppSettings>(STORAGE_KEYS.SETTINGS, { 
       greetingsEnabled: true, 
-      pushNotifications: true 
+      pushNotifications: true,
+      timeLetterReminder: true
     });
   },
 
@@ -201,5 +204,10 @@ export const storage = {
     const diaries = storage.getDiaries();
     const cleaned = diaries.map(d => ({ ...d, media: undefined }));
     storage.saveDiaries(cleaned);
+  },
+
+  deleteCat: () => {
+    localStorage.removeItem(STORAGE_KEYS.CAT_LIST);
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_CAT_ID);
   }
 };

@@ -2,19 +2,28 @@ import { storage, CatInfo } from './storage';
 
 export const catService = {
   breeds: [
-    { id: 'british_shorthair', name: '英国短毛猫', image: 'https://picsum.photos/seed/cat_breed_1/200/200' },
-    { id: 'ragdoll', name: '布偶猫', image: 'https://picsum.photos/seed/cat_breed_2/200/200' },
-    { id: 'siamese', name: '暹罗猫', image: 'https://picsum.photos/seed/cat_breed_3/200/200' },
-    { id: 'maine_coon', name: '缅因猫', image: 'https://picsum.photos/seed/cat_breed_4/200/200' },
+    { id: 'british_shorthair', name: '英国短毛猫', prompt: 'British Shorthair cat', image: 'https://picsum.photos/seed/cat_breed_1/400/400' },
+    { id: 'ragdoll', name: '布偶猫', prompt: 'Ragdoll cat', image: 'https://picsum.photos/seed/cat_breed_2/400/400' },
+    { id: 'siamese', name: '暹罗猫', prompt: 'Siamese cat', image: 'https://picsum.photos/seed/cat_breed_3/400/400' },
+    { id: 'maine_coon', name: '缅因猫', prompt: 'Maine Coon cat', image: 'https://picsum.photos/seed/cat_breed_4/400/400' },
   ],
   
   colors: [
-    { id: 'white', name: '纯白', hex: '#FFFFFF' },
-    { id: 'black', name: '纯黑', hex: '#000000' },
-    { id: 'orange', name: '橘色', hex: '#FFA500' },
-    { id: 'gray', name: '灰色', hex: '#808080' },
-    { id: 'calico', name: '三花', hex: 'linear-gradient(45deg, #FFA500, #000000, #FFFFFF)' },
+    { id: 'white', name: '白色', prompt: 'white', hex: '#FFFFFF' },
+    { id: 'black', name: '黑色', prompt: 'black', hex: '#000000' },
+    { id: 'orange', name: '橘色', prompt: 'orange', hex: '#FFA500' },
+    { id: 'gray', name: '灰色', prompt: 'gray', hex: '#808080' },
+    { id: 'calico', name: '三花', prompt: 'calico', hex: 'linear-gradient(45deg, #FFA500, #000000, #FFFFFF)' },
   ],
+
+  getPrompt: (breedId: string, colorId: string) => {
+    const breed = catService.breeds.find(b => b.id === breedId);
+    const color = catService.colors.find(c => c.id === colorId);
+    
+    if (!breed || !color) return "A cute cat";
+    
+    return `A fluffy ${color.prompt} ${breed.prompt}, blue eyes, high detail, in a cozy cat nest, cinematic lighting, 4k`;
+  },
 
   saveCat: (info: CatInfo) => {
     storage.saveCatInfo(info);

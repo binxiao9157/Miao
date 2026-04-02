@@ -5,8 +5,15 @@ import axios from 'axios';
  * 火山引擎配置中心 (方舟 Ark 平台)
  */
 export const VolcanoConfig = {
-  ApiKey: '46527621-b924-40e6-b6cf-4d457669f7a8',
-  ModelId: 'doubao-seedance-1-5-pro-251215',
+  // 开启 API 调用
+  MOCK_MODE: false, 
+  
+  // 凭证信息 (从环境变量读取)
+  AccessKey: import.meta.env.VITE_VOLC_ACCESS_KEY,
+  SecretKey: import.meta.env.VITE_VOLC_SECRET_KEY,
+  
+  ApiKey: import.meta.env.VITE_VOLC_API_KEY,
+  ModelId: import.meta.env.VITE_VOLC_MODEL_ID || 'doubao-seedance-1-5-pro-251215',
   BaseUrl: 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
 };
 
@@ -18,35 +25,22 @@ export class VolcanoService {
    * 提交视频生成任务 (SubmitTask)
    */
   public static async submitTask(imageBase64: string) {
-    const body = {
-      model: VolcanoConfig.ModelId,
-      content: [
-        {
-          type: "image_url",
-          image_url: {
-            url: imageBase64,
-          },
-        },
-        {
-          type: "text",
-          text: "A high quality video of this cat, cinematic lighting, realistic.",
-        },
-      ],
-    };
+    if (VolcanoConfig.MOCK_MODE) {
+      console.log("MOCK: 提交视频生成任务", imageBase64.substring(0, 50) + "...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return { id: 'mock_task_' + Date.now() };
+    }
 
     try {
-      const response = await axios.post(VolcanoConfig.BaseUrl, body, {
-        headers: {
-          'Authorization': `Bearer ${VolcanoConfig.ApiKey}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await axios.post("/api/generate-video", {
+        prompt: "A high quality video of this cat, cinematic lighting, realistic.",
+        image_base64: imageBase64,
       });
       return response.data;
     } catch (error: any) {
       if (error.response) {
-        // 打印详细的错误信息，帮助诊断 400 错误
-        console.error("火山引擎提交失败详情:", error.response.data);
-        throw new Error(`提交失败 (${error.response.status}): ${JSON.stringify(error.response.data)}`);
+        console.error("提交失败详情:", error.response.data);
+        throw new Error(error.response.data.error || `提交失败 (${error.response.status})`);
       }
       throw error;
     }
@@ -56,19 +50,29 @@ export class VolcanoService {
    * 查询任务结果 (GetTaskResult)
    */
   public static async getTaskResult(taskId: string) {
-    const url = `${VolcanoConfig.BaseUrl}/${taskId}`;
+    if (VolcanoConfig.MOCK_MODE) {
+      console.log("MOCK: 查询任务状态", taskId);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const progress = Math.random();
+      if (progress > 0.8) {
+        return {
+          status: 'succeeded',
+          content: {
+            video_url: 'https://www.w3schools.com/html/mov_bbb.mp4'
+          }
+        };
+      }
+      return { status: 'running' };
+    }
 
     try {
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${VolcanoConfig.ApiKey}`,
-        },
-      });
+      const response = await axios.get(`/api/video-status/${taskId}`);
       return response.data;
     } catch (error: any) {
       if (error.response) {
-        console.error("火山引擎查询失败详情:", error.response.data);
-        throw new Error(`查询失败 (${error.response.status}): ${JSON.stringify(error.response.data)}`);
+        console.error("查询失败详情:", error.response.data);
+        throw new Error(error.response.data.error || `查询失败 (${error.response.status})`);
       }
       throw error;
     }
@@ -76,43 +80,64 @@ export class VolcanoService {
 
   /**
    * 轮询逻辑 (Polling Logic)
-   * 每隔 5 秒查询一次，直到成功或失败
+   * 每隔 5 秒查询一次，直到成功或失败，增加超时和中止支持
    */
-  public static async pollTaskResult(taskId: string, onProgress?: (status: string) => void): Promise<string> {
+  public static async pollTaskResult(
+    taskId: string, 
+    onProgress?: (status: string) => void,
+    signal?: AbortSignal,
+    maxWaitTimeMs: number = 300000 // 默认 5 分钟超时
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      
       const timer = setInterval(async () => {
+        // 检查是否已中止
+        if (signal?.aborted) {
+          clearInterval(timer);
+          reject(new Error("任务轮询已中止"));
+          return;
+        }
+
+        // 检查是否超时
+        if (Date.now() - startTime > maxWaitTimeMs) {
+          clearInterval(timer);
+          reject(new Error("任务轮询超时 (5分钟)"));
+          return;
+        }
+
         try {
           const result = await this.getTaskResult(taskId);
-          // 打印完整的任务结果，方便调试结构变化
           console.log("任务状态查询结果:", JSON.stringify(result));
 
-          // 方舟 API 状态字段通常在 status 中
           const status = result.status;
-          
           if (onProgress) onProgress(status);
 
           if (status === 'succeeded') {
             clearInterval(timer);
-            
-            // 兼容性处理：尝试从不同路径获取视频 URL
             const videoUrl = result.content?.video_url || result.output?.video_url || result.response?.video_url || result.video_url;
             
             if (videoUrl) {
-              console.log("获取到视频 URL:", videoUrl);
               resolve(videoUrl);
             } else {
-              console.error("任务成功但未找到视频 URL, 完整响应:", result);
               reject(new Error(`任务成功但未找到视频 URL。`));
             }
           } else if (status === 'failed' || status === 'cancelled') {
             clearInterval(timer);
             reject(new Error(`任务失败，状态: ${status}, 错误: ${JSON.stringify(result.error || result.message)}`));
           }
+          // 如果是 running, pending 等状态，继续轮询
         } catch (error) {
           clearInterval(timer);
           reject(error);
         }
       }, 5000);
+
+      // 监听中止信号
+      signal?.addEventListener('abort', () => {
+        clearInterval(timer);
+        reject(new Error("任务轮询已中止"));
+      });
     });
   }
 }

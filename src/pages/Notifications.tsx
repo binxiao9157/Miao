@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Bell, Sun } from "lucide-react";
+import { ArrowLeft, Bell, Sun, Mail } from "lucide-react";
 import { storage, AppSettings } from "../services/storage";
 
 export default function Notifications() {
@@ -15,6 +15,12 @@ export default function Notifications() {
 
   const togglePush = () => {
     const newSettings = { ...settings, pushNotifications: !settings.pushNotifications };
+    setSettings(newSettings);
+    storage.saveSettings(newSettings);
+  };
+
+  const toggleLetterReminder = () => {
+    const newSettings = { ...settings, timeLetterReminder: !settings.timeLetterReminder };
     setSettings(newSettings);
     storage.saveSettings(newSettings);
   };
@@ -50,7 +56,7 @@ export default function Notifications() {
 
           <div className="h-px bg-outline-variant opacity-30 mb-6"></div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-500">
                 <Sun size={20} />
@@ -65,6 +71,26 @@ export default function Notifications() {
               className={`w-12 h-6 rounded-full transition-colors relative ${settings.greetingsEnabled ? "bg-primary" : "bg-outline-variant"}`}
             >
               <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.greetingsEnabled ? "left-7" : "left-1"}`}></div>
+            </button>
+          </div>
+
+          <div className="h-px bg-outline-variant opacity-30 mb-6"></div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-500">
+                <Mail size={20} />
+              </div>
+              <div>
+                <p className="font-bold text-on-surface">时光信件解锁提醒</p>
+                <p className="text-[10px] text-on-surface-variant opacity-60">信件可解锁时第一时间通知您</p>
+              </div>
+            </div>
+            <button 
+              onClick={toggleLetterReminder}
+              className={`w-12 h-6 rounded-full transition-colors relative ${settings.timeLetterReminder ? "bg-primary" : "bg-outline-variant"}`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.timeLetterReminder ? "left-7" : "left-1"}`}></div>
             </button>
           </div>
         </section>

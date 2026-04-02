@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { VolcanoService } from "../services/volcanoService";
 import { FileManager } from "../services/fileManager";
+import { storage } from "../services/storage";
 
 export default function GenerationProgress() {
   const location = useLocation();
@@ -20,6 +21,8 @@ export default function GenerationProgress() {
       return;
     }
 
+    const abortController = new AbortController();
+
     const startGeneration = async () => {
       try {
         // 1. 提交任务
@@ -35,16 +38,20 @@ export default function GenerationProgress() {
         // 2. 轮询结果
         setStatus("猫咪数字化建模中...");
         setProgress(50);
-        const videoUrl = await VolcanoService.pollTaskResult(taskId, (pollingStatus) => {
-          if (pollingStatus === 'running') {
-            setStatus("AI 正在绘制视频帧...");
-          }
-        });
+        const videoUrl = await VolcanoService.pollTaskResult(
+          taskId, 
+          (pollingStatus) => {
+            if (pollingStatus === 'running') {
+              setStatus("AI 正在绘制视频帧...");
+            }
+          },
+          abortController.signal
+        );
 
         // 3. 下载视频
         setStatus("正在下载视频...");
         setProgress(80);
-        const localPath = await FileManager.downloadVideo(videoUrl, taskId, "我的 AI 猫咪");
+        const localPath = await FileManager.downloadVideo(videoUrl, taskId, "我的 AI 猫咪", image);
 
         // 4. 完成
         setStatus("生成成功！");
@@ -54,10 +61,14 @@ export default function GenerationProgress() {
         storage.setActiveCatId(taskId);
         
         setTimeout(() => {
-          navigate(`/cat-player/${taskId}`, { replace: true });
+          if (!abortController.signal.aborted) {
+            navigate("/", { replace: true });
+          }
         }, 1500);
 
       } catch (err: any) {
+        if (err.message === "任务轮询已中止") return;
+        
         console.error("生成过程出错:", err);
         const errorMessage = err.message || "生成失败，请稍后重试";
         setError(errorMessage);
@@ -65,6 +76,10 @@ export default function GenerationProgress() {
     };
 
     startGeneration();
+
+    return () => {
+      abortController.abort();
+    };
   }, [image, navigate]);
 
   return (

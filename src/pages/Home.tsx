@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, TouchEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, MessageCircle, Sparkles, Coins, Plus, Share2 } from "lucide-react";
-import { storage, CatInfo, PointsInfo } from "../services/storage";
+import { Heart, MessageCircle, Sparkles, Coins, Plus, Share2, RefreshCw, AlertTriangle, Loader2, AlertCircle } from "lucide-react";
+import { storage, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 
 const VIDEOS = {
@@ -20,21 +20,34 @@ export default function Home() {
   const [points, setPoints] = useState<number>(0);
   const [showPointToast, setShowPointToast] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false); // 控制视频层淡入
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false); // 确认弹窗状态
+  const [loadError, setLoadError] = useState(false); // 加载错误状态
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const onlineTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
-    const info = storage.getActiveCat();
-    setCat(info);
+    const refreshCat = () => {
+      const info = storage.getActiveCat();
+      setCat(info);
 
-    // 如果是 AI 生成的猫咪，默认播放其生成的视频
-    if (info && info.source === 'uploaded' && info.videoPath) {
-      setCurrentVideo(info.videoPath);
-    }
+      if (info) {
+        // 优先使用本地路径，如果没有则使用远程备份
+        const videoSource = (info.source === 'uploaded' || info.source === 'created') 
+          ? (info.videoPath || info.remoteVideoUrl || VIDEOS.DEFAULT)
+          : VIDEOS.DEFAULT;
+        
+        setCurrentVideo(videoSource);
+      }
+    };
 
-    // Points logic: Daily Login
+    refreshCat();
+
     const pointsInfo = storage.getPoints();
     const today = new Date().toLocaleDateString();
     
@@ -48,7 +61,6 @@ export default function Home() {
       setPoints(pointsInfo.total);
     }
 
-    // Greeting logic
     const settings = storage.getSettings();
     if (settings.greetingsEnabled) {
       const hour = new Date().getHours();
@@ -59,7 +71,6 @@ export default function Home() {
       }
     }
 
-    // Online time tracking
     onlineTimerRef.current = setInterval(() => {
       const p = storage.getPoints();
       const now = Date.now();
@@ -104,20 +115,51 @@ export default function Home() {
   };
 
   const playAction = (videoUrl: string) => {
-    setCurrentVideo(videoUrl);
+    if (currentVideo === videoUrl) {
+      // 如果已经在播放该视频，重置进度
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.play();
+      }
+    } else {
+      // 切换视频时不重置 isInitialized，避免闪烁
+      setCurrentVideo(videoUrl);
+    }
     handleInteraction();
+  };
+
+  const handleRegenerate = () => {
     if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play();
+      videoRef.current.pause();
+      videoRef.current.src = "";
+    }
+    storage.deleteCat(); // 清除存储中的猫咪
+    setCat(null);
+    setShowRegenerateConfirm(false);
+    navigate('/welcome', { replace: true });
+  };
+
+  const handleVideoError = (e: any) => {
+    console.error("Video load error:", e);
+    setLoadError(true);
+    setIsInitialized(true);
+  };
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current && videoRef.current.currentTime > 0.1 && !isVideoReady) {
+      setIsVideoReady(true);
     }
   };
 
   const handleVideoEnd = () => {
-    const defaultSource = (cat?.source === 'uploaded' && cat.videoPath) ? cat.videoPath : VIDEOS.DEFAULT;
+    const defaultSource = cat?.videoPath || cat?.remoteVideoUrl || VIDEOS.DEFAULT;
     if (currentVideo !== defaultSource) {
       setCurrentVideo(defaultSource);
     }
   };
+
+  const interactionVideos = [VIDEOS.PETTING, VIDEOS.WAKEUP, VIDEOS.PLAYING, VIDEOS.EATING];
+  const shouldLoop = !interactionVideos.includes(currentVideo);
 
   const handleLongPressStart = () => {
     longPressTimer.current = setTimeout(() => {
@@ -129,6 +171,44 @@ export default function Home() {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
     }
+  };
+
+  const handleTouchStart = (e: TouchEvent) => {
+    touchStartPos.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    };
+    handleLongPressStart();
+  };
+
+  const handleTouchEnd = (e: TouchEvent) => {
+    handleLongPressEnd();
+    if (!touchStartPos.current) return;
+
+    const touchEndPos = {
+      x: e.changedTouches[0].clientX,
+      y: e.changedTouches[0].clientY
+    };
+
+    const dx = touchEndPos.x - touchStartPos.current.x;
+    const dy = touchEndPos.y - touchStartPos.current.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance > 50) {
+      // Swipe detected
+      playAction(VIDEOS.EATING);
+    }
+    
+    touchStartPos.current = null;
+  };
+
+  const handleResetCat = () => {
+    const list = storage.getCatList();
+    const activeId = storage.getActiveCatId();
+    const updated = list.filter(c => c.id !== activeId);
+    storage.saveCatList(updated);
+    storage.setActiveCatId(updated[0]?.id || "");
+    navigate("/upload-material");
   };
 
   if (!cat || !cat.name) {
@@ -151,39 +231,117 @@ export default function Home() {
 
   return (
     <div className="flex-grow relative overflow-hidden bg-black">
-      {/* 视频播放器区域 */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      {/* 视频播放器区域 - 采用 Stack 堆叠布局实现无缝切换 */}
+      <div className="absolute inset-0 flex items-center justify-center bg-[#F8F9FA] overflow-hidden">
+        {/* 底层：动态占位图 (基于 CatModel 属性，优先使用 avatar) */}
+        <img 
+          src={cat?.avatar || `https://picsum.photos/seed/${cat?.breed}-${cat?.color}/1080/1920`} 
+          alt="" 
+          className="absolute inset-0 w-full h-full object-cover z-0"
+          referrerPolicy="no-referrer"
+        />
+
+        {/* 上层：原生视频控件 - 增加淡入动画 */}
         <video
           ref={videoRef}
           src={currentVideo}
           autoPlay
           muted
-          loop={currentVideo === (cat?.source === 'uploaded' ? cat.videoPath : VIDEOS.DEFAULT)}
-          onEnded={handleVideoEnd}
-          className="w-full h-full object-cover"
           playsInline
+          preload="auto"
+          onTimeUpdate={handleTimeUpdate}
+          // 仅在默认动作时开启原生循环
+          loop={shouldLoop}
+          onEnded={handleVideoEnd}
+          onError={handleVideoError}
+          onLoadedData={() => {
+            setIsInitialized(true);
+          }}
+          onPlaying={() => {
+            setIsInitialized(true);
+            setIsBuffering(false);
+            setIsVideoReady(true); // 确保视频开始播放时显示
+          }}
+          onWaiting={() => setIsBuffering(true)}
+          className={`absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
         />
         
+        {/* 初始加载状态 */}
+        {!isInitialized && !loadError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-md z-20">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="w-10 h-10 text-primary animate-spin" />
+              <span className="text-xs text-primary/60 font-medium">正在唤醒小猫...</span>
+            </div>
+          </div>
+        )}
+
+        {/* 错误状态处理 */}
+        {loadError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-md z-40 p-6 text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">小猫迷路了</h3>
+              <p className="text-sm text-gray-500">视频文件加载失败，可能已被移动或删除。</p>
+              <button 
+                onClick={handleRegenerate}
+                className="px-6 py-2 bg-primary text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform"
+              >
+                重新领养
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 交互层 */}
-        <motion.div 
-          className="absolute inset-0 z-10"
-          onClick={(e) => {
-            if (e.detail === 1) {
-              playAction(VIDEOS.PETTING);
-            } else if (e.detail === 2) {
-              playAction(VIDEOS.PLAYING);
-            }
-          }}
-          onPointerDown={handleLongPressStart}
-          onPointerUp={handleLongPressEnd}
+        <div 
+          className="absolute inset-0 z-30 cursor-pointer"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onContextMenu={(e) => e.preventDefault()}
         />
       </div>
 
+      {/* 重新生成确认弹窗 */}
+      {showRegenerateConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl p-8 w-full max-w-xs shadow-2xl text-center"
+          >
+            <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <RefreshCw className="w-8 h-8 text-orange-500" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">重新领养？</h3>
+            <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+              确定要送走当前的小猫并重新领养一只吗？这会清除当前的猫咪形象。
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={handleRegenerate}
+                className="w-full py-3 bg-red-500 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-transform"
+              >
+                确定送走
+              </button>
+              <button 
+                onClick={() => setShowRegenerateConfirm(false)}
+                className="w-full py-3 bg-gray-100 text-gray-600 rounded-2xl font-bold active:scale-95 transition-transform"
+              >
+                再留一会儿
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* 顶部状态栏 */}
-      <div className="absolute top-12 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
+      <div className="absolute top-12 left-6 right-6 z-50 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto">
           <div className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center text-white overflow-hidden">
-            <img src={cat.avatar || "https://picsum.photos/seed/cat-avatar/100/100"} alt="Avatar" className="w-full h-full object-cover" />
+            <img src={cat.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
           <div className="bg-white/20 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/20">
             <span className="text-xs font-black text-white">{cat.name}</span>
@@ -195,6 +353,15 @@ export default function Home() {
             <Coins size={14} className="text-primary" />
             <span className="text-xs font-black text-white">{points}</span>
           </div>
+          
+          {/* 重新生成按钮 */}
+          <button 
+            onClick={() => setShowRegenerateConfirm(true)}
+            className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform pointer-events-auto"
+          >
+            <RefreshCw size={18} />
+          </button>
+
           <button onClick={() => navigate("/settings")} className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center text-white">
             <Plus size={20} />
           </button>
@@ -260,12 +427,9 @@ export default function Home() {
       {/* 底部信息 */}
       <div className="absolute bottom-32 left-6 right-24 text-white z-20 pointer-events-none">
         <div className="flex items-center gap-2 mb-3">
-          <span className="px-4 py-1 bg-primary/90 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest">
-            {cat.breed}
-          </span>
-          {cat.source === 'uploaded' && (
-            <span className="px-4 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-              <Sparkles size={10} /> AI 生成
+          {cat.breed !== 'AI 生成' && (
+            <span className="px-4 py-1 bg-primary/90 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest">
+              {cat.breed}
             </span>
           )}
         </div>
@@ -274,6 +438,7 @@ export default function Home() {
           今天也是元气满满的一天喵~ 快来和我一起玩耍吧！✨
         </p>
       </div>
+
 
       <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 pointer-events-none z-10" />
     </div>

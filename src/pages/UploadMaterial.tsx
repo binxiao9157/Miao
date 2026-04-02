@@ -1,18 +1,18 @@
 import { useState, useRef, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload, Image as ImageIcon, Sparkles, X } from "lucide-react";
-import { catService } from "../services/catService";
+import { ArrowLeft, Upload, Sparkles, X, Pencil } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 
 export default function UploadMaterial() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [nickname, setNickname] = useState("");
+  const [showToast, setShowToast] = useState<string | null>(null);
 
-  const playMeow = () => {
-    const audio = new Audio("https://www.myinstants.com/media/sounds/meow.mp3");
-    audio.play().catch(e => console.error("Audio play failed", e));
+  const triggerToast = (msg: string) => {
+    setShowToast(msg);
+    setTimeout(() => setShowToast(null), 2000);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -20,98 +20,139 @@ export default function UploadMaterial() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setSelectedImage(reader.result as string);
+        const dataUrl = reader.result as string;
+        
+        const img = new Image();
+        img.onload = () => {
+          if (img.width < 300) {
+            triggerToast("图片宽度至少需 300 像素哦～");
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+          }
+          setSelectedImage(dataUrl);
+        };
+        img.src = dataUrl;
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleAnalyze = async () => {
-    if (!selectedImage) return;
+  const handleGenerate = () => {
+    if (!selectedImage || !nickname.trim()) {
+      triggerToast("请输入猫咪名字并上传照片哦～");
+      return;
+    }
     
-    // 跳转到生成进度页，并传递图片数据
-    navigate("/generation-progress", { state: { image: selectedImage } });
+    // 跳转到生成进度页，并传递图片和昵称数据
+    navigate("/generation-progress", { state: { image: selectedImage, name: nickname } });
   };
 
+  const isReady = selectedImage && nickname.trim();
+
   return (
-    <div className="min-h-screen bg-background p-6 flex flex-col">
-      <header className="flex items-center mb-8">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant">
+    <div className="min-h-screen bg-[#F8F9FA] p-6 flex flex-col font-sans" onClick={() => (document.activeElement as HTMLElement)?.blur()}>
+      <header className="flex items-center mb-10">
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant active:scale-90 transition-transform">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold text-on-surface ml-2">上传猫咪素材</h1>
+        <h1 className="text-xl font-black text-on-surface ml-2">上传素材</h1>
       </header>
 
-      <div className="flex-grow flex flex-col">
-        <section className="mb-8">
-          <h2 className="text-2xl font-extrabold text-primary mb-2">AI 形象生成</h2>
-          <p className="text-on-surface-variant text-sm opacity-70">上传一张您家猫咪的照片，AI 将为您生成专属的数字形象。</p>
+      <div className="flex-grow flex flex-col max-w-md mx-auto w-full">
+        <section className="mb-10">
+          <h2 className="text-3xl font-black text-on-surface mb-2 tracking-tight">AI 形象生成</h2>
+          <p className="text-on-surface-variant text-sm font-bold opacity-40 uppercase tracking-widest">AI Image Generation</p>
+          <p className="text-on-surface-variant text-sm mt-3 leading-relaxed">上传一张您家猫咪的照片，AI 将为您生成专属的数字形象。</p>
         </section>
 
-        <div className="flex-grow flex flex-col items-center justify-center">
-          {selectedImage ? (
-            <div className="relative w-full aspect-square rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
-              <img src={selectedImage} alt="Selected" className="w-full h-full object-cover" />
-              <button 
-                onClick={() => setSelectedImage(null)}
-                className="absolute top-4 right-4 w-10 h-10 bg-black/50 backdrop-blur-md text-white rounded-full flex items-center justify-center"
+        <div className="flex-grow flex flex-col items-center justify-start space-y-8">
+          {/* 图片预览区 */}
+          <div className="w-full aspect-square relative">
+            {selectedImage ? (
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="w-full h-full rounded-[40px] overflow-hidden shadow-2xl border-4 border-white relative"
               >
-                <X size={20} />
-              </button>
-              {isAnalyzing && (
-                <div className="absolute inset-0 bg-primary/20 backdrop-blur-[2px] flex flex-col items-center justify-center">
-                  <div className="relative">
-                    <div className="w-20 h-20 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white animate-pulse" size={32} />
-                  </div>
-                  <p className="mt-6 text-white font-bold tracking-widest animate-bounce">AI 正在深度分析中...</p>
+                <img src={selectedImage} alt="Selected" className="w-full h-full object-cover" />
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedImage(null);
+                  }}
+                  className="absolute top-4 right-4 w-10 h-10 bg-black/40 backdrop-blur-md text-white rounded-full flex items-center justify-center active:scale-90 transition-transform"
+                >
+                  <X size={20} />
+                </button>
+              </motion.div>
+            ) : (
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-full rounded-[40px] border-4 border-dashed border-outline-variant/30 bg-white flex flex-col items-center justify-center gap-4 active:scale-[0.98] transition-all group"
+              >
+                <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                  <Upload size={32} />
                 </div>
-              )}
-            </div>
-          ) : (
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full aspect-square rounded-3xl border-4 border-dashed border-outline-variant bg-white flex flex-col items-center justify-center gap-4 active:scale-[0.98] transition-transform"
-            >
-              <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center text-primary">
-                <Upload size={32} />
-              </div>
-              <div className="text-center">
-                <p className="font-bold text-on-surface">点击上传照片</p>
-                <p className="text-xs text-on-surface-variant opacity-60 mt-1">支持 JPG, PNG 格式</p>
-              </div>
-            </button>
-          )}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept="image/*" 
-            className="hidden" 
-          />
-        </div>
-
-        <div className="mt-10 space-y-4">
-          <div className="flex items-center gap-3 p-4 bg-surface-container-low rounded-2xl">
-            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <ImageIcon size={20} />
-            </div>
-            <div className="flex-grow">
-              <p className="text-xs font-bold text-on-surface">火山引擎 API 支持</p>
-              <p className="text-[10px] text-on-surface-variant">精准识别品种、毛色及神态特征</p>
-            </div>
+                <div className="text-center">
+                  <p className="font-black text-on-surface">点击上传照片</p>
+                  <p className="text-[10px] font-bold text-on-surface-variant opacity-40 mt-1 uppercase tracking-widest">JPG, PNG Support</p>
+                </div>
+              </button>
+            )}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              accept="image/*" 
+              className="hidden" 
+            />
           </div>
 
+          {/* 昵称输入框 */}
+          <div className="w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="relative group">
+              <div className="absolute left-5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 group-focus-within:text-primary transition-colors">
+                <Pencil size={18} />
+              </div>
+              <input 
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="给猫咪起个好听的名字"
+                className="w-full py-5 pl-14 pr-6 bg-white rounded-[24px] border-2 border-transparent focus:border-primary/20 focus:bg-white shadow-sm outline-none text-on-surface font-bold placeholder:text-on-surface-variant/30 transition-all"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12 pb-8">
           <button 
-            onClick={handleAnalyze}
-            disabled={!selectedImage || isAnalyzing}
-            className="w-full py-5 bg-primary-container text-white rounded-full font-bold text-lg shadow-2xl flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
+            onClick={handleGenerate}
+            className={`w-full py-5 rounded-full font-black text-lg shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 ${
+              isReady 
+                ? "bg-[#FF9D76] text-white shadow-[#FF9D76]/30" 
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
           >
             <Sparkles size={20} />
-            {isAnalyzing ? "正在生成..." : "开始生成数字形象"}
+            开始生成数字形象
           </button>
         </div>
       </div>
+
+      {/* 轻提示 Toast */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-50 bg-black/80 backdrop-blur-md text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-2xl"
+          >
+            {showToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

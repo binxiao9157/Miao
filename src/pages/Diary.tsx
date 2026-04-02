@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, ChangeEvent } from "react";
-import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal } from "lucide-react";
+import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles } from "lucide-react";
 import { storage, DiaryEntry } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function Diary() {
   const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
   const [isPosting, setIsPosting] = useState(false);
+  const [sharingEntry, setSharingEntry] = useState<DiaryEntry | null>(null);
   const [newContent, setNewContent] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
@@ -72,22 +73,7 @@ export default function Diary() {
   };
 
   const handleShare = (entry: DiaryEntry) => {
-    if (navigator.share) {
-      navigator.share({
-        title: 'Miao 日常记录',
-        text: entry.content,
-        url: window.location.href,
-      }).catch(console.error);
-    } else {
-      // Fallback for desktop or non-supporting browsers
-      const dummy = document.createElement('input');
-      document.body.appendChild(dummy);
-      dummy.value = window.location.href;
-      dummy.select();
-      document.execCommand('copy');
-      document.body.removeChild(dummy);
-      alert("链接已复制到剪贴板");
-    }
+    setSharingEntry(entry);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -215,61 +201,68 @@ export default function Diary() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-on-primary-container/40 backdrop-blur-md flex items-end justify-center p-4"
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end justify-center p-4 sm:p-6"
+            onClick={() => setIsPosting(false)}
           >
             <motion.div 
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="bg-background w-full max-w-lg rounded-[48px] p-8 pb-12 shadow-2xl"
+              className="bg-background w-full max-w-lg rounded-[40px] p-6 pb-10 shadow-2xl flex flex-col max-h-[90vh]"
+              onClick={e => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center mb-8">
+              <div className="flex justify-between items-center mb-6">
                 <div>
                   <h2 className="text-2xl font-black text-on-surface">记录此刻</h2>
                   <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Capture the moment</p>
                 </div>
-                <button onClick={() => setIsPosting(false)} className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant">
+                <button onClick={() => setIsPosting(false)} className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform">
                   <X size={20} />
                 </button>
               </div>
 
-              <textarea 
-                value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
-                placeholder="这一刻在想什么..."
-                className="w-full h-40 p-6 bg-surface-container rounded-[32px] border-none focus:ring-2 focus:ring-primary/20 outline-none resize-none mb-8 text-on-surface font-medium placeholder:text-on-surface-variant/40"
-              />
+              <div className="flex-grow overflow-y-auto custom-scrollbar pr-1">
+                <textarea 
+                  autoFocus
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                  placeholder="这一刻在想什么..."
+                  className="w-full h-40 p-5 bg-surface-container rounded-[28px] border-none focus:ring-2 focus:ring-primary/20 outline-none resize-none mb-6 text-on-surface font-medium placeholder:text-on-surface-variant/40"
+                />
 
-              {selectedMedia && (
-                <div className="relative w-28 h-28 rounded-3xl overflow-hidden mb-8 group shadow-lg">
-                  {selectedMedia.type === 'video' ? (
-                    <video src={selectedMedia.url} className="w-full h-full object-cover" />
-                  ) : (
-                    <img src={selectedMedia.url} className="w-full h-full object-cover" />
-                  )}
-                  <button 
-                    onClick={() => setSelectedMedia(null)}
-                    className="absolute top-2 right-2 w-6 h-6 bg-black/60 text-white rounded-full flex items-center justify-center"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
+                {selectedMedia && (
+                  <div className="relative w-32 h-32 rounded-3xl overflow-hidden mb-6 group shadow-lg">
+                    {selectedMedia.type === 'video' ? (
+                      <video src={selectedMedia.url} className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={selectedMedia.url} className="w-full h-full object-cover" />
+                    )}
+                    <button 
+                      onClick={() => setSelectedMedia(null)}
+                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center backdrop-blur-sm active:scale-90 transition-transform"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex gap-4">
+              <div className="flex items-center justify-between pt-4 border-t border-outline-variant/30">
+                <div className="flex gap-3">
                   <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-14 h-14 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
+                    className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
+                    title="上传图片"
                   >
-                    <ImageIcon size={28} />
+                    <ImageIcon size={24} />
                   </button>
                   <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-14 h-14 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
+                    className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
+                    title="上传视频"
                   >
-                    <Video size={28} />
+                    <Video size={24} />
                   </button>
                   <input 
                     type="file" 
@@ -282,11 +275,74 @@ export default function Diary() {
                 <button 
                   onClick={handlePost}
                   disabled={!newContent.trim() && !selectedMedia}
-                  className="miao-btn-primary !w-auto px-10 disabled:opacity-30 disabled:scale-100"
+                  className="miao-btn-primary !w-auto px-8 h-12 disabled:opacity-30 disabled:scale-100"
                 >
                   发布
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 微信分享菜单 */}
+      <AnimatePresence>
+        {sharingEntry && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-end justify-center p-4"
+            onClick={() => setSharingEntry(null)}
+          >
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              className="bg-background w-full max-w-lg rounded-[40px] p-8 pb-12 shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="text-center mb-10">
+                <h3 className="text-xl font-black text-on-surface">分享至微信</h3>
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Share to WeChat</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <button 
+                  onClick={() => {
+                    alert("正在检测微信安装状态...\n(模拟：已安装，正在分享至好友)");
+                    setSharingEntry(null);
+                  }}
+                  className="flex flex-col items-center gap-3 group"
+                >
+                  <div className="w-16 h-16 bg-[#07C160] rounded-3xl flex items-center justify-center text-white shadow-lg shadow-green-500/20 active:scale-90 transition-all">
+                    <MessageCircle size={32} fill="currentColor" />
+                  </div>
+                  <span className="text-sm font-bold text-on-surface">微信好友</span>
+                </button>
+
+                <button 
+                  onClick={() => {
+                    alert("正在检测微信安装状态...\n(模拟：已安装，正在分享至朋友圈)");
+                    setSharingEntry(null);
+                  }}
+                  className="flex flex-col items-center gap-3 group"
+                >
+                  <div className="w-16 h-16 bg-gradient-to-br from-[#07C160] to-[#00B050] rounded-3xl flex items-center justify-center text-white shadow-lg shadow-green-500/20 active:scale-90 transition-all">
+                    <div className="relative">
+                      <Sparkles size={32} />
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-on-surface">朋友圈</span>
+                </button>
+              </div>
+
+              <button 
+                onClick={() => setSharingEntry(null)}
+                className="w-full mt-12 py-4 bg-surface-container text-on-surface-variant rounded-2xl font-black active:scale-95 transition-all"
+              >
+                取消
+              </button>
             </motion.div>
           </motion.div>
         )}
@@ -299,7 +355,7 @@ export default function Diary() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-on-primary-container/20 backdrop-blur-sm flex items-end justify-center p-4"
+            className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-end justify-center p-4"
             onClick={() => setCommentingId(null)}
           >
             <motion.div 
