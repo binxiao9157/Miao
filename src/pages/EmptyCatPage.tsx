@@ -59,7 +59,7 @@ export default function EmptyCatPage() {
         </p>
 
         <button 
-          onClick={() => navigate("/welcome")}
+          onClick={() => navigate("/welcome", { replace: true })}
           className="miao-btn-primary w-full py-5 text-lg font-black shadow-[0_15px_30px_rgba(232,159,113,0.3)] group relative overflow-hidden"
         >
           <span className="relative z-10 flex items-center justify-center gap-2">

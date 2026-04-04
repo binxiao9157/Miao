@@ -41,10 +41,21 @@ async function startServer() {
 
       // 确保 base64 字符串没有多余的空格或换行符，并提取纯 base64 数据
       let cleanBase64 = image_base64.replace(/\s/g, '');
+      let mimeType = 'image/png'; // Default
+      
       if (cleanBase64.includes('base64,')) {
-        cleanBase64 = cleanBase64.split('base64,')[1];
+        const parts = cleanBase64.split('base64,');
+        const header = parts[0];
+        cleanBase64 = parts[1];
+        
+        // Extract MIME type from header like "data:image/jpeg;"
+        const match = header.match(/data:([^;]+);/);
+        if (match) {
+          mimeType = match[1];
+        }
       }
-      const dataUrl = `data:image/png;base64,${cleanBase64}`;
+      
+      const dataUrl = `data:${mimeType};base64,${cleanBase64}`;
 
       // Seedance 1.5 Pro V3 任务接口规范
       // 根据用户反馈，还原为 content 在根节点的结构
@@ -91,7 +102,7 @@ async function startServer() {
           },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
-          timeout: 120000 // Increased to 120 seconds
+          timeout: 150000 // Increased to 150 seconds
         }
       );
 
@@ -124,7 +135,7 @@ async function startServer() {
 
       if (isBalanceError) {
         return res.status(403).json({ 
-          error: "账户余额不足，请登录火山引擎控制台充值",
+          error: "账户余额不足，请联系管理员充值",
           detail: errorResponse
         });
       }
@@ -187,7 +198,7 @@ async function startServer() {
       
       // If it's a quota issue, it will be in errorResponse
       if (errorResponse && (errorResponse.error?.code === "QuotaExceeded" || errorResponse.code === "QuotaExceeded")) {
-        return res.status(403).json({ error: "API 额度已耗尽，请检查火山引擎账户余额" });
+        return res.status(403).json({ error: "API 额度已耗尽，请检查账户余额" });
       }
 
       res.status(500).json({ 
@@ -213,6 +224,10 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   });
 }
 

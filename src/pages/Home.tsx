@@ -91,6 +91,17 @@ export default function Home() {
 
     return () => {
       if (onlineTimerRef.current) clearInterval(onlineTimerRef.current);
+      
+      // 显式释放视频资源，防止内存泄漏
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause();
+          videoRef.current.src = "";
+          videoRef.current.load();
+        } catch (e) {
+          // 忽略清理过程中的错误
+        }
+      }
     };
   }, []);
 
@@ -135,6 +146,7 @@ export default function Home() {
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.src = "";
+      videoRef.current.load();
     }
     storage.deleteCat(); // 清除存储中的猫咪
     refreshCatStatus();
@@ -144,7 +156,6 @@ export default function Home() {
   };
 
   const handleVideoError = (e: any) => {
-    console.error("Video load error:", e);
     setLoadError(true);
     setIsInitialized(true);
   };

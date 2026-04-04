@@ -24,6 +24,19 @@ export default function CatPlayer() {
     } else {
       navigate("/");
     }
+
+    return () => {
+      // 显式释放视频资源，防止内存泄漏
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause();
+          videoRef.current.src = "";
+          videoRef.current.load();
+        } catch (e) {
+          // 忽略清理过程中的错误
+        }
+      }
+    };
   }, [id, navigate]);
 
   const togglePlay = () => {

@@ -36,7 +36,7 @@ export default function PrivacyPolicy() {
       id: 4,
       title: "四、 第三方服务",
       content: [
-        { label: "AI 视频生成", detail: "为了实现 AI 视频生成，我们会将您提供的基础参数或图片传输至火山引擎（Volcengine） API 接口，我们承诺不会将其用于除此之外的其他用途。" },
+        { label: "AI 视频生成", detail: "为了实现 AI 视频生成，我们会将您提供的基础参数或图片传输至 AI 服务商 API 接口，我们承诺不会将其用于除此之外的其他用途。" },
         { label: "分享功能", detail: "为了实现分享功能，我们会接入微信 SDK。" },
       ]
     },

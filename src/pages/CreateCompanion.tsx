@@ -50,8 +50,8 @@ export default function CreateCompanion() {
           let width = img.width;
           let height = img.height;
           
-          // 限制最大尺寸为 768px，减小 payload 大小，加快上传速度
-          const maxSide = 768;
+          // 限制最大尺寸为 512px，减小 payload 大小，加快上传速度
+          const maxSide = 512;
           if (width > maxSide || height > maxSide) {
             if (width > height) {
               height = (height / width) * maxSide;
@@ -96,7 +96,7 @@ export default function CreateCompanion() {
       setGenerationStatus("正在处理图像数据...");
       const imageBase64 = await getBase64FromUrl(breed?.image || "", selectedBreed);
       
-      setGenerationStatus("正在提交生成任务 (火山引擎)...");
+      setGenerationStatus("正在提交生成任务...");
       const prompt = catService.getPrompt(selectedBreed, selectedColor);
       
       const submitResult = await VolcanoService.submitTask(imageBase64, prompt);

@@ -31,9 +31,9 @@ export default function Register() {
     
     const hasCat = storage.getCatList().length > 0;
     if (hasCat) {
-      navigate("/");
+      navigate("/", { replace: true });
     } else {
-      navigate("/empty-cat");
+      navigate("/empty-cat", { replace: true });
     }
   };
 

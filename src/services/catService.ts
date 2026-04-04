@@ -53,8 +53,7 @@ export const catService = {
   playMeow: () => {
     // 模拟播放猫叫声
     // 在实际环境中，我们会加载一个 mp3 文件
-    // 这里我们用 console.log 模拟，并尝试使用 Web Audio API 播放一个简单的合成音
-    console.log('🐾 Meow! 猫叫声播放中...');
+    // 尝试使用 Web Audio API 播放一个简单的合成音
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioCtx.createOscillator();
@@ -79,7 +78,6 @@ export const catService = {
 
   // 模拟调用火山引擎 API (Volcano API)
   mockAnalyzeCatImage: async (imageBase64: string): Promise<Partial<CatInfo>> => {
-    console.log('正在调用火山引擎 API 分析图片...', imageBase64.substring(0, 20) + '...');
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 2000));
     

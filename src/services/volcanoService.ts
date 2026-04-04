@@ -26,7 +26,6 @@ export class VolcanoService {
    */
   public static async submitTask(imageBase64: string, prompt?: string) {
     if (VolcanoConfig.MOCK_MODE) {
-      console.log("MOCK: 提交视频生成任务", imageBase64.substring(0, 50) + "...");
       await new Promise(resolve => setTimeout(resolve, 1000));
       return { id: 'mock_task_' + Date.now() };
     }
@@ -36,15 +35,23 @@ export class VolcanoService {
         prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
         image_base64: imageBase64,
       }, {
-        timeout: 150000 // 150 seconds, slightly longer than backend
+        timeout: 180000, // Increased to 180 seconds
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       return response.data;
     } catch (error: any) {
       if (error.response) {
-        console.error("提交失败详情:", error.response.data);
+        console.error("提交失败详情 (HTTP Error):", error.response.status, error.response.data);
         throw new Error(error.response.data.error || `提交失败 (${error.response.status})`);
+      } else if (error.request) {
+        console.error("网络错误 (No Response):", error.request);
+        throw new Error("网络错误: 无法连接到服务器，请检查网络或稍后重试");
+      } else {
+        console.error("请求配置错误:", error.message);
+        throw new Error(`请求错误: ${error.message}`);
       }
-      throw error;
     }
   }
 
@@ -53,7 +60,6 @@ export class VolcanoService {
    */
   public static async getTaskResult(taskId: string) {
     if (VolcanoConfig.MOCK_MODE) {
-      console.log("MOCK: 查询任务状态", taskId);
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const progress = Math.random();
@@ -73,10 +79,14 @@ export class VolcanoService {
       return response.data;
     } catch (error: any) {
       if (error.response) {
-        console.error("查询失败详情:", error.response.data);
+        console.error("查询失败详情 (HTTP Error):", error.response.status, error.response.data);
         throw new Error(error.response.data.error || `查询失败 (${error.response.status})`);
+      } else if (error.request) {
+        console.error("网络错误 (No Response):", error.request);
+        throw new Error("网络错误: 无法连接到服务器");
+      } else {
+        throw new Error(`查询错误: ${error.message}`);
       }
-      throw error;
     }
   }
 
@@ -110,7 +120,6 @@ export class VolcanoService {
 
         try {
           const result = await this.getTaskResult(taskId);
-          console.log("任务状态查询结果:", JSON.stringify(result));
 
           const status = result.status;
           if (onProgress) onProgress(status);

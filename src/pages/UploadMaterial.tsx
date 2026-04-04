@@ -44,7 +44,7 @@ export default function UploadMaterial() {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const maxSide = 768;
+          const maxSide = 512;
           
           if (width > maxSide || height > maxSide) {
             if (width > height) {
