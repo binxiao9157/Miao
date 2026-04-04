@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, TouchEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Coins, RefreshCw, Loader2, AlertCircle, Settings, Plus, Bell } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
-import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "motion/react";
+import { useAuthContext } from "../context/AuthContext";
 
 const VIDEOS = {
   DEFAULT: "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4",
@@ -15,7 +15,7 @@ const VIDEOS = {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshCatStatus } = useAuthContext();
   const [cat, setCat] = useState<CatInfo | null>(null);
   const [currentVideo, setCurrentVideo] = useState(VIDEOS.DEFAULT);
   const [greeting, setGreeting] = useState<string | null>(null);
@@ -137,6 +137,7 @@ export default function Home() {
       videoRef.current.src = "";
     }
     storage.deleteCat(); // 清除存储中的猫咪
+    refreshCatStatus();
     setCat(null);
     setShowRegenerateConfirm(false);
     navigate('/welcome', { replace: true });

@@ -4,10 +4,12 @@ import { storage, UserInfo } from '../services/storage';
 interface AuthContextType {
   user: UserInfo | null;
   isAuthenticated: boolean;
+  hasCat: boolean;
   login: (username: string, password: string) => boolean;
   register: (info: UserInfo) => void;
   logout: () => void;
   updateProfile: (updates: Partial<UserInfo>) => void;
+  refreshCatStatus: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,6 +17,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasCat, setHasCat] = useState(false);
+
+  const refreshCatStatus = () => {
+    setHasCat(storage.getCatList().length > 0);
+  };
 
   useEffect(() => {
     const info = storage.getUserInfo();
@@ -23,6 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(info);
       setIsAuthenticated(true);
     }
+    refreshCatStatus();
   }, []);
 
   const login = (username: string, password: string): boolean => {
@@ -31,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       storage.saveToken('mock_token_' + Date.now());
       setIsAuthenticated(true);
       setUser(savedUser);
+      refreshCatStatus();
       return true;
     }
     return false;
@@ -41,12 +50,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     storage.saveToken('mock_token_' + Date.now());
     setUser(info);
     setIsAuthenticated(true);
+    refreshCatStatus();
   };
 
   const logout = () => {
     storage.clearAll();
     setUser(null);
     setIsAuthenticated(false);
+    setHasCat(false);
   };
 
   const updateProfile = (updates: Partial<UserInfo>) => {
@@ -58,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, hasCat, login, register, logout, updateProfile, refreshCatStatus }}>
       {children}
     </AuthContext.Provider>
   );

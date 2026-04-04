@@ -5,10 +5,12 @@ import { Sparkles, Loader2, CheckCircle2, AlertCircle, PartyPopper, Coins } from
 import { VolcanoService } from "../services/volcanoService";
 import { FileManager } from "../services/fileManager";
 import { storage } from "../services/storage";
+import { useAuthContext } from "../context/AuthContext";
 
 export default function GenerationProgress() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { refreshCatStatus } = useAuthContext();
   const { image, name, isRedemption } = location.state || {};
 
   const [status, setStatus] = useState<string>("正在分析图片...");
@@ -65,7 +67,7 @@ export default function GenerationProgress() {
         // 3. 下载视频
         setStatus("正在下载视频...");
         setProgress(80);
-        const localPath = await FileManager.downloadVideo(videoUrl, taskId, "我的 AI 猫咪", image);
+        const localPath = await FileManager.downloadVideo(videoUrl, taskId, name || "我的 AI 猫咪", image);
 
         // 4. 完成
         setStatus("生成成功！");
@@ -81,6 +83,9 @@ export default function GenerationProgress() {
 
         // 确保活跃 ID 已设置
         storage.setActiveCatId(taskId);
+        
+        // 更新全局猫咪状态，防止重定向到空页面
+        refreshCatStatus();
         
         setTimeout(() => {
           if (!abortController.signal.aborted) {

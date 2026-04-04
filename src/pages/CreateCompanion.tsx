@@ -7,9 +7,12 @@ import { motion, AnimatePresence } from "motion/react";
 import { VolcanoService } from "../services/volcanoService";
 import { GoogleGenAI } from "@google/genai";
 
+import { useAuthContext } from "../context/AuthContext";
+
 export default function CreateCompanion() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { refreshCatStatus } = useAuthContext();
   const isRedemption = location.state?.isRedemption || false;
   
   const [selectedBreed, setSelectedBreed] = useState<string | null>(null);
@@ -25,6 +28,54 @@ export default function CreateCompanion() {
     setTimeout(() => setShowToast(null), 3000);
   };
 
+  const getBase64FromUrl = async (url: string, fallbackId: string): Promise<string> => {
+    try {
+      let response = await fetch(url);
+      if (!response.ok) {
+        console.warn(`Local asset not found: ${url}, using fallback.`);
+        const fallbackUrl = `https://picsum.photos/seed/cat_${fallbackId}/400/400`;
+        response = await fetch(fallbackUrl);
+      }
+      const blob = await response.blob();
+      
+      // 使用 Canvas 进行图片压缩和尺寸调整，确保 API 兼容性
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // 限制最大尺寸为 768px，减小 payload 大小，加快上传速度
+          const maxSide = 768;
+          if (width > maxSide || height > maxSide) {
+            if (width > height) {
+              height = (height / width) * maxSide;
+              width = maxSide;
+            } else {
+              width = (width / height) * maxSide;
+              height = maxSide;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // 导出为 jpeg 格式，质量设为 0.8
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(dataUrl);
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(blob);
+      });
+    } catch (error) {
+      console.error("Failed to convert image to base64:", error);
+      return url;
+    }
+  };
+
   const handleGenerate = async () => {
     if (!catName.trim() || !selectedBreed || !selectedColor) {
       triggerToast("请填写完整信息后再生成哦！");
@@ -38,10 +89,13 @@ export default function CreateCompanion() {
       const breed = catService.breeds.find(b => b.id === selectedBreed);
       const color = catService.colors.find(c => c.id === selectedColor);
       
-      setGenerationStatus("正在提交生成任务 (火山引擎)...");
+      setGenerationStatus("正在处理图像数据...");
+      const imageBase64 = await getBase64FromUrl(breed?.image || "", selectedBreed);
       
-      // 使用品种默认图作为参考
-      const submitResult = await VolcanoService.submitTask(breed?.image || "");
+      setGenerationStatus("正在提交生成任务 (火山引擎)...");
+      const prompt = catService.getPrompt(selectedBreed, selectedColor);
+      
+      const submitResult = await VolcanoService.submitTask(imageBase64, prompt);
       const taskId = submitResult.id;
 
       if (!taskId) {
@@ -79,6 +133,7 @@ export default function CreateCompanion() {
         remoteVideoUrl: videoUrl
       });
       
+      refreshCatStatus();
       catService.playMeow();
       setIsGenerating(false);
       setShowSuccess(true);

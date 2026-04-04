@@ -24,7 +24,7 @@ export class VolcanoService {
   /**
    * 提交视频生成任务 (SubmitTask)
    */
-  public static async submitTask(imageBase64: string) {
+  public static async submitTask(imageBase64: string, prompt?: string) {
     if (VolcanoConfig.MOCK_MODE) {
       console.log("MOCK: 提交视频生成任务", imageBase64.substring(0, 50) + "...");
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -33,8 +33,10 @@ export class VolcanoService {
 
     try {
       const response = await axios.post("/api/generate-video", {
-        prompt: "A high quality video of this cat, cinematic lighting, realistic.",
+        prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
         image_base64: imageBase64,
+      }, {
+        timeout: 150000 // 150 seconds, slightly longer than backend
       });
       return response.data;
     } catch (error: any) {

@@ -14,7 +14,16 @@ async function startServer() {
 
   const ARK_API_KEY = process.env.VOLC_API_KEY;
   const ARK_MODEL_ID = process.env.VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215";
+  // 还原为用户确认可用的 Seedance 专用任务接口端点
   const ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks";
+
+  console.log("Server Config:", {
+    hasApiKey: !!ARK_API_KEY,
+    modelId: ARK_MODEL_ID,
+    isEndpointId: ARK_MODEL_ID.startsWith("ep-"),
+    baseUrl: ARK_BASE_URL,
+    nodeEnv: process.env.NODE_ENV
+  });
 
   // Volcengine AccessKey and SecretKey should be provided via environment variables
   const VOLC_ACCESS_KEY = process.env.VOLC_ACCESS_KEY;
@@ -25,29 +34,23 @@ async function startServer() {
     const { prompt, image_base64 } = req.body;
 
     try {
-      // Ark Video Generation API often expects an 'input' object or direct fields
-      // We'll try the most robust structure for the tasks endpoint
+      if (!ARK_API_KEY) {
+        console.error("Missing VOLC_API_KEY environment variable");
+        return res.status(500).json({ error: "服务器未配置 API Key，请检查环境变量" });
+      }
+
+      // 确保 base64 字符串没有多余的空格或换行符，并提取纯 base64 数据
+      let cleanBase64 = image_base64.replace(/\s/g, '');
+      if (cleanBase64.includes('base64,')) {
+        cleanBase64 = cleanBase64.split('base64,')[1];
+      }
+      const dataUrl = `data:image/png;base64,${cleanBase64}`;
+
+      // Seedance 1.5 Pro V3 任务接口规范
+      // 根据用户反馈，还原为 content 在根节点的结构
       const requestBody: any = {
         model: ARK_MODEL_ID,
-        parameters: {
-          size: "480p"
-        }
-      };
-
-      // Handle both image and text
-      if (image_base64) {
-        // Ensure we have a clean data URL with prefix
-        // Ark Video Generation API (Seedance) typically expects the full data URL
-        const dataUrl = image_base64.startsWith('data:') 
-          ? image_base64 
-          : `data:image/jpeg;base64,${image_base64}`;
-        
-        console.log("Image size (data URL):", (dataUrl.length / 1024 / 1024).toFixed(2), "MB");
-
-        // Seedance 1.5 Pro V3 Tasks API structure
-        // The error "Invalid base64 image_url" often occurs when the prefix is missing
-        // or the structure is incorrect.
-        requestBody.content = [
+        content: [
           {
             type: "image_url",
             image_url: {
@@ -58,28 +61,24 @@ async function startServer() {
             type: "text",
             text: prompt || "A high quality video of this cat, cinematic lighting, realistic."
           }
-        ];
-
-        // We also include 'input' as some model versions might look there.
-        requestBody.input = {
-          prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
-          image_url: dataUrl
-        };
-      } else {
-        requestBody.content = [
-          {
-            type: "text",
-            text: prompt || "A high quality video of a cute cat."
-          }
-        ];
-        requestBody.input = { prompt: prompt };
-      }
+        ],
+        parameters: {
+          // 使用 480p 这种更兼容的尺寸标识
+          size: "480p"
+        }
+      };
 
       console.log("Submitting task to Ark:", {
         model: ARK_MODEL_ID,
         url: ARK_BASE_URL,
-        has_image: !!image_base64,
-        prompt: requestBody.input?.prompt?.substring(0, 30) + "..."
+        requestBody: {
+          ...requestBody,
+          content: requestBody.content.map((c: any) => 
+            c.type === 'image_url' ? { ...c, image_url: { url: c.image_url.url.substring(0, 50) + "..." } } : c
+          )
+        },
+        image_length: dataUrl.length,
+        image_size_mb: (dataUrl.length / 1024 / 1024).toFixed(2) + "MB"
       });
 
       const response = await axios.post(
@@ -92,7 +91,7 @@ async function startServer() {
           },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
-          timeout: 60000 // 60 seconds for large uploads
+          timeout: 120000 // Increased to 120 seconds
         }
       );
 
@@ -101,8 +100,14 @@ async function startServer() {
     } catch (error: any) {
       const errorResponse = error.response?.data;
       const errorMessage = error.message;
+      const errorUrl = error.config?.url;
       
-      console.error("Ark API Error Detail:", JSON.stringify(errorResponse || errorMessage, null, 2));
+      console.error("Ark API Error:", {
+        message: errorMessage,
+        url: errorUrl,
+        status: error.response?.status,
+        data: errorResponse
+      });
       
       // Check for quota or balance issues
       const isBalanceError = errorResponse && (
@@ -139,8 +144,16 @@ async function startServer() {
         });
       }
 
+      if (error.response?.status === 404) {
+        return res.status(404).json({
+          error: "API 端点未找到 (404)。请检查 VOLC_MODEL_ID 是否为有效的推理接入点 ID (以 ep- 开头)。",
+          detail: errorResponse || errorMessage
+        });
+      }
+
       res.status(500).json({ 
-        error: errorResponse ? JSON.stringify(errorResponse) : `提交任务失败: ${errorMessage}` 
+        error: errorResponse ? JSON.stringify(errorResponse) : `提交任务失败: ${errorMessage}`,
+        detail: errorResponse || errorMessage
       });
     }
   });

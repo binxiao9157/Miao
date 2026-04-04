@@ -43,11 +43,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuthContext();
-  const hasCat = storage.getCatList().length > 0;
+  const { isAuthenticated, hasCat } = useAuthContext();
+  const location = useLocation(); // Force re-render on route change
 
   return (
-    <Routes>
+    <Routes location={location}>
       {/* Auth Routes */}
       <Route path="/login" element={
         isAuthenticated ? (

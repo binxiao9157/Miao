@@ -39,7 +39,33 @@ export default function UploadMaterial() {
             if (fileInputRef.current) fileInputRef.current.value = "";
             return;
           }
-          setSelectedImage(dataUrl);
+          
+          // 压缩并调整大小，减小 payload
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxSide = 768;
+          
+          if (width > maxSide || height > maxSide) {
+            if (width > height) {
+              height = (height / width) * maxSide;
+              width = maxSide;
+            } else {
+              width = (width / height) * maxSide;
+              height = maxSide;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            setSelectedImage(compressedDataUrl);
+          } else {
+            setSelectedImage(dataUrl);
+          }
         };
         img.src = dataUrl;
       };
