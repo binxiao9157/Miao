@@ -71,7 +71,7 @@ function AppRoutes() {
 
       {/* Main App Routes (with Bottom Nav) */}
       <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-        <Route path="/" element={hasCat ? <Home /> : <Navigate to="/empty-cat" replace />} />
+        <Route path="/" element={hasCat ? null : <Navigate to="/empty-cat" replace />} />
         <Route path="/diary" element={hasCat ? <Diary /> : <Navigate to="/empty-cat" replace />} />
         <Route path="/time-letters" element={hasCat ? <TimeLetters /> : <Navigate to="/empty-cat" replace />} />
         <Route path="/points" element={hasCat ? <Points /> : <Navigate to="/empty-cat" replace />} />

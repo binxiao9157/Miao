@@ -1,10 +1,15 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { BookOpen, Mail, Home, Star, User } from "lucide-react";
 import { motion } from "motion/react";
+import HomePage from "../../pages/Home";
+import { useAuthContext } from "../../context/AuthContext";
 
 export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasCat } = useAuthContext();
+
+  const isHome = location.pathname === "/";
 
   const navItems = [
     { icon: BookOpen, label: "日志", path: "/diary" },
@@ -15,9 +20,17 @@ export default function MainLayout() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-grow flex flex-col pb-28">
-        <Outlet />
+    <div className="min-h-screen flex flex-col bg-background relative">
+      <main className="flex-grow flex flex-col pb-28 relative">
+        {/* Keep Home alive by rendering it always. Use opacity/z-index instead of display:none to prevent video blanking issues in browsers */}
+        <div className={`absolute inset-0 ${isHome ? 'z-0 opacity-100' : '-z-10 opacity-0 pointer-events-none'}`}>
+          {hasCat && <HomePage />}
+        </div>
+        
+        {/* Other routes will render here */}
+        <div className={`absolute inset-0 z-10 bg-background overflow-y-auto ${isHome ? 'hidden' : 'block'}`}>
+          <Outlet />
+        </div>
       </main>
       
       <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/80 backdrop-blur-xl rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex justify-around items-center px-4 py-3 z-50 border border-white/50">

@@ -40,39 +40,45 @@ async function startServer() {
       }
 
       // 确保 base64 字符串没有多余的空格或换行符，并提取纯 base64 数据
-      let cleanBase64 = image_base64.replace(/\s/g, '');
-      let mimeType = 'image/png'; // Default
-      
-      if (cleanBase64.includes('base64,')) {
-        const parts = cleanBase64.split('base64,');
-        const header = parts[0];
-        cleanBase64 = parts[1];
+      let dataUrl = "";
+      if (image_base64) {
+        let cleanBase64 = image_base64.replace(/\s/g, '');
+        let mimeType = 'image/png'; // Default
         
-        // Extract MIME type from header like "data:image/jpeg;"
-        const match = header.match(/data:([^;]+);/);
-        if (match) {
-          mimeType = match[1];
+        if (cleanBase64.includes('base64,')) {
+          const parts = cleanBase64.split('base64,');
+          const header = parts[0];
+          cleanBase64 = parts[1];
+          
+          // Extract MIME type from header like "data:image/jpeg;"
+          const match = header.match(/data:([^;]+);/);
+          if (match) {
+            mimeType = match[1];
+          }
         }
+        
+        dataUrl = `data:${mimeType};base64,${cleanBase64}`;
       }
-      
-      const dataUrl = `data:${mimeType};base64,${cleanBase64}`;
 
       // Seedance 1.5 Pro V3 任务接口规范
       // 根据用户反馈，还原为 content 在根节点的结构
+      const contentArray: any[] = [];
+      if (dataUrl) {
+        contentArray.push({
+          type: "image_url",
+          image_url: {
+            url: dataUrl
+          }
+        });
+      }
+      contentArray.push({
+        type: "text",
+        text: prompt || "A high quality video of this cat, cinematic lighting, realistic."
+      });
+
       const requestBody: any = {
         model: ARK_MODEL_ID,
-        content: [
-          {
-            type: "image_url",
-            image_url: {
-              url: dataUrl
-            }
-          },
-          {
-            type: "text",
-            text: prompt || "A high quality video of this cat, cinematic lighting, realistic."
-          }
-        ],
+        content: contentArray,
         parameters: {
           // 使用 480p 这种更兼容的尺寸标识
           size: "480p"
@@ -88,8 +94,8 @@ async function startServer() {
             c.type === 'image_url' ? { ...c, image_url: { url: c.image_url.url.substring(0, 50) + "..." } } : c
           )
         },
-        image_length: dataUrl.length,
-        image_size_mb: (dataUrl.length / 1024 / 1024).toFixed(2) + "MB"
+        image_length: dataUrl ? dataUrl.length : 0,
+        image_size_mb: dataUrl ? (dataUrl.length / 1024 / 1024).toFixed(2) + "MB" : "0MB"
       });
 
       const response = await axios.post(

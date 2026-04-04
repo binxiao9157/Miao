@@ -99,7 +99,8 @@ export default function CreateCompanion() {
       setGenerationStatus("正在提交生成任务...");
       const prompt = catService.getPrompt(selectedBreed, selectedColor);
       
-      const submitResult = await VolcanoService.submitTask(imageBase64, prompt);
+      // Do not send the breed placeholder image to the API, so the AI relies entirely on the text prompt (Text-to-Video)
+      const submitResult = await VolcanoService.submitTask(null, prompt);
       const taskId = submitResult.id;
 
       if (!taskId) {

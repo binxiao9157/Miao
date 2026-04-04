@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, TouchEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Sparkles, Coins, RefreshCw, Loader2, AlertCircle, Settings, Plus, Bell } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
@@ -7,14 +7,11 @@ import { useAuthContext } from "../context/AuthContext";
 
 const VIDEOS = {
   DEFAULT: "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4",
-  PETTING: "https://assets.mixkit.co/videos/preview/mixkit-cat-being-petted-on-the-head-34538-large.mp4",
-  WAKEUP: "https://assets.mixkit.co/videos/preview/mixkit-cat-waking-up-and-looking-around-34540-large.mp4",
-  PLAYING: "https://assets.mixkit.co/videos/preview/mixkit-cat-playing-with-a-toy-34541-large.mp4",
-  EATING: "https://assets.mixkit.co/videos/preview/mixkit-cat-eating-from-a-bowl-34542-large.mp4",
 };
 
 export default function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, refreshCatStatus } = useAuthContext();
   const [cat, setCat] = useState<CatInfo | null>(null);
   const [currentVideo, setCurrentVideo] = useState(VIDEOS.DEFAULT);
@@ -92,25 +89,44 @@ export default function Home() {
     return () => {
       if (onlineTimerRef.current) clearInterval(onlineTimerRef.current);
       
-      // 显式释放视频资源，防止内存泄漏
-      if (videoRef.current) {
-        try {
-          videoRef.current.pause();
-          videoRef.current.src = "";
-          videoRef.current.load();
-        } catch (e) {
-          // 忽略清理过程中的错误
-        }
-      }
+      // We no longer explicitly destroy the video here because Home is kept alive by MainLayout.
+      // The component will only unmount if the user logs out or leaves the main app area.
     };
   }, []);
+
+  // Handle visibility changes (KeepAlive resume) and cat changes
+  useEffect(() => {
+    if (location.pathname === "/") {
+      // Refresh cat info in case it was changed in another tab (e.g., Switch Companion)
+      const info = storage.getActiveCat();
+      if (info && info.id !== cat?.id) {
+        setCat(info);
+        const videoSource = (info.source === 'uploaded' || info.source === 'created') 
+          ? (info.videoPath || info.remoteVideoUrl || VIDEOS.DEFAULT)
+          : VIDEOS.DEFAULT;
+        setCurrentVideo(videoSource);
+        setIsInitialized(false);
+        setIsVideoReady(false);
+      }
+
+      // Resume video playback
+      if (videoRef.current) {
+        videoRef.current.play().catch(() => {});
+      }
+    } else {
+      // Pause video when leaving the tab to save resources
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+    }
+  }, [location.pathname, cat?.id]);
 
   const triggerPointToast = (msg: string) => {
     setShowPointToast(msg);
     setTimeout(() => setShowPointToast(null), 3000);
   };
 
-  const handleInteraction = () => {
+  const handleInteraction = (actionName: string) => {
     const p = storage.getPoints();
     const today = new Date().toLocaleDateString();
     
@@ -124,22 +140,28 @@ export default function Home() {
       const newTotal = storage.addPoints(5);
       storage.savePoints(p);
       setPoints(newTotal);
-      triggerPointToast("+5 互动奖励");
+      triggerPointToast(`${actionName}！+5 互动奖励`);
+    } else {
+      triggerPointToast(`${actionName}！`);
     }
   };
 
-  const playAction = (videoUrl: string) => {
-    if (currentVideo === videoUrl) {
-      // 如果已经在播放该视频，重置进度
-      if (videoRef.current) {
-        videoRef.current.currentTime = 0;
-        videoRef.current.play();
-      }
-    } else {
-      // 切换视频时不重置 isInitialized，避免闪烁
-      setCurrentVideo(videoUrl);
+  const playAction = (action: string) => {
+    // 重新播放当前视频以提供反馈，不再切换 src 导致加载失败
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
     }
-    handleInteraction();
+    
+    let actionName = "";
+    switch(action) {
+      case 'eating': actionName = "喂食成功"; break;
+      case 'playing': actionName = "玩耍开心"; break;
+      case 'wakeup': actionName = "贴贴猫咪"; break;
+      default: actionName = "互动成功";
+    }
+    
+    handleInteraction(actionName);
   };
 
   const handleRegenerate = () => {
@@ -155,7 +177,31 @@ export default function Home() {
     navigate('/welcome', { replace: true });
   };
 
+  const handleRetryPlay = () => {
+    setLoadError(false);
+    setIsInitialized(false);
+    if (videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play().catch(() => {});
+    }
+  };
+
   const handleVideoError = (e: any) => {
+    const videoElement = e.target as HTMLVideoElement;
+    const error = videoElement.error;
+
+    if (!error) return;
+    if (error.code === 1) return;
+
+    console.error("Fatal Video Error:", error.code, error.message, "URL:", currentVideo);
+
+    // 核心修复：如果 Blob URL 失效（如 App 重新加载），自动降级使用远程 URL
+    if (currentVideo && currentVideo.startsWith('blob:') && cat?.remoteVideoUrl) {
+      console.log("Blob video failed, falling back to remote URL");
+      setCurrentVideo(cat.remoteVideoUrl);
+      return;
+    }
+
     setLoadError(true);
     setIsInitialized(true);
   };
@@ -166,19 +212,9 @@ export default function Home() {
     }
   };
 
-  const handleVideoEnd = () => {
-    const defaultSource = cat?.videoPath || cat?.remoteVideoUrl || VIDEOS.DEFAULT;
-    if (currentVideo !== defaultSource) {
-      setCurrentVideo(defaultSource);
-    }
-  };
-
-  const interactionVideos = [VIDEOS.PETTING, VIDEOS.WAKEUP, VIDEOS.PLAYING, VIDEOS.EATING];
-  const shouldLoop = !interactionVideos.includes(currentVideo);
-
   const handleLongPressStart = () => {
     longPressTimer.current = setTimeout(() => {
-      playAction(VIDEOS.WAKEUP);
+      playAction('wakeup');
     }, 600);
   };
 
@@ -207,12 +243,19 @@ export default function Home() {
 
     const dx = touchEndPos.x - touchStartPos.current.x;
     const dy = touchEndPos.y - touchStartPos.current.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
 
-    if (distance > 50) {
+    if (absDx > 50 || absDy > 50) {
       // Swipe detected
-      playAction(VIDEOS.EATING);
-    } else {
+      if (absDx > absDy) {
+        // 水平滑动 (Horizontal Swipe)
+        playAction('playing');
+      } else {
+        // 垂直滑动 (Vertical Swipe)
+        playAction('eating');
+      }
+    } else if (absDx < 10 && absDy < 10) {
       // Single tap detected - toggle controls
       setShowControls(!showControls);
       // Auto hide controls after 5 seconds
@@ -235,23 +278,26 @@ export default function Home() {
 
   if (!cat || !cat.name) {
     return (
-      <div className="flex-grow flex items-center justify-center bg-black">
+      <div className="w-full h-full flex items-center justify-center bg-black">
         <Loader2 className="w-10 h-10 text-white animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex-grow relative overflow-hidden bg-black">
+    <div className="w-full h-full flex flex-col relative overflow-hidden bg-black touch-none">
       {/* 视频播放器区域 - 采用 Stack 堆叠布局实现无缝切换 */}
       <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden">
         {/* 底层：动态占位图 */}
         <img 
           src={cat?.avatar || `https://picsum.photos/seed/${cat?.breed}-${cat?.color}/1080/1920`} 
           alt="" 
-          className="absolute inset-0 w-full h-full object-cover z-0"
+          className="absolute inset-0 w-full h-full object-cover z-0 opacity-40"
           referrerPolicy="no-referrer"
         />
+
+        {/* 隔离层：深色毛玻璃，防止视频切换时底图刺眼闪烁 */}
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-xl z-[5]"></div>
 
         {/* 上层：原生视频控件 */}
         <video
@@ -262,17 +308,17 @@ export default function Home() {
           playsInline
           preload="auto"
           onTimeUpdate={handleTimeUpdate}
-          loop={shouldLoop}
-          onEnded={handleVideoEnd}
+          loop={true}
           onError={handleVideoError}
           onLoadedData={() => setIsInitialized(true)}
           onPlaying={() => {
             setIsInitialized(true);
             setIsBuffering(false);
             setIsVideoReady(true);
+            setLoadError(false); // 成功播放时清除错误状态
           }}
           onWaiting={() => setIsBuffering(true)}
-          className={`absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-500 ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-150 ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
         />
         
         {/* 初始加载状态 */}
@@ -292,21 +338,29 @@ export default function Home() {
               <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
                 <AlertCircle className="w-8 h-8 text-red-500" />
               </div>
-              <h3 className="text-lg font-bold text-white">小猫迷路了</h3>
-              <p className="text-sm text-white/60">视频文件加载失败，可能已被移动或删除。</p>
-              <button 
-                onClick={handleRegenerate}
-                className="px-8 py-3 bg-[#FF9D76] text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform"
-              >
-                重新领养
-              </button>
+              <h3 className="text-lg font-bold text-white">视频加载失败</h3>
+              <p className="text-sm text-white/60">网络波动或视频文件暂时无法访问，请重试。</p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={handleRetryPlay}
+                  className="px-6 py-3 bg-[#FF9D76] text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform"
+                >
+                  重试播放
+                </button>
+                <button 
+                  onClick={() => setShowRegenerateConfirm(true)}
+                  className="px-6 py-3 bg-white/10 text-white rounded-full font-bold active:scale-95 transition-transform"
+                >
+                  重新领养
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* 交互层 */}
         <div 
-          className="absolute inset-0 z-30"
+          className="absolute inset-0 z-30 touch-none"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onContextMenu={(e) => e.preventDefault()}
