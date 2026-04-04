@@ -13,6 +13,9 @@ export default function CatPlayer() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [showControls, setShowControls] = useState(true);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showToast, setShowToast] = useState<string | null>(null);
+
   useEffect(() => {
     const list = storage.getCatList();
     const found = list.find(c => c.id === id);
@@ -45,20 +48,79 @@ export default function CatPlayer() {
     link.click();
     document.body.removeChild(link);
     
-    alert("视频已开始下载到您的设备");
+    setShowToast("视频已开始下载到您的设备");
+    setTimeout(() => setShowToast(null), 3000);
   };
 
   const handleDelete = () => {
-    if (window.confirm("确定要删除这个猫咪视频吗？")) {
-      FileManager.deleteVideo(id!);
-      navigate("/cat-history");
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    FileManager.deleteVideo(id!);
+    navigate("/cat-history");
   };
 
   if (!cat) return null;
 
   return (
     <div className="h-screen bg-black relative overflow-hidden flex flex-col">
+      {/* 删除确认弹窗 */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDeleteConfirm(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-surface-container rounded-[32px] p-8 shadow-2xl border border-outline-variant/30"
+            >
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-6 mx-auto">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-black text-on-surface text-center mb-2">确定要删除吗？</h3>
+              <p className="text-sm text-on-surface-variant text-center mb-8">
+                删除后将无法找回这个猫咪视频，确定要继续吗？
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="py-4 bg-surface-container-highest text-on-surface font-black text-sm rounded-2xl active:scale-95 transition-transform"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="py-4 bg-red-500 text-white font-black text-sm rounded-2xl active:scale-95 transition-transform shadow-lg shadow-red-500/20"
+                >
+                  确定删除
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast 提示 */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-white text-black rounded-full shadow-xl font-bold text-sm"
+          >
+            {showToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* 顶部栏 */}
       <header className="absolute top-0 left-0 right-0 z-30 p-6 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent">
         <button onClick={() => navigate("/")} className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white">

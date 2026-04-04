@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, ChangeEvent } from "react";
-import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles } from "lucide-react";
+import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles, Trash2, CheckCircle, Loader2 } from "lucide-react";
 import { storage, DiaryEntry } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -10,6 +10,10 @@ export default function Diary() {
   const [newContent, setNewContent] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showDeleteToast, setShowDeleteToast] = useState(false);
+  const [showPostToast, setShowPostToast] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -17,8 +21,13 @@ export default function Diary() {
     setDiaries(storage.getDiaries());
   }, []);
 
-  const handlePost = () => {
+  const handlePost = async () => {
     if (!newContent.trim() && !selectedMedia) return;
+
+    setIsLoading(true);
+    
+    // 模拟保存延迟
+    await new Promise(resolve => setTimeout(resolve, 800));
 
     const newEntry: DiaryEntry = {
       id: 'diary_' + Date.now(),
@@ -35,9 +44,17 @@ export default function Diary() {
     setDiaries(updatedDiaries);
     storage.saveDiaries(updatedDiaries);
     
+    // 1. 关闭弹窗 (相当于 Navigator.pop)
+    setIsPosting(false);
+    
+    // 2. 重置状态
     setNewContent("");
     setSelectedMedia(null);
-    setIsPosting(false);
+    setIsLoading(false);
+
+    // 3. 显示成功提示
+    setShowPostToast(true);
+    setTimeout(() => setShowPostToast(false), 2000);
   };
 
   const handleLike = (id: string) => {
@@ -74,6 +91,14 @@ export default function Diary() {
 
   const handleShare = (entry: DiaryEntry) => {
     setSharingEntry(entry);
+  };
+
+  const handleDelete = (id: string) => {
+    const updated = storage.deleteDiary(id);
+    setDiaries(updated);
+    setDeletingId(null);
+    setShowDeleteToast(true);
+    setTimeout(() => setShowDeleteToast(false), 2000);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -132,9 +157,17 @@ export default function Diary() {
                     </p>
                   </div>
                 </div>
-                <button className="text-on-surface-variant/40">
-                  <MoreHorizontal size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setDeletingId(entry.id)}
+                    className="w-8 h-8 flex items-center justify-center text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                  <button className="text-on-surface-variant/40">
+                    <MoreHorizontal size={20} />
+                  </button>
+                </div>
               </div>
 
               {entry.media && (
@@ -274,10 +307,17 @@ export default function Diary() {
                 </div>
                 <button 
                   onClick={handlePost}
-                  disabled={!newContent.trim() && !selectedMedia}
-                  className="miao-btn-primary !w-auto px-8 h-12 disabled:opacity-30 disabled:scale-100"
+                  disabled={(!newContent.trim() && !selectedMedia) || isLoading}
+                  className="miao-btn-primary !w-auto px-8 h-12 disabled:opacity-30 disabled:scale-100 flex items-center gap-2"
                 >
-                  发布
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>发布中...</span>
+                    </>
+                  ) : (
+                    "发布"
+                  )}
                 </button>
               </div>
             </motion.div>
@@ -380,6 +420,79 @@ export default function Diary() {
                 <Send size={20} />
               </button>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 删除确认弹窗 */}
+      <AnimatePresence>
+        {deletingId && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={() => setDeletingId(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-background w-full max-w-xs rounded-[40px] p-8 shadow-2xl text-center"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-[24px] flex items-center justify-center mx-auto mb-6 text-red-500">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-black text-on-surface mb-3">确定删除吗？</h3>
+              <p className="text-sm text-on-surface-variant leading-relaxed mb-8">
+                确定要删除这条记录吗？删除后将无法找回。
+              </p>
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => handleDelete(deletingId)}
+                  className="w-full py-4 bg-red-500 text-white rounded-2xl font-black shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+                >
+                  确定删除
+                </button>
+                <button 
+                  onClick={() => setDeletingId(null)}
+                  className="w-full py-4 bg-surface-container text-on-surface-variant rounded-2xl font-black active:scale-95 transition-all"
+                >
+                  取消
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 删除成功提示 */}
+      <AnimatePresence>
+        {showDeleteToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[130] bg-on-surface text-surface px-6 py-3 rounded-full shadow-2xl flex items-center gap-3"
+          >
+            <CheckCircle size={18} className="text-primary" />
+            <span className="text-sm font-black">记录已删除</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 发布成功提示 */}
+      <AnimatePresence>
+        {showPostToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[130] bg-on-surface text-surface px-6 py-3 rounded-full shadow-2xl flex items-center gap-3"
+          >
+            <CheckCircle size={18} className="text-primary" />
+            <span className="text-sm font-black">发布成功啦～</span>
           </motion.div>
         )}
       </AnimatePresence>

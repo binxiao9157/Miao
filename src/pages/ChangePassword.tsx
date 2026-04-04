@@ -11,7 +11,9 @@ export default function ChangePassword() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
-  const [showPass, setShowPass] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [showToast, setShowToast] = useState<string | null>(null);
 
   const triggerToast = (msg: string) => {
@@ -82,17 +84,21 @@ export default function ChangePassword() {
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
               <input 
-                type={showPass ? "text" : "password"}
+                type={showCurrent ? "text" : "password"}
                 value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
+                onChange={(e) => {
+                  setCurrentPassword(e.target.value);
+                  if (error) setError("");
+                }}
                 placeholder="请输入当前使用的密码" 
-                className="miao-input pl-12" 
+                className="miao-input pl-12 pr-12" 
               />
               <button 
-                onClick={() => setShowPass(!showPass)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40"
+                type="button"
+                onClick={() => setShowCurrent(!showCurrent)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40 hover:text-primary transition-colors"
               >
-                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
@@ -102,12 +108,22 @@ export default function ChangePassword() {
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
               <input 
-                type="password" 
+                type={showNew ? "text" : "password"}
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  if (error) setError("");
+                }}
                 placeholder="设置 6-20 位新密码" 
-                className="miao-input pl-12" 
+                className="miao-input pl-12 pr-12" 
               />
+              <button 
+                type="button"
+                onClick={() => setShowNew(!showNew)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40 hover:text-primary transition-colors"
+              >
+                {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
@@ -116,12 +132,22 @@ export default function ChangePassword() {
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
               <input 
-                type="password" 
+                type={showConfirm ? "text" : "password"}
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  if (error) setError("");
+                }}
                 placeholder="请再次输入新密码" 
-                className="miao-input pl-12" 
+                className="miao-input pl-12 pr-12" 
               />
+              <button 
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40 hover:text-primary transition-colors"
+              >
+                {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
         </div>

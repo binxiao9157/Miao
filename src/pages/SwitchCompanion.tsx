@@ -24,15 +24,7 @@ export default function SwitchCompanion() {
 
   const handleAddNew = () => {
     if (points >= 200) {
-      // Deduct points? The prompt says "积分兑换：...满足积分后点击可重新进入初始化流程"
-      // Usually "redemption" implies spending, but let's just check the requirement.
-      // "积分兑换：在‘切换伙伴页面’，若积分<200，则‘添加新伙伴’按钮置灰；满足积分后点击可重新进入初始化流程。"
-      // It doesn't explicitly say deduct, but "redemption" (兑换) usually does.
-      // I'll deduct 200 points to make it a real "redemption".
-      const p = storage.getPoints();
-      p.total -= 200;
-      storage.savePoints(p);
-      navigate("/welcome");
+      navigate("/welcome", { state: { isRedemption: true } });
     }
   };
 

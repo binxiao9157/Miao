@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { PawPrint } from "lucide-react";
+import { storage } from "../services/storage";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -17,7 +18,12 @@ export default function Login() {
     }
     const success = login(username, password);
     if (success) {
-      navigate("/");
+      const hasCat = storage.getCatList().length > 0;
+      if (hasCat) {
+        navigate("/");
+      } else {
+        navigate("/empty-cat");
+      }
     } else {
       setError("用户名或密码错误");
     }

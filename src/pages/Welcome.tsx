@@ -1,8 +1,11 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Camera, ArrowRight, Upload, PawPrint } from "lucide-react";
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isRedemption = location.state?.isRedemption || false;
+
   return (
     <div className="min-h-screen flex flex-col p-8 bg-background">
       <div className="flex items-center gap-2 mb-12 group">
@@ -19,7 +22,7 @@ export default function Welcome() {
 
       <div className="space-y-6 flex-grow">
         <button 
-          onClick={() => navigate("/upload-material")}
+          onClick={() => navigate("/upload-material", { state: { isRedemption } })}
           className="w-full p-8 bg-surface-container rounded-[40px] text-left relative group active:scale-[0.98] transition-all"
         >
           <div className="flex items-start justify-between mb-6">
@@ -38,7 +41,7 @@ export default function Welcome() {
         </button>
 
         <button 
-          onClick={() => navigate("/create-companion")}
+          onClick={() => navigate("/create-companion", { state: { isRedemption } })}
           className="w-full p-8 bg-surface-container rounded-[40px] text-left relative group active:scale-[0.98] transition-all"
         >
           <div className="flex items-start justify-between mb-6">

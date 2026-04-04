@@ -170,6 +170,16 @@ export const storage = {
     return points.total;
   },
 
+  deductPoints: (amount: number) => {
+    const points = storage.getPoints();
+    if (points.total >= amount) {
+      points.total -= amount;
+      storage.savePoints(points);
+      return true;
+    }
+    return false;
+  },
+
   saveSettings: (settings: AppSettings) => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   },
@@ -189,6 +199,13 @@ export const storage = {
 
   saveDiaries: (diaries: DiaryEntry[]) => {
     localStorage.setItem(STORAGE_KEYS.DIARIES, JSON.stringify(diaries));
+  },
+
+  deleteDiary: (id: string) => {
+    const diaries = storage.getDiaries();
+    const updated = diaries.filter(d => d.id !== id);
+    storage.saveDiaries(updated);
+    return updated;
   },
 
   // Time Letters storage

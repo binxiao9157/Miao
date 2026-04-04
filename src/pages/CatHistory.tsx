@@ -9,20 +9,69 @@ export default function CatHistory() {
   const navigate = useNavigate();
   const [cats, setCats] = useState<CatInfo[]>([]);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
   useEffect(() => {
     setCats(FileManager.getHistory());
   }, []);
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (window.confirm("确定要删除这条记录吗？")) {
-      FileManager.deleteVideo(id);
+    setShowDeleteConfirm(id);
+  };
+
+  const confirmDelete = () => {
+    if (showDeleteConfirm) {
+      FileManager.deleteVideo(showDeleteConfirm);
       setCats(FileManager.getHistory());
+      setShowDeleteConfirm(null);
     }
   };
 
   return (
     <div className="min-h-screen bg-background p-6 pb-32">
+      {/* 删除确认弹窗 */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDeleteConfirm(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-surface-container rounded-[32px] p-8 shadow-2xl border border-outline-variant/30"
+            >
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-6 mx-auto">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-black text-on-surface text-center mb-2">确定要删除吗？</h3>
+              <p className="text-sm text-on-surface-variant text-center mb-8">
+                删除后将无法找回这条记录，确定要继续吗？
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(null)}
+                  className="py-4 bg-surface-container-highest text-on-surface font-black text-sm rounded-2xl active:scale-95 transition-transform"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="py-4 bg-red-500 text-white font-black text-sm rounded-2xl active:scale-95 transition-transform shadow-lg shadow-red-500/20"
+                >
+                  确定删除
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       <header className="flex items-center mb-10">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant">
           <ArrowLeft size={24} />

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, TouchEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, MessageCircle, Sparkles, Coins, Plus, Share2, RefreshCw, AlertTriangle, Loader2, AlertCircle } from "lucide-react";
+import { Sparkles, Coins, RefreshCw, Loader2, AlertCircle, Settings, Plus, Bell } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
+import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "motion/react";
 
 const VIDEOS = {
@@ -14,6 +15,7 @@ const VIDEOS = {
 
 export default function Home() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [cat, setCat] = useState<CatInfo | null>(null);
   const [currentVideo, setCurrentVideo] = useState(VIDEOS.DEFAULT);
   const [greeting, setGreeting] = useState<string | null>(null);
@@ -25,6 +27,7 @@ export default function Home() {
   const [isBuffering, setIsBuffering] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false); // 确认弹窗状态
   const [loadError, setLoadError] = useState(false); // 加载错误状态
+  const [showControls, setShowControls] = useState(false); // 控制按钮显示状态
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -197,6 +200,13 @@ export default function Home() {
     if (distance > 50) {
       // Swipe detected
       playAction(VIDEOS.EATING);
+    } else {
+      // Single tap detected - toggle controls
+      setShowControls(!showControls);
+      // Auto hide controls after 5 seconds
+      if (!showControls) {
+        setTimeout(() => setShowControls(false), 5000);
+      }
     }
     
     touchStartPos.current = null;
@@ -213,18 +223,8 @@ export default function Home() {
 
   if (!cat || !cat.name) {
     return (
-      <div className="flex-grow flex flex-col items-center justify-center p-12 text-center bg-background">
-        <div className="w-32 h-32 bg-primary/5 rounded-full flex items-center justify-center text-primary mb-8">
-          <Sparkles size={64} />
-        </div>
-        <h2 className="text-3xl font-black text-on-surface mb-3">还没有猫咪伙伴</h2>
-        <p className="text-on-surface-variant text-base mb-12">快去捏一只或者上传照片生成吧！</p>
-        <button 
-          onClick={() => navigate("/welcome")}
-          className="miao-btn-primary max-w-xs"
-        >
-          开启缘分
-        </button>
+      <div className="flex-grow flex items-center justify-center bg-black">
+        <Loader2 className="w-10 h-10 text-white animate-spin" />
       </div>
     );
   }
@@ -232,8 +232,8 @@ export default function Home() {
   return (
     <div className="flex-grow relative overflow-hidden bg-black">
       {/* 视频播放器区域 - 采用 Stack 堆叠布局实现无缝切换 */}
-      <div className="absolute inset-0 flex items-center justify-center bg-[#F8F9FA] overflow-hidden">
-        {/* 底层：动态占位图 (基于 CatModel 属性，优先使用 avatar) */}
+      <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden">
+        {/* 底层：动态占位图 */}
         <img 
           src={cat?.avatar || `https://picsum.photos/seed/${cat?.breed}-${cat?.color}/1080/1920`} 
           alt="" 
@@ -241,7 +241,7 @@ export default function Home() {
           referrerPolicy="no-referrer"
         />
 
-        {/* 上层：原生视频控件 - 增加淡入动画 */}
+        {/* 上层：原生视频控件 */}
         <video
           ref={videoRef}
           src={currentVideo}
@@ -250,44 +250,41 @@ export default function Home() {
           playsInline
           preload="auto"
           onTimeUpdate={handleTimeUpdate}
-          // 仅在默认动作时开启原生循环
           loop={shouldLoop}
           onEnded={handleVideoEnd}
           onError={handleVideoError}
-          onLoadedData={() => {
-            setIsInitialized(true);
-          }}
+          onLoadedData={() => setIsInitialized(true)}
           onPlaying={() => {
             setIsInitialized(true);
             setIsBuffering(false);
-            setIsVideoReady(true); // 确保视频开始播放时显示
+            setIsVideoReady(true);
           }}
           onWaiting={() => setIsBuffering(true)}
-          className={`absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-500 ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
         />
         
         {/* 初始加载状态 */}
         {!isInitialized && !loadError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-md z-20">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-20">
             <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-10 h-10 text-primary animate-spin" />
-              <span className="text-xs text-primary/60 font-medium">正在唤醒小猫...</span>
+              <Loader2 className="w-10 h-10 text-white animate-spin" />
+              <span className="text-xs text-white/60 font-medium">正在唤醒小猫...</span>
             </div>
           </div>
         )}
 
         {/* 错误状态处理 */}
         {loadError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-md z-40 p-6 text-center">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-40 p-6 text-center">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
                 <AlertCircle className="w-8 h-8 text-red-500" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">小猫迷路了</h3>
-              <p className="text-sm text-gray-500">视频文件加载失败，可能已被移动或删除。</p>
+              <h3 className="text-lg font-bold text-white">小猫迷路了</h3>
+              <p className="text-sm text-white/60">视频文件加载失败，可能已被移动或删除。</p>
               <button 
                 onClick={handleRegenerate}
-                className="px-6 py-2 bg-primary text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform"
+                className="px-8 py-3 bg-[#FF9D76] text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform"
               >
                 重新领养
               </button>
@@ -297,12 +294,108 @@ export default function Home() {
 
         {/* 交互层 */}
         <div 
-          className="absolute inset-0 z-30 cursor-pointer"
+          className="absolute inset-0 z-30"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onContextMenu={(e) => e.preventDefault()}
         />
       </div>
+
+      {/* 隐藏式功能按钮 - 仅在点击屏幕时浮现 */}
+      <AnimatePresence>
+        {showControls && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 pointer-events-none"
+          >
+            {/* 顶部控制项 */}
+            <div className="absolute top-12 left-6 flex flex-col gap-4 pointer-events-auto">
+              <button 
+                onClick={() => navigate("/profile")}
+                className="flex items-center gap-2 bg-black/20 backdrop-blur-xl p-1.5 pr-4 rounded-full border border-white/10 active:scale-95 transition-all"
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20">
+                  <img 
+                    src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
+                    alt="User" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <span className="text-xs font-bold text-white truncate max-w-[80px]">{user?.nickname || "喵星人"}</span>
+              </button>
+
+              <div className="bg-black/20 backdrop-blur-xl px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 w-fit">
+                <Coins size={16} className="text-[#FF9D76]" />
+                <span className="text-sm font-black text-white">{points}</span>
+              </div>
+            </div>
+
+            <div className="absolute top-12 right-6 flex flex-col gap-4 pointer-events-auto">
+              <button 
+                onClick={() => navigate("/notifications")}
+                className="w-12 h-12 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all"
+              >
+                <Bell size={20} />
+              </button>
+              <button 
+                onClick={() => setShowRegenerateConfirm(true)}
+                className="w-12 h-12 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all"
+              >
+                <RefreshCw size={20} />
+              </button>
+              <button 
+                onClick={() => navigate("/switch-companion")}
+                className="w-12 h-12 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all"
+              >
+                <Plus size={22} />
+              </button>
+              <button 
+                onClick={() => navigate("/settings")}
+                className="w-12 h-12 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all"
+              >
+                <Settings size={20} />
+              </button>
+            </div>
+
+            {/* 积分展示 */}
+            {/* 已移动到左侧头像下方 */}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 问候气泡 - 自动消失 */}
+      <AnimatePresence>
+        {greeting && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="absolute top-1/4 left-1/2 -translate-x-1/2 z-40"
+          >
+            <div className="bg-white/10 backdrop-blur-xl px-6 py-3 rounded-full border border-white/10 shadow-2xl">
+              <p className="text-sm font-black text-white tracking-wide">{greeting}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 积分奖励提示 */}
+      <AnimatePresence>
+        {showPointToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-28 left-1/2 -translate-x-1/2 z-50 bg-[#FF9D76] text-white px-6 py-2 rounded-full shadow-2xl flex items-center gap-2"
+          >
+            <Coins size={16} />
+            <span className="text-sm font-black">{showPointToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 重新生成确认弹窗 */}
       {showRegenerateConfirm && (
@@ -336,111 +429,6 @@ export default function Home() {
           </motion.div>
         </div>
       )}
-
-      {/* 顶部状态栏 */}
-      <div className="absolute top-12 left-6 right-6 z-50 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center text-white overflow-hidden">
-            <img src={cat.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-          <div className="bg-white/20 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/20">
-            <span className="text-xs font-black text-white">{cat.name}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 pointer-events-auto">
-          <div className="bg-white/20 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/20 flex items-center gap-2">
-            <Coins size={14} className="text-primary" />
-            <span className="text-xs font-black text-white">{points}</span>
-          </div>
-          
-          {/* 重新生成按钮 */}
-          <button 
-            onClick={() => setShowRegenerateConfirm(true)}
-            className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform pointer-events-auto"
-          >
-            <RefreshCw size={18} />
-          </button>
-
-          <button onClick={() => navigate("/settings")} className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center text-white">
-            <Plus size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* 积分奖励提示 */}
-      <AnimatePresence>
-        {showPointToast && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-28 left-1/2 -translate-x-1/2 z-50 bg-primary text-white px-6 py-2 rounded-full shadow-2xl flex items-center gap-2"
-          >
-            <Coins size={16} />
-            <span className="text-sm font-black">{showPointToast}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 问候气泡 */}
-      <AnimatePresence>
-        {greeting && (
-          <motion.div 
-            initial={{ opacity: 0, x: -20, scale: 0.8 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute top-32 left-8 z-20 bg-white/90 backdrop-blur-md px-5 py-3 rounded-3xl rounded-bl-none shadow-xl border border-white/20"
-          >
-            <p className="text-sm font-black text-on-primary-container">{greeting}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 右侧操作栏 */}
-      <div className="absolute right-6 bottom-40 flex flex-col gap-6 z-20">
-        <button 
-          onClick={() => setIsLiked(!isLiked)}
-          className="flex flex-col items-center gap-1 group"
-        >
-          <div className={`w-14 h-14 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/20 transition-all ${isLiked ? 'bg-red-500 text-white border-red-500' : 'bg-white/10 text-white'}`}>
-            <Heart size={28} fill={isLiked ? "currentColor" : "none"} />
-          </div>
-          <span className="text-[10px] text-white font-black drop-shadow-md">1.2k</span>
-        </button>
-        
-        <button className="flex flex-col items-center gap-1">
-          <div className="w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/20">
-            <MessageCircle size={28} />
-          </div>
-          <span className="text-[10px] text-white font-black drop-shadow-md">86</span>
-        </button>
-
-        <button className="flex flex-col items-center gap-1">
-          <div className="w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/20">
-            <Share2 size={28} />
-          </div>
-          <span className="text-[10px] text-white font-black drop-shadow-md">分享</span>
-        </button>
-      </div>
-
-      {/* 底部信息 */}
-      <div className="absolute bottom-32 left-6 right-24 text-white z-20 pointer-events-none">
-        <div className="flex items-center gap-2 mb-3">
-          {cat.breed !== 'AI 生成' && (
-            <span className="px-4 py-1 bg-primary/90 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest">
-              {cat.breed}
-            </span>
-          )}
-        </div>
-        <h1 className="text-4xl font-black tracking-tight mb-2 drop-shadow-lg">{cat.name}</h1>
-        <p className="text-base opacity-90 font-bold drop-shadow-md leading-relaxed">
-          今天也是元气满满的一天喵~ 快来和我一起玩耍吧！✨
-        </p>
-      </div>
-
-
-      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 pointer-events-none z-10" />
     </div>
   );
 }

@@ -2,10 +2,10 @@ import { storage, CatInfo } from './storage';
 
 export const catService = {
   breeds: [
-    { id: 'british_shorthair', name: '英国短毛猫', prompt: 'British Shorthair cat', image: 'https://picsum.photos/seed/cat_breed_1/400/400' },
-    { id: 'ragdoll', name: '布偶猫', prompt: 'Ragdoll cat', image: 'https://picsum.photos/seed/cat_breed_2/400/400' },
-    { id: 'siamese', name: '暹罗猫', prompt: 'Siamese cat', image: 'https://picsum.photos/seed/cat_breed_3/400/400' },
-    { id: 'maine_coon', name: '缅因猫', prompt: 'Maine Coon cat', image: 'https://picsum.photos/seed/cat_breed_4/400/400' },
+    { id: 'british_shorthair', name: '英国短毛猫', prompt: 'British Shorthair cat', image: '/assets/images/breeds/brit_shorthair.png' },
+    { id: 'ragdoll', name: '布偶猫', prompt: 'Ragdoll cat', image: '/assets/images/breeds/ragdoll.png' },
+    { id: 'siamese', name: '暹罗猫', prompt: 'Siamese cat', image: '/assets/images/breeds/siamese.png' },
+    { id: 'maine_coon', name: '缅因猫', prompt: 'Maine Coon cat', image: '/assets/images/breeds/maine_coon.png' },
   ],
   
   colors: [

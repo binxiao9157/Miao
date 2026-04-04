@@ -1,9 +1,12 @@
-import { Star, CheckCircle2, ArrowRight } from "lucide-react";
+import { Star, CheckCircle2, ArrowRight, Lock } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { storage } from "../services/storage";
 
 export default function Points() {
   const [points, setPoints] = useState(0);
+  const navigate = useNavigate();
+  const REDEEM_THRESHOLD = 200;
 
   useEffect(() => {
     const data = storage.getPoints();
@@ -71,13 +74,36 @@ export default function Points() {
 
       <section className="mt-10">
         <h2 className="text-lg font-bold text-on-surface mb-4">积分兑换</h2>
-        <div className="miao-card p-6 bg-surface-container-low border-dashed border-2 border-outline-variant flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4">
-            <Star className="text-primary" size={32} />
+        <div className={`miao-card p-6 flex flex-col items-center justify-center text-center transition-all ${
+          points < REDEEM_THRESHOLD 
+            ? "bg-surface-container-low border-dashed border-2 border-outline-variant opacity-80" 
+            : "bg-primary/5 border-2 border-primary/20"
+        }`}>
+          <div className={`w-16 h-16 rounded-full shadow-sm flex items-center justify-center mb-4 ${
+            points < REDEEM_THRESHOLD ? "bg-white text-on-surface-variant/40" : "bg-white text-primary"
+          }`}>
+            {points < REDEEM_THRESHOLD ? <Lock size={32} /> : <Star size={32} />}
           </div>
           <h3 className="font-bold text-on-surface mb-1">解锁新伙伴</h3>
-          <p className="text-xs text-on-surface-variant opacity-70 mb-4">消耗 200 积分，即可生成一只全新的猫咪伙伴</p>
-          <button className="miao-btn-secondary w-full py-3 text-sm font-bold">前往兑换</button>
+          <p className="text-xs text-on-surface-variant opacity-70 mb-2">消耗 200 积分，即可生成一只全新的猫咪伙伴</p>
+          
+          {points < REDEEM_THRESHOLD && (
+            <p className="text-[10px] font-black text-primary mb-4 uppercase tracking-widest">
+              还差 {REDEEM_THRESHOLD - points} 积分即可解锁
+            </p>
+          )}
+
+          <button 
+            disabled={points < REDEEM_THRESHOLD}
+            onClick={() => navigate("/welcome", { state: { isRedemption: true } })}
+            className={`w-full py-3 text-sm font-bold rounded-2xl transition-all active:scale-95 ${
+              points < REDEEM_THRESHOLD 
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
+                : "bg-primary text-white shadow-lg shadow-primary/20"
+            }`}
+          >
+            前往兑换
+          </button>
         </div>
       </section>
     </div>

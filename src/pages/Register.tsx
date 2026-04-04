@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ArrowLeft, User, Lock, ShieldCheck, PawPrint } from "lucide-react";
+import { storage } from "../services/storage";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -28,7 +29,12 @@ export default function Register() {
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
     });
     
-    navigate("/welcome");
+    const hasCat = storage.getCatList().length > 0;
+    if (hasCat) {
+      navigate("/");
+    } else {
+      navigate("/empty-cat");
+    }
   };
 
   return (

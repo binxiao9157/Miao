@@ -1,14 +1,24 @@
-import { useState, useRef, ChangeEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, ChangeEvent, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Upload, Sparkles, X, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function UploadMaterial() {
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [nickname, setNickname] = useState("");
+  const [selectedImage, setSelectedImage] = useState<string | null>(location.state?.image || null);
+  const [nickname, setNickname] = useState(location.state?.name || "");
   const [showToast, setShowToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (location.state?.image) {
+      setSelectedImage(location.state.image);
+    }
+    if (location.state?.name) {
+      setNickname(location.state.name);
+    }
+  }, [location.state]);
 
   const triggerToast = (msg: string) => {
     setShowToast(msg);
@@ -50,19 +60,19 @@ export default function UploadMaterial() {
   const isReady = selectedImage && nickname.trim();
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] p-6 flex flex-col font-sans" onClick={() => (document.activeElement as HTMLElement)?.blur()}>
+    <div className="min-h-screen bg-[#FFF5F0] p-6 flex flex-col font-sans" onClick={() => (document.activeElement as HTMLElement)?.blur()}>
       <header className="flex items-center mb-10">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant active:scale-90 transition-transform">
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-[#5D4037] active:scale-90 transition-transform">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-black text-on-surface ml-2">上传素材</h1>
+        <h1 className="text-xl font-black text-[#5D4037] ml-2">上传素材</h1>
       </header>
 
       <div className="flex-grow flex flex-col max-w-md mx-auto w-full">
         <section className="mb-10">
-          <h2 className="text-3xl font-black text-on-surface mb-2 tracking-tight">AI 形象生成</h2>
-          <p className="text-on-surface-variant text-sm font-bold opacity-40 uppercase tracking-widest">AI Image Generation</p>
-          <p className="text-on-surface-variant text-sm mt-3 leading-relaxed">上传一张您家猫咪的照片，AI 将为您生成专属的数字形象。</p>
+          <h2 className="text-3xl font-black text-[#5D4037] mb-2 tracking-tight">AI 形象生成</h2>
+          <p className="text-[#5D4037]/40 text-sm font-bold uppercase tracking-widest">AI Image Generation</p>
+          <p className="text-[#5D4037]/60 text-sm mt-3 leading-relaxed">上传一张您家猫咪的照片，AI 将为您生成专属的数字形象。</p>
         </section>
 
         <div className="flex-grow flex flex-col items-center justify-start space-y-8">

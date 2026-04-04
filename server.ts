@@ -36,19 +36,22 @@ async function startServer() {
 
       // Handle both image and text
       if (image_base64) {
-        // Ensure we have a clean base64 string without the Data URL prefix
-        const rawBase64 = image_base64.replace(/^data:image\/\w+;base64,/, "");
+        // Ensure we have a clean data URL with prefix
+        // Ark Video Generation API (Seedance) typically expects the full data URL
+        const dataUrl = image_base64.startsWith('data:') 
+          ? image_base64 
+          : `data:image/jpeg;base64,${image_base64}`;
         
-        console.log("Image size (raw base64):", (rawBase64.length / 1024 / 1024).toFixed(2), "MB");
+        console.log("Image size (data URL):", (dataUrl.length / 1024 / 1024).toFixed(2), "MB");
 
         // Seedance 1.5 Pro V3 Tasks API structure
-        // The error "Invalid base64 image_url" often occurs when the 'url' field 
-        // contains the 'data:image/...' prefix but the API expects raw base64.
+        // The error "Invalid base64 image_url" often occurs when the prefix is missing
+        // or the structure is incorrect.
         requestBody.content = [
           {
             type: "image_url",
             image_url: {
-              url: rawBase64 // Use raw base64 without prefix
+              url: dataUrl
             }
           },
           {
@@ -57,11 +60,10 @@ async function startServer() {
           }
         ];
 
-        // We also include 'input' as some model versions might look there, 
-        // but we use the same raw base64 format.
+        // We also include 'input' as some model versions might look there.
         requestBody.input = {
           prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
-          image_url: rawBase64
+          image_url: dataUrl
         };
       } else {
         requestBody.content = [

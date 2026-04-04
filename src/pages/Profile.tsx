@@ -3,12 +3,15 @@ import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as U
 import { useAuth } from "../hooks/useAuth";
 import { storage } from "../services/storage";
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [stats, setStats] = useState({ days: 0, entries: 0 });
   const [activeCat, setActiveCat] = useState<any>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const diaries = storage.getDiaries();
@@ -28,18 +31,14 @@ export default function Profile() {
   }, []);
 
   const handleLogout = () => {
-    if (window.confirm("确定要退出登录吗？")) {
-      logout();
-      navigate("/login");
-    }
+    logout();
+    navigate("/login", { replace: true });
   };
 
   const handleDeleteAccount = () => {
-    if (window.confirm("警告：注销账户将清除所有数据且无法恢复！确定要继续吗？")) {
-      storage.clearAll();
-      logout();
-      navigate("/register");
-    }
+    storage.clearAll();
+    logout();
+    navigate("/register", { replace: true });
   };
 
   const menuItems = [
@@ -68,7 +67,7 @@ export default function Profile() {
           <div className="relative mb-4 group">
             <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-tr from-primary to-secondary shadow-xl overflow-hidden">
               <img 
-                src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'default'}`} 
+                src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
                 alt="Avatar" 
                 className="w-full h-full rounded-full border-4 border-white object-cover bg-white"
                 referrerPolicy="no-referrer"
@@ -134,7 +133,7 @@ export default function Profile() {
           ))}
           
           <button 
-            onClick={handleLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             className="w-full flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm active:scale-[0.98] transition-all hover:shadow-md mt-6"
           >
             <div className="flex items-center gap-4">
@@ -147,7 +146,7 @@ export default function Profile() {
           </button>
 
           <button 
-            onClick={handleDeleteAccount}
+            onClick={() => setShowDeleteConfirm(true)}
             className="w-full flex items-center justify-between p-4 bg-red-50 rounded-2xl shadow-sm active:scale-[0.98] transition-all hover:shadow-md mt-4"
           >
             <div className="flex items-center gap-4">
@@ -160,6 +159,78 @@ export default function Profile() {
           </button>
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-3xl p-8 w-full max-w-xs shadow-2xl text-center"
+            >
+              <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <LogOut className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">退出登录？</h3>
+              <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+                确定要退出登录吗？
+              </p>
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleLogout}
+                  className="w-full py-3 bg-primary text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-transform"
+                >
+                  确定退出
+                </button>
+                <button 
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="w-full py-3 bg-gray-100 text-gray-600 rounded-2xl font-bold active:scale-95 transition-transform"
+                >
+                  取消
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Account Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-3xl p-8 w-full max-w-xs shadow-2xl text-center"
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-red-500 mb-2">注销账户？</h3>
+              <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+                注销账户将永久删除您的所有数据（包括猫咪、日记、信件），此操作不可撤销。确定继续吗？
+              </p>
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleDeleteAccount}
+                  className="w-full py-3 bg-red-500 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-transform"
+                >
+                  确定注销
+                </button>
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="w-full py-3 bg-gray-100 text-gray-600 rounded-2xl font-bold active:scale-95 transition-transform"
+                >
+                  再想想
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <footer className="mt-12 text-center">
         <p className="text-[10px] font-bold text-on-surface-variant opacity-30 uppercase tracking-widest">Miao Version 1.0.0</p>
