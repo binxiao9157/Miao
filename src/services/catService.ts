@@ -2,10 +2,30 @@ import { storage, CatInfo } from './storage';
 
 export const catService = {
   breeds: [
-    { id: 'british_shorthair', name: '英国短毛猫', prompt: 'British Shorthair cat', image: '/assets/images/breeds/brit_shorthair.png' },
-    { id: 'ragdoll', name: '布偶猫', prompt: 'Ragdoll cat', image: '/assets/images/breeds/ragdoll.png' },
-    { id: 'siamese', name: '暹罗猫', prompt: 'Siamese cat', image: '/assets/images/breeds/siamese.png' },
-    { id: 'maine_coon', name: '缅因猫', prompt: 'Maine Coon cat', image: '/assets/images/breeds/maine_coon.png' },
+    { 
+      id: 'british_shorthair', 
+      name: '英国短毛猫', 
+      prompt: 'British Shorthair cat', 
+      image: 'https://images.unsplash.com/photo-1513245543132-31f507417b26?q=80&w=512&h=512&auto=format&fit=crop' 
+    },
+    { 
+      id: 'ragdoll', 
+      name: '布偶猫', 
+      prompt: 'Ragdoll cat', 
+      image: 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?q=80&w=512&h=512&auto=format&fit=crop' 
+    },
+    { 
+      id: 'persian', 
+      name: '波斯猫', 
+      prompt: 'Persian cat', 
+      image: 'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?q=80&w=512&h=512&auto=format&fit=crop' 
+    },
+    { 
+      id: 'maine_coon', 
+      name: '缅因猫', 
+      prompt: 'Maine Coon cat', 
+      image: 'https://images.unsplash.com/photo-1589883661923-6476cb0ae9f2?q=80&w=512&h=512&auto=format&fit=crop' 
+    },
   ],
   
   colors: [

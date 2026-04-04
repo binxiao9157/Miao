@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Check, Sparkles, AlertCircle, Coins, PartyPopper, Loader2 } from "lucide-react";
 import { catService } from "../services/catService";
@@ -30,12 +30,16 @@ export default function CreateCompanion() {
 
   const getBase64FromUrl = async (url: string, fallbackId: string): Promise<string> => {
     try {
-      let response = await fetch(url);
-      if (!response.ok) {
-        console.warn(`Local asset not found: ${url}, using fallback.`);
+      let response;
+      try {
+        response = await fetch(url);
+        if (!response.ok) throw new Error("Not found");
+      } catch (e) {
+        console.warn(`Local asset not found or fetch failed: ${url}, using fallback.`);
         const fallbackUrl = `https://picsum.photos/seed/cat_${fallbackId}/400/400`;
         response = await fetch(fallbackUrl);
       }
+      
       const blob = await response.blob();
       
       // 使用 Canvas 进行图片压缩和尺寸调整，确保 API 兼容性
@@ -170,110 +174,114 @@ export default function CreateCompanion() {
       </header>
 
       {/* 滚动内容区域 */}
-      <div className="flex-grow overflow-y-auto px-6 pb-40 space-y-10 no-scrollbar">
-        {/* 名字输入 */}
-        <div className="space-y-3">
-          <label className="text-xs font-black uppercase tracking-[0.2em] text-on-surface-variant/40 ml-1">猫咪昵称</label>
-          <input 
-            type="text" 
-            value={catName}
-            onChange={(e) => setCatName(e.target.value)}
-            placeholder="给它起个好听的名字"
-            className="w-full p-5 bg-white rounded-3xl border-none shadow-sm focus:ring-4 focus:ring-primary/10 outline-none transition-all font-bold text-on-surface" 
-          />
-        </div>
-
-        {/* 品种选择 - 2x2 Grid */}
-        <div className="space-y-4">
-          <label className="text-xs font-black uppercase tracking-[0.2em] text-on-surface-variant/40 ml-1">选择品种</label>
-          <div className="grid grid-cols-2 gap-4">
-            {catService.breeds.map((breed) => (
-              <button
-                key={breed.id}
-                onClick={() => setSelectedBreed(breed.id)}
-                className={`p-5 rounded-[32px] border-[3px] transition-all flex flex-col items-center gap-4 relative overflow-hidden ${
-                  selectedBreed === breed.id 
-                    ? "border-[#8B4513] bg-[#8B4513]/5 scale-[1.02] shadow-lg" 
-                    : "border-transparent bg-white shadow-sm hover:bg-surface-variant/5"
-                }`}
-              >
-                <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-white shadow-md bg-surface-variant/10">
-                  <img 
-                    src={breed.image} 
-                    alt={breed.name} 
-                    className="w-full h-full object-cover" 
-                    onError={(e) => {
-                      // Fallback if local asset is missing
-                      (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${breed.id}`;
-                    }}
-                  />
-                </div>
-                <span className={`text-sm font-black ${selectedBreed === breed.id ? "text-[#8B4513]" : "text-on-surface-variant"}`}>
-                  {breed.name}
-                </span>
-                {selectedBreed === breed.id && (
-                  <div className="absolute top-3 right-3 bg-[#8B4513] text-white rounded-full p-1 shadow-sm">
-                    <Check size={14} strokeWidth={4} />
-                  </div>
-                )}
-              </button>
-            ))}
+      <div className="flex-grow overflow-y-auto px-6 no-scrollbar">
+        <div className="pt-4 pb-40 space-y-10">
+          {/* 名字输入 */}
+          <div className="space-y-3">
+            <label className="text-xs font-black uppercase tracking-[0.2em] text-[#5D4037]/40 ml-1">猫咪昵称</label>
+            <input 
+              type="text" 
+              value={catName}
+              onChange={(e) => setCatName(e.target.value)}
+              placeholder="给它起个好听的名字"
+              className="w-full p-5 bg-white rounded-[24px] border-none shadow-sm focus:ring-4 focus:ring-[#FF9D76]/10 outline-none transition-all font-bold text-[#5D4037]" 
+            />
           </div>
-        </div>
 
-        {/* 毛色选择 */}
-        <div className="space-y-4">
-          <label className="text-xs font-black uppercase tracking-[0.2em] text-on-surface-variant/40 ml-1">选择毛色</label>
-          <div className="flex flex-wrap items-center gap-6 px-2">
-            {catService.colors.map((color) => (
-              <button
-                key={color.id}
-                onClick={() => setSelectedColor(color.id)}
-                className={`relative shrink-0 w-14 h-14 rounded-full transition-all shadow-md ${
-                  selectedColor === color.id 
-                    ? "scale-110 ring-4 ring-primary ring-offset-4 z-10" 
-                    : "hover:scale-105 active:scale-95"
-                }`}
-                style={{ background: color.hex }}
-              >
-                {selectedColor === color.id && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Check 
-                      size={28} 
-                      className={color.id === 'white' ? "text-primary" : "text-white"} 
-                      strokeWidth={4}
+          {/* 品种选择 - 2x2 Grid */}
+          <div className="space-y-4">
+            <label className="text-xs font-black uppercase tracking-[0.2em] text-[#5D4037]/40 ml-1">选择品种</label>
+            <div className="grid grid-cols-2 gap-4">
+              {catService.breeds.map((breed) => (
+                <button
+                  key={breed.id}
+                  onClick={() => setSelectedBreed(breed.id)}
+                  className={`p-5 rounded-[32px] border-[3px] transition-all flex flex-col items-center gap-4 relative overflow-hidden ${
+                    selectedBreed === breed.id 
+                      ? "border-[#8B4513] bg-[#8B4513]/5 scale-[1.02] shadow-lg" 
+                      : "border-transparent bg-white shadow-sm hover:bg-[#5D4037]/5"
+                  }`}
+                >
+                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-white shadow-md bg-[#5D4037]/5">
+                    <img 
+                      src={breed.image} 
+                      alt={breed.name} 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => {
+                        // 如果本地素材缺失，使用高质量的占位图
+                        (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${breed.id}&backgroundColor=f8d4c1`;
+                      }}
                     />
                   </div>
-                )}
-              </button>
-            ))}
+                  <span className={`text-sm font-black ${selectedBreed === breed.id ? "text-[#8B4513]" : "text-[#5D4037]/60"}`}>
+                    {breed.name}
+                  </span>
+                  {selectedBreed === breed.id && (
+                    <div className="absolute top-3 right-3 bg-[#8B4513] text-white rounded-full p-1 shadow-sm">
+                      <Check size={14} strokeWidth={4} />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 毛色选择 */}
+          <div className="space-y-4">
+            <label className="text-xs font-black uppercase tracking-[0.2em] text-[#5D4037]/40 ml-1">选择毛色</label>
+            <div className="flex flex-wrap items-center gap-6 px-2">
+              {catService.colors.map((color) => (
+                <button
+                  key={color.id}
+                  onClick={() => setSelectedColor(color.id)}
+                  className={`relative shrink-0 w-14 h-14 rounded-full transition-all shadow-md ${
+                    selectedColor === color.id 
+                      ? "scale-110 ring-4 ring-[#FF9D76] ring-offset-4 z-10" 
+                      : "hover:scale-105 active:scale-95"
+                  }`}
+                  style={{ background: color.hex }}
+                >
+                  {selectedColor === color.id && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Check 
+                        size={28} 
+                        className={color.id === 'white' ? "text-[#FF9D76]" : "text-white"} 
+                        strokeWidth={4}
+                      />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 底部固定按钮区域 */}
-      <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-background via-background to-transparent pt-12 z-50">
-        <button 
-          onClick={handleGenerate}
-          disabled={isGenerating || !isFormComplete}
-          className={`w-full py-5 rounded-full font-black text-lg shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all relative overflow-hidden ${
-            isFormComplete && !isGenerating
-              ? "bg-primary text-white shadow-primary/30"
-              : "bg-surface-variant text-on-surface-variant opacity-50 cursor-not-allowed"
-          }`}
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="animate-spin" size={24} />
-              <span>{generationStatus}</span>
-            </>
-          ) : (
-            <>
-              <Sparkles size={22} />
-              <span>确认生成</span>
-            </>
-          )}
-        </button>
+      {/* 底部固定按钮区域 - 使用 SafeArea 逻辑 */}
+      <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[#FFF5F0] via-[#FFF5F0] to-transparent pt-12 z-50">
+        <div className="max-w-md mx-auto w-full">
+          <button 
+            onClick={handleGenerate}
+            disabled={isGenerating || !isFormComplete}
+            className={`w-full py-5 rounded-full font-black text-lg shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all relative overflow-hidden ${
+              isFormComplete && !isGenerating
+                ? "bg-[#FF9D76] text-white shadow-[#FF9D76]/30"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="animate-spin" size={24} />
+                <span>{generationStatus}</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={22} />
+                <span>确认生成</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* 成功弹窗 */}
