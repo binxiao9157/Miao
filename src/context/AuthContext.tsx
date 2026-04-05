@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    storage.clearAll();
+    storage.removeToken();
     setUser(null);
     setIsAuthenticated(false);
     setHasCat(false);

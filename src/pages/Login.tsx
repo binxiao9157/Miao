@@ -30,8 +30,12 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-between p-8 bg-background dot-pattern">
-      <div className="w-full flex flex-col items-center pt-8">
+    <div className="min-h-screen flex flex-col items-center justify-between p-8 bg-background relative overflow-hidden">
+      {/* Decorative elements */}
+      <div className="absolute -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
+      <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl"></div>
+
+      <div className="w-full flex flex-col items-center pt-8 relative z-10">
         {/* Logo Section */}
         <div className="flex items-center gap-3 mb-10 group">
           <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={36} />
@@ -94,7 +98,7 @@ export default function Login() {
       </div>
 
       {/* Footer Section */}
-      <div className="pb-8 text-center space-y-4">
+      <div className="pb-8 text-center space-y-4 relative z-10">
         <div className="flex items-center justify-center gap-4 text-sm font-medium text-on-surface-variant/60">
           <span>隐私政策</span>
           <span className="w-1.5 h-1.5 bg-on-surface-variant/20 rounded-full"></span>

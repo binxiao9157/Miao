@@ -85,6 +85,12 @@ export const storage = {
     }
   },
   
+  removeToken: () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    } catch (e) {}
+  },
+  
   clearAll: () => {
     Object.values(STORAGE_KEYS).forEach(key => {
       try {
