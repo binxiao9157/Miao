@@ -21,8 +21,8 @@
 }
 
 @layer base {
-  body {
-    @apply bg-background text-on-surface font-sans;
+  html, body, #root {
+    @apply w-full h-full overflow-hidden bg-background text-on-surface font-sans;
     -webkit-font-smoothing: antialiased;
   }
 }
@@ -56,5 +56,17 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /* 全屏沉浸式组件需要忽略安全区 */
+  .edge-to-edge {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 0;
   }
 }

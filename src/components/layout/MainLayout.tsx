@@ -3,6 +3,7 @@ import { BookOpen, Mail, Home, Star, User } from "lucide-react";
 import { motion } from "motion/react";
 import HomePage from "../../pages/Home";
 import { useAuthContext } from "../../context/AuthContext";
+import { useStatusBar } from "../../hooks/useStatusBar";
 
 export default function MainLayout() {
   const navigate = useNavigate();
@@ -10,6 +11,9 @@ export default function MainLayout() {
   const { hasCat } = useAuthContext();
 
   const isHome = location.pathname === "/";
+  
+  // 动态管理状态栏样式
+  useStatusBar(isHome ? 'immersive' : 'light');
 
   const navItems = [
     { icon: BookOpen, label: "日志", path: "/diary" },
@@ -20,20 +24,31 @@ export default function MainLayout() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-background relative">
-      <main className="flex-grow flex flex-col pb-28 relative">
+    <div className="min-h-screen flex flex-col bg-background relative overflow-hidden">
+      <main className={`flex-grow flex flex-col relative ${isHome ? '' : 'pb-28'}`}>
         {/* Keep Home alive by rendering it always. Use opacity/z-index instead of display:none to prevent video blanking issues in browsers */}
         <div className={`absolute inset-0 ${isHome ? 'z-0 opacity-100' : '-z-10 opacity-0 pointer-events-none'}`}>
           {hasCat && <HomePage />}
         </div>
         
-        {/* Other routes will render here */}
-        <div className={`absolute inset-0 z-10 bg-background overflow-y-auto ${isHome ? 'hidden' : 'block'}`}>
+        {/* Other routes will render here - 适配安全区 */}
+        <div 
+          className={`absolute inset-0 z-10 bg-background overflow-y-auto ${isHome ? 'hidden' : 'block'}`}
+          style={{ 
+            paddingTop: 'env(safe-area-inset-top)',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+            paddingLeft: 'env(safe-area-inset-left)',
+            paddingRight: 'env(safe-area-inset-right)'
+          }}
+        >
           <Outlet />
         </div>
       </main>
       
-      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/80 backdrop-blur-xl rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex justify-around items-center px-4 py-3 z-50 border border-white/50">
+      <nav 
+        className="fixed left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/80 backdrop-blur-xl rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex justify-around items-center px-4 py-3 z-50 border border-white/50"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 2rem)' }}
+      >
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;

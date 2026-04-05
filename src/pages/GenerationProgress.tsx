@@ -207,33 +207,45 @@ export default function GenerationProgress() {
         )}
       </AnimatePresence>
 
-      {/* 成功弹窗 */}
+      {/* 成功预览 - 全屏沉浸式 */}
       <AnimatePresence>
         {showSuccess && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-center justify-center p-6"
+            className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center overflow-hidden"
           >
+            {/* 视频背景 */}
+            <div className="absolute inset-0 z-0">
+              <video 
+                src={storage.getActiveCat()?.videoPath}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-black/20"></div>
+            </div>
+
+            {/* 成功信息浮层 - 半透明毛玻璃 */}
             <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-[40px] p-8 w-full max-w-sm shadow-2xl text-center relative overflow-hidden"
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              className="relative z-10 bg-white/10 backdrop-blur-xl rounded-[40px] p-8 w-[85%] max-w-sm shadow-2xl text-center border border-white/20"
             >
-              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF9D76] to-orange-300"></div>
-              
-              <div className="w-20 h-20 bg-[#FF9D76]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-20 h-20 bg-[#FF9D76]/20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <PartyPopper className="text-[#FF9D76]" size={40} />
               </div>
               
-              <h2 className="text-2xl font-black text-[#5D4037] mb-2">恭喜获得新伙伴！</h2>
-              <p className="text-sm text-[#5D4037]/60 mb-8 leading-relaxed">
+              <h2 className="text-2xl font-black text-white mb-2">恭喜获得新伙伴！</h2>
+              <p className="text-sm text-white/80 mb-8 leading-relaxed">
                 你成功领养了 <span className="text-[#FF9D76] font-bold">{name || "小猫"}</span>，它已经在猫窝里等你啦～
               </p>
               
               {isRedemption && (
-                <div className="bg-[#FF9D76]/5 rounded-2xl p-4 mb-8 flex items-center justify-center gap-2">
+                <div className="bg-white/5 rounded-2xl p-4 mb-8 flex items-center justify-center gap-2 border border-white/10">
                   <Coins size={16} className="text-[#FF9D76]" />
                   <span className="text-xs font-bold text-[#FF9D76]">已消耗 200 积分</span>
                 </div>

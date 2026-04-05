@@ -80,8 +80,8 @@ async function startServer() {
         model: ARK_MODEL_ID,
         content: contentArray,
         parameters: {
-          // 使用 480p 这种更兼容的尺寸标识
-          size: "480p"
+          // 请求 9:16 比例以适配手机全屏
+          size: "540x960"
         }
       };
 

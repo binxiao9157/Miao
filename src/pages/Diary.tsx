@@ -117,7 +117,7 @@ export default function Diary() {
 
   return (
     <div className="min-h-screen bg-background pb-32">
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 py-6 flex justify-between items-center">
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 py-8 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-on-surface">日常记录</h1>
           <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest mt-1">Daily Moments</p>

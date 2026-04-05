@@ -110,7 +110,7 @@ export default function CatPlayer() {
   if (!cat) return null;
 
   return (
-    <div className="h-screen bg-black relative overflow-hidden flex flex-col">
+    <div className="edge-to-edge bg-black relative overflow-hidden flex flex-col">
       {/* 错误提示 */}
       <AnimatePresence>
         {errorDetails && (
@@ -204,8 +204,11 @@ export default function CatPlayer() {
           </motion.div>
         )}
       </AnimatePresence>
-      {/* 顶部栏 */}
-      <header className="absolute top-0 left-0 right-0 z-30 p-6 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent">
+      {/* 顶部栏 - 适配安全区 */}
+      <header 
+        className="absolute left-0 right-0 z-30 p-6 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent"
+        style={{ top: 'env(safe-area-inset-top)' }}
+      >
         <button onClick={() => navigate("/")} className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white">
           <ArrowLeft size={24} />
         </button>
@@ -229,7 +232,7 @@ export default function CatPlayer() {
           muted
           playsInline
           referrerPolicy="no-referrer"
-          className="w-full h-full object-contain"
+          className="w-full h-full object-cover"
           onPlay={() => {
             console.log("[DEBUG] Video play event triggered");
             setIsPlaying(true);

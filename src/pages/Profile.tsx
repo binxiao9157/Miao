@@ -49,7 +49,7 @@ export default function Profile() {
   ];
 
   return (
-    <div className="min-h-screen bg-background p-6 pb-24 flex flex-col">
+    <div className="min-h-screen bg-background p-6 pt-10 pb-24 flex flex-col">
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-2 group">
           <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={28} />
