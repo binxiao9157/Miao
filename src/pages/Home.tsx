@@ -7,6 +7,11 @@ import { useAuthContext } from "../context/AuthContext";
 
 const VIDEOS = {
   DEFAULT: "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4",
+  // 由于真实的互动视频需要 AI 针对每只猫咪单独生成，这里在原型阶段统一使用可靠的默认视频进行动作模拟，避免 404 加载失败
+  TAP: "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4",
+  DOUBLE_TAP: "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4",
+  LONG_PRESS: "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4",
+  SWIPE: "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4"
 };
 
 export default function Home() {
@@ -25,11 +30,15 @@ export default function Home() {
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false); // 确认弹窗状态
   const [loadError, setLoadError] = useState(false); // 加载错误状态
   const [showControls, setShowControls] = useState(false); // 控制按钮显示状态
+  const [interactionBubble, setInteractionBubble] = useState<{text: string, id: number} | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const onlineTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+  const lastTapTime = useRef<number>(0);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressTriggered = useRef(false);
 
   useEffect(() => {
     const refreshCat = () => {
@@ -94,6 +103,15 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    if (interactionBubble) {
+      const timer = setTimeout(() => {
+        setInteractionBubble(null);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [interactionBubble]);
+
   // Handle visibility changes (KeepAlive resume) and cat changes
   useEffect(() => {
     if (location.pathname === "/") {
@@ -146,21 +164,8 @@ export default function Home() {
     }
   };
 
-  const playAction = (action: string) => {
-    // 重新播放当前视频以提供反馈，不再切换 src 导致加载失败
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play().catch(() => {});
-    }
-    
-    let actionName = "";
-    switch(action) {
-      case 'eating': actionName = "喂食成功"; break;
-      case 'playing': actionName = "玩耍开心"; break;
-      case 'wakeup': actionName = "贴贴猫咪"; break;
-      default: actionName = "互动成功";
-    }
-    
+  const triggerInteraction = (actionName: string, bubbleText: string) => {
+    setInteractionBubble({ text: bubbleText, id: Date.now() });
     handleInteraction(actionName);
   };
 
@@ -213,8 +218,10 @@ export default function Home() {
   };
 
   const handleLongPressStart = () => {
+    isLongPressTriggered.current = false;
     longPressTimer.current = setTimeout(() => {
-      playAction('wakeup');
+      isLongPressTriggered.current = true;
+      triggerInteraction('贴贴猫咪', '呼噜呼噜... 🐾');
     }, 600);
   };
 
@@ -245,22 +252,38 @@ export default function Home() {
     const dy = touchEndPos.y - touchStartPos.current.y;
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
+    const now = Date.now();
+
+    if (isLongPressTriggered.current) {
+      isLongPressTriggered.current = false;
+      touchStartPos.current = null;
+      return;
+    }
 
     if (absDx > 50 || absDy > 50) {
       // Swipe detected
-      if (absDx > absDy) {
-        // 水平滑动 (Horizontal Swipe)
-        playAction('playing');
-      } else {
-        // 垂直滑动 (Vertical Swipe)
-        playAction('eating');
-      }
+      triggerInteraction('喂食成功', '吧唧吧唧... 🐟');
     } else if (absDx < 10 && absDy < 10) {
-      // Single tap detected - toggle controls
-      setShowControls(!showControls);
-      // Auto hide controls after 5 seconds
-      if (!showControls) {
-        setTimeout(() => setShowControls(false), 5000);
+      if (now - lastTapTime.current < 300) {
+        // Double tap
+        if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+        triggerInteraction('开心玩耍', '好开心！ 🧶');
+        lastTapTime.current = 0;
+      } else {
+        // Single tap
+        lastTapTime.current = now;
+        tapTimeoutRef.current = setTimeout(() => {
+          if (lastTapTime.current === now) {
+            triggerInteraction('轻轻抚摸', '喵呜～ ❤️');
+            setShowControls(prev => {
+              const next = !prev;
+              if (next) {
+                setTimeout(() => setShowControls(false), 5000);
+              }
+              return next;
+            });
+          }
+        }, 300);
       }
     }
     
@@ -443,6 +466,24 @@ export default function Home() {
           >
             <div className="bg-white/10 backdrop-blur-xl px-6 py-3 rounded-full border border-white/10 shadow-2xl">
               <p className="text-sm font-black text-white tracking-wide">{greeting}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 互动气泡 */}
+      <AnimatePresence>
+        {interactionBubble && (
+          <motion.div 
+            key={interactionBubble.id}
+            initial={{ opacity: 0, scale: 0.5, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: -20 }}
+            transition={{ type: "spring", damping: 15 }}
+            className="absolute top-1/3 left-1/2 -translate-x-1/2 z-40 pointer-events-none"
+          >
+            <div className="bg-white/90 backdrop-blur-md px-5 py-2.5 rounded-2xl shadow-xl border border-primary/20 flex items-center gap-2">
+              <span className="text-primary font-black text-sm">{interactionBubble.text}</span>
             </div>
           </motion.div>
         )}
