@@ -84,16 +84,24 @@ export default function Profile() {
           <p className="text-[10px] font-bold text-on-surface-variant opacity-50 uppercase tracking-widest mt-1">ID: {user?.username || "---"}</p>
           
           <div className="mt-8 grid grid-cols-2 gap-4 w-full">
-            <div className="miao-card p-4 flex flex-col items-center justify-center bg-white border-b-4 border-primary/20">
+            <motion.div 
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate("/accompany-milestone", { state: { catName: activeCat?.name || "猫咪", days: stats.days } })}
+              className="miao-card p-4 flex flex-col items-center justify-center bg-white border-b-4 border-primary/20 cursor-pointer"
+            >
               <Calendar className="text-primary mb-1 opacity-40" size={16} />
               <p className="text-xl font-black text-primary">{stats.days}</p>
               <p className="text-[10px] font-bold text-on-surface-variant opacity-60 uppercase tracking-tighter">陪伴天数</p>
-            </div>
-            <div className="miao-card p-4 flex flex-col items-center justify-center bg-white border-b-4 border-secondary/20">
+            </motion.div>
+            <motion.div 
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate("/diary")}
+              className="miao-card p-4 flex flex-col items-center justify-center bg-white border-b-4 border-secondary/20 cursor-pointer"
+            >
               <ImageIcon className="text-secondary mb-1 opacity-40" size={16} />
               <p className="text-xl font-black text-secondary">{stats.entries}</p>
               <p className="text-[10px] font-bold text-on-surface-variant opacity-60 uppercase tracking-tighter">记录瞬间</p>
-            </div>
+            </motion.div>
           </div>
 
           {/* 猫咪切换入口 */}

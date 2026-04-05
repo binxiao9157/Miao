@@ -27,6 +27,7 @@ import CatPlayer from "./pages/CatPlayer";
 import CatHistory from "./pages/CatHistory";
 import CreateCompanion from "./pages/CreateCompanion";
 import EmptyCatPage from "./pages/EmptyCatPage";
+import AccompanyMilestonePage from "./pages/AccompanyMilestonePage";
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 import { storage } from "./services/storage";
@@ -68,6 +69,7 @@ function AppRoutes() {
       <Route path="/generation-progress" element={<ProtectedRoute><GenerationProgress /></ProtectedRoute>} />
       <Route path="/cat-player/:id" element={<ProtectedRoute><CatPlayer /></ProtectedRoute>} />
       <Route path="/cat-history" element={<ProtectedRoute><CatHistory /></ProtectedRoute>} />
+      <Route path="/accompany-milestone" element={<ProtectedRoute><AccompanyMilestonePage /></ProtectedRoute>} />
 
       {/* Main App Routes (with Bottom Nav) */}
       <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
