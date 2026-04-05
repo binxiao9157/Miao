@@ -271,6 +271,10 @@ export const storage = {
     storage.saveDiaries(cleaned);
   },
 
+  clearAll: () => {
+    Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+  },
+  
   deleteCat: () => {
     localStorage.removeItem(STORAGE_KEYS.CAT_LIST);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_CAT_ID);
