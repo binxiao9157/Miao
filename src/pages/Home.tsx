@@ -161,6 +161,21 @@ export default function Home() {
       if (videoRef.current) {
         videoRef.current.play().catch(() => {});
       }
+
+      // 刷新问候语逻辑，确保设置即时生效
+      const settings = storage.getSettings();
+      if (settings.greetingsEnabled) {
+        const hour = new Date().getHours();
+        if (hour >= 7 && hour < 10) {
+          setGreeting("早上好～");
+        } else if (hour >= 22 && hour < 24) {
+          setGreeting("该休息啦～");
+        } else {
+          setGreeting(null);
+        }
+      } else {
+        setGreeting(null);
+      }
     } else {
       // Pause video when leaving the tab to save resources
       if (videoRef.current) {
@@ -348,7 +363,7 @@ export default function Home() {
   return (
     <div className="w-full h-full flex flex-col relative overflow-hidden bg-black touch-none">
       {/* 视频播放器区域 - 采用 Stack 堆叠布局实现无缝切换 */}
-      <div className="edge-to-edge flex items-center justify-center bg-black overflow-hidden">
+      <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden">
         {/* 底层：动态占位图 */}
         <img 
           src={cat?.avatar || `https://picsum.photos/seed/${cat?.breed}-${cat?.color}/1080/1920`} 
@@ -437,8 +452,8 @@ export default function Home() {
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 pointer-events-none"
           >
-            {/* 顶部控制项 - 适配安全区 */}
-            <div className="absolute left-6 flex flex-col gap-4 pointer-events-auto" style={{ top: 'calc(env(safe-area-inset-top) + 1.5rem)' }}>
+            {/* 顶部控制项 */}
+            <div className="absolute top-12 left-6 flex flex-col gap-4 pointer-events-auto">
               <button 
                 onClick={() => navigate("/profile")}
                 className="flex items-center gap-2 bg-black/20 backdrop-blur-xl p-1.5 pr-4 rounded-full border border-white/10 active:scale-95 transition-all"
@@ -460,7 +475,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="absolute right-6 flex flex-col gap-4 pointer-events-auto" style={{ top: 'calc(env(safe-area-inset-top) + 1.5rem)' }}>
+            <div className="absolute top-12 right-6 flex flex-col gap-4 pointer-events-auto">
               <button 
                 onClick={() => navigate("/notifications")}
                 className="w-12 h-12 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all"
