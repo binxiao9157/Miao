@@ -138,9 +138,9 @@ export default function TimeLetters() {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="min-h-[100dvh] bg-background flex flex-col"
+      className="bg-background flex flex-col min-h-screen pb-32"
     >
-      <div className="flex-grow overflow-y-auto p-8 pb-32">
+      <div className="p-8">
         <header className="flex items-center justify-between mb-12">
           <button onClick={() => setView('list')} className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant">
             <ArrowLeft size={24} />
@@ -205,9 +205,6 @@ export default function TimeLetters() {
           <Send size={20} />
           封存信件
         </button>
-        
-        {/* 底部安全间距，确保能滚过导航栏 */}
-        <div className="h-24" />
       </div>
     </motion.div>
   );
