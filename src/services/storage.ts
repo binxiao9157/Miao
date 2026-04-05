@@ -37,6 +37,11 @@ export interface AppSettings {
   timeLetterReminder: boolean;
 }
 
+export interface Comment {
+  id: string;
+  content: string;
+}
+
 export interface DiaryEntry {
   id: string;
   content: string;
@@ -45,7 +50,7 @@ export interface DiaryEntry {
   createdAt: number;
   likes: number;
   isLiked: boolean;
-  comments: string[];
+  comments: Comment[];
 }
 
 export interface TimeLetter {
@@ -256,6 +261,20 @@ export const storage = {
     return updated;
   },
 
+  deleteComment: (diaryId: string, commentId: string) => {
+    console.log("storage: deleteComment called", { diaryId, commentId });
+    const diaries = storage.getDiaries();
+    const diary = diaries.find(d => d.id === diaryId);
+    console.log("storage: diary found", diary);
+    if (diary) {
+      diary.comments = diary.comments.filter(c => c.id !== commentId);
+      console.log("storage: comments after filter", diary.comments);
+      storage.saveDiaries(diaries);
+      return [...diaries];
+    }
+    return [...diaries];
+  },
+
   // Time Letters storage
   getTimeLetters: (): TimeLetter[] => {
     return storage.safeParse<TimeLetter[]>(STORAGE_KEYS.TIME_LETTERS, []);
@@ -271,10 +290,6 @@ export const storage = {
     storage.saveDiaries(cleaned);
   },
 
-  clearAll: () => {
-    Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
-  },
-  
   deleteCat: () => {
     localStorage.removeItem(STORAGE_KEYS.CAT_LIST);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_CAT_ID);

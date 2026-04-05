@@ -1,43 +1,88 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Settings, Mail, Star, Bell, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { storage } from "../services/storage";
 
 interface NotificationItem {
   id: string;
   type: 'letter' | 'points' | 'system';
   title: string;
   content: string;
-  time: string;
+  timestamp: number;
   link?: string;
 }
 
+const formatNotificationTime = (timestamp: number) => {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const date = new Date(timestamp);
+
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+  if (isToday) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `昨天 ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
+};
+
 export default function NotificationList() {
   const navigate = useNavigate();
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
-  const notifications: NotificationItem[] = [
-    {
-      id: '1',
-      type: 'letter',
-      title: '时光信件提醒',
-      content: '您有一封时光信件已解锁，快去看看吧～',
-      time: '10:30',
-      link: '/time-letters'
-    },
-    {
-      id: '2',
-      type: 'points',
-      title: '积分提醒',
-      content: '今日互动目标达成，+5 积分已入账。',
-      time: '昨天',
-    },
-    {
-      id: '3',
+  useEffect(() => {
+    const diaries = storage.getDiaries();
+    const points = storage.getPoints();
+    const letters = storage.getTimeLetters();
+    const now = Date.now();
+
+    const newNotifications: NotificationItem[] = [];
+
+    // 1. 检查信件解锁 (模拟逻辑)
+    const unlockedLetters = letters.filter(l => l.unlockAt <= now);
+    if (unlockedLetters.length > 0) {
+      newNotifications.push({
+        id: 'letter_unlocked',
+        type: 'letter',
+        title: '时光信件解锁',
+        content: `你有 ${unlockedLetters.length} 封时光信件已解锁，快去看看吧～`,
+        timestamp: unlockedLetters[unlockedLetters.length - 1].unlockAt,
+        link: '/time-letters'
+      });
+    }
+
+    // 2. 检查积分变动
+    if (points.history.length > 0) {
+      const lastTx = points.history[0];
+      newNotifications.push({
+        id: 'points_update',
+        type: 'points',
+        title: '积分变动提醒',
+        content: `${lastTx.type === 'earn' ? '获得' : '消耗'}了 ${lastTx.amount} 积分：${lastTx.reason}`,
+        timestamp: lastTx.timestamp
+      });
+    }
+
+    // 3. 系统问候
+    newNotifications.push({
+      id: 'system_greeting',
       type: 'system',
       title: '系统问候',
       content: '今天也是元气满满的一天，记得给猫咪加餐哦。',
-      time: '前天',
-    }
-  ];
+      timestamp: now
+    });
+
+    setNotifications(newNotifications.sort((a, b) => b.timestamp - a.timestamp));
+  }, []);
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -95,7 +140,7 @@ export default function NotificationList() {
               <div className="flex-grow min-w-0">
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="text-sm font-black text-on-surface truncate pr-2">{item.title}</h3>
-                  <span className="text-[10px] text-on-surface-variant opacity-40 font-bold whitespace-nowrap">{item.time}</span>
+                  <span className="text-[10px] text-on-surface-variant opacity-40 font-bold whitespace-nowrap">{formatNotificationTime(item.timestamp)}</span>
                 </div>
                 <p className="text-xs text-on-surface-variant font-medium leading-relaxed line-clamp-2">
                   {item.content}

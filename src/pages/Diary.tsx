@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles, Trash2, CheckCircle, Loader2 } from "lucide-react";
 import { storage, DiaryEntry } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
+import CommentItem from "../components/CommentItem";
 
 export default function Diary() {
   const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
@@ -81,7 +82,7 @@ export default function Diary() {
       if (d.id === id) {
         return {
           ...d,
-          comments: [...d.comments, commentText]
+          comments: [...d.comments, { id: Date.now().toString(), content: commentText }]
         };
       }
       return d;
@@ -97,16 +98,9 @@ export default function Diary() {
   };
 
   const handleDelete = (id: string) => {
-    const entryToDelete = diaries.find(d => d.id === id);
-    if (entryToDelete?.media && entryToDelete.media.startsWith('blob:')) {
-      URL.revokeObjectURL(entryToDelete.media); // 物理清理内存中的 Blob 文件
-    }
-
     const updated = storage.deleteDiary(id);
     setDiaries(updated);
     setDeletingId(null);
-    setShowDeleteToast(true);
-    setTimeout(() => setShowDeleteToast(false), 2000);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -221,10 +215,16 @@ export default function Diary() {
                 {/* 评论列表 */}
                 {entry.comments.length > 0 && (
                   <div className="mt-6 pt-6 border-t border-outline-variant/30 space-y-3">
-                    {entry.comments.map((c, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-xs font-black text-primary whitespace-nowrap">我:</span>
-                        <p className="text-xs text-on-surface-variant font-medium leading-relaxed">{c}</p>
+                    {entry.comments.map((comment) => (
+                      <div key={comment.id}>
+                        <CommentItem 
+                          comment={comment} 
+                          diaryId={entry.id} 
+                          onDelete={(dId, cId) => {
+                            const updated = storage.deleteComment(dId, cId);
+                            setDiaries(updated);
+                          }}
+                        />
                       </div>
                     ))}
                   </div>
