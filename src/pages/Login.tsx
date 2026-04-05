@@ -105,7 +105,7 @@ export default function Login() {
           <span>服务条款</span>
         </div>
         <p className="text-[11px] text-on-surface-variant/40 font-bold tracking-[0.2em] uppercase">
-          © 2024 MIAO SANCTUARY
+          © 2026 MIAO SANCTUARY
         </p>
       </div>
     </div>

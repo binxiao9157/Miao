@@ -67,7 +67,7 @@ export default function Welcome() {
 
       <div className="pt-12 pb-4 text-center">
         <p className="text-[10px] text-on-surface-variant/40 tracking-widest uppercase">
-          © 2024 MIAO · 纯粹的猫咪生活
+          © 2026 MIAO · 纯粹的猫咪生活
         </p>
       </div>
     </div>
