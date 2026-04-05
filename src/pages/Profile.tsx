@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { storage } from "../services/storage";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import InstallPromptBanner from "../components/InstallPromptBanner";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -63,6 +64,7 @@ export default function Profile() {
       </header>
 
       <div className="flex-grow">
+        <InstallPromptBanner />
         <section className="flex flex-col items-center mb-10">
           <div className="relative mb-4 group">
             <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-tr from-primary to-secondary shadow-xl overflow-hidden">
