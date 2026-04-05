@@ -14,6 +14,7 @@ export default function CreateCompanion() {
   const location = useLocation();
   const { refreshCatStatus } = useAuthContext();
   const isRedemption = location.state?.isRedemption || false;
+  const isDebugRedemption = location.state?.isDebugRedemption || false;
   
   const [selectedBreed, setSelectedBreed] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -120,11 +121,14 @@ export default function CreateCompanion() {
 
       setGenerationStatus("猫咪正在赶来的路上...");
       
-      if (isRedemption) {
-        const success = storage.deductPoints(200);
+      if (isRedemption && !isDebugRedemption) {
+        const success = storage.deductPoints(200, "解锁新伙伴");
         if (!success) {
           throw new Error("积分不足，兑换失败");
         }
+      } else if (isRedemption && isDebugRedemption) {
+        // Debug mode: don't deduct points, just simulate it
+        console.log("Debug mode: Skipped point deduction");
       }
 
       catService.saveCat({

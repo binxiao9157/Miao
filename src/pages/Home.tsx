@@ -61,10 +61,20 @@ export default function Home() {
     const today = new Date().toLocaleDateString();
     
     if (pointsInfo.lastLoginDate !== today) {
-      const newTotal = storage.addPoints(10);
+      pointsInfo.total += 10;
+      pointsInfo.history.unshift({
+        id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+        type: 'earn',
+        amount: 10,
+        reason: '每日登录奖励',
+        timestamp: Date.now()
+      });
+      if (pointsInfo.history.length > 50) pointsInfo.history.pop();
       pointsInfo.lastLoginDate = today;
+      pointsInfo.onlineMinutes = 0; // Reset daily online minutes
+      pointsInfo.lastOnlineUpdate = Date.now(); // Reset the timer start
       storage.savePoints(pointsInfo);
-      setPoints(newTotal);
+      setPoints(pointsInfo.total);
       triggerPointToast("+10 每日登录奖励");
     } else {
       setPoints(pointsInfo.total);
@@ -83,15 +93,35 @@ export default function Home() {
     onlineTimerRef.current = setInterval(() => {
       const p = storage.getPoints();
       const now = Date.now();
+      
+      // If the last update was more than 5 minutes ago, assume they were offline and don't count that gap
+      if (now - p.lastOnlineUpdate > 5 * 60000) {
+        p.lastOnlineUpdate = now;
+        storage.savePoints(p);
+        return;
+      }
+
       const diffMinutes = Math.floor((now - p.lastOnlineUpdate) / 60000);
       
-      if (diffMinutes >= 10) {
-        const newTotal = storage.addPoints(10);
-        p.lastOnlineUpdate = now;
+      if (diffMinutes >= 1) {
         p.onlineMinutes += diffMinutes;
+        p.lastOnlineUpdate = now;
+        
+        // Check if we just crossed the 10 minute threshold
+        if (p.onlineMinutes >= 10 && p.onlineMinutes - diffMinutes < 10) {
+          p.total += 10;
+          p.history.unshift({
+            id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+            type: 'earn',
+            amount: 10,
+            reason: '在线时长奖励',
+            timestamp: Date.now()
+          });
+          if (p.history.length > 50) p.history.pop();
+          setPoints(p.total);
+          triggerPointToast("+10 在线时长奖励");
+        }
         storage.savePoints(p);
-        setPoints(newTotal);
-        triggerPointToast("+10 在线时长奖励");
       }
     }, 60000);
 
@@ -155,9 +185,17 @@ export default function Home() {
 
     if (p.dailyInteractionPoints < 20) {
       p.dailyInteractionPoints += 5;
-      const newTotal = storage.addPoints(5);
+      p.total += 5;
+      p.history.unshift({
+        id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+        type: 'earn',
+        amount: 5,
+        reason: '互动奖励',
+        timestamp: Date.now()
+      });
+      if (p.history.length > 50) p.history.pop();
       storage.savePoints(p);
-      setPoints(newTotal);
+      setPoints(p.total);
       triggerPointToast(`${actionName}！+5 互动奖励`);
     } else {
       triggerPointToast(`${actionName}！`);

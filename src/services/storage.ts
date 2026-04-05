@@ -55,6 +55,14 @@ export interface TimeLetter {
   createdAt: number;
 }
 
+export interface PointTransaction {
+  id: string;
+  type: 'earn' | 'spend';
+  amount: number;
+  reason: string;
+  timestamp: number;
+}
+
 export interface PointsInfo {
   total: number;
   lastLoginDate: string | null;
@@ -62,6 +70,7 @@ export interface PointsInfo {
   lastInteractionDate: string | null;
   onlineMinutes: number;
   lastOnlineUpdate: number;
+  history: PointTransaction[];
 }
 
 export const storage = {
@@ -155,31 +164,64 @@ export const storage = {
 
   // Points Management
   getPoints: (): PointsInfo => {
-    return storage.safeParse<PointsInfo>(STORAGE_KEYS.POINTS, {
+    const p = storage.safeParse<PointsInfo>(STORAGE_KEYS.POINTS, {
       total: 0,
       lastLoginDate: null,
       dailyInteractionPoints: 0,
       lastInteractionDate: null,
       onlineMinutes: 0,
-      lastOnlineUpdate: Date.now()
+      lastOnlineUpdate: Date.now(),
+      history: []
     });
+
+    if (!p.history) p.history = [];
+
+    // Self-healing for the previous bug where points were reset to 0
+    const today = new Date().toLocaleDateString();
+    let expectedMinimum = 0;
+    if (p.lastLoginDate === today) expectedMinimum += 10;
+    if (p.lastInteractionDate === today) expectedMinimum += p.dailyInteractionPoints;
+    if (p.onlineMinutes >= 10) expectedMinimum += 10;
+
+    if (p.total < expectedMinimum) {
+      p.total = expectedMinimum;
+      localStorage.setItem(STORAGE_KEYS.POINTS, JSON.stringify(p));
+    }
+
+    return p;
   },
 
   savePoints: (points: PointsInfo) => {
     localStorage.setItem(STORAGE_KEYS.POINTS, JSON.stringify(points));
   },
 
-  addPoints: (amount: number) => {
+  addPoints: (amount: number, reason: string = '系统奖励') => {
     const points = storage.getPoints();
     points.total += amount;
+    points.history.unshift({
+      id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+      type: 'earn',
+      amount,
+      reason,
+      timestamp: Date.now()
+    });
+    if (points.history.length > 50) points.history.pop();
     storage.savePoints(points);
     return points.total;
   },
 
-  deductPoints: (amount: number) => {
+  deductPoints: (amount: number, reason: string = '积分消耗') => {
     const points = storage.getPoints();
     if (points.total >= amount) {
       points.total -= amount;
+      points.history.unshift({
+        id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+        type: 'spend',
+        amount,
+        reason,
+        timestamp: Date.now()
+      });
+      if (points.history.length > 50) points.history.pop();
       storage.savePoints(points);
       return true;
     }

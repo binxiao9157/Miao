@@ -11,7 +11,7 @@ export default function GenerationProgress() {
   const location = useLocation();
   const navigate = useNavigate();
   const { refreshCatStatus } = useAuthContext();
-  const { image, name, isRedemption } = location.state || {};
+  const { image, name, isRedemption, isDebugRedemption } = location.state || {};
 
   const [status, setStatus] = useState<string>("正在分析图片...");
   const [error, setError] = useState<string | null>(null);
@@ -74,11 +74,13 @@ export default function GenerationProgress() {
         setProgress(100);
         
         // 扣除积分 (如果是兑换)
-        if (isRedemption) {
-          const success = storage.deductPoints(200);
+        if (isRedemption && !isDebugRedemption) {
+          const success = storage.deductPoints(200, "解锁新伙伴");
           if (!success) {
             throw new Error("积分不足，兑换失败");
           }
+        } else if (isRedemption && isDebugRedemption) {
+          console.log("Debug mode: Skipped point deduction");
         }
 
         // 确保活跃 ID 已设置

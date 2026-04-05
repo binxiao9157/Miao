@@ -1,14 +1,24 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Camera, ArrowRight, Upload, PawPrint } from "lucide-react";
+import { Camera, ArrowRight, Upload, PawPrint, ArrowLeft } from "lucide-react";
 
 export default function Welcome() {
   const navigate = useNavigate();
   const location = useLocation();
   const isRedemption = location.state?.isRedemption || false;
+  const isDebugRedemption = location.state?.isDebugRedemption || false;
 
   return (
-    <div className="min-h-screen flex flex-col p-8 bg-background">
-      <div className="flex items-center gap-2 mb-12 group">
+    <div className="min-h-screen flex flex-col p-8 bg-background relative">
+      {isRedemption && (
+        <button 
+          onClick={() => navigate(-1)} 
+          className="absolute top-6 left-6 w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform z-10 shadow-sm"
+        >
+          <ArrowLeft size={20} />
+        </button>
+      )}
+
+      <div className={`flex items-center gap-2 mb-12 group ${isRedemption ? 'mt-12' : ''}`}>
         <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={32} />
         <span className="text-2xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">Miao</span>
       </div>
@@ -22,7 +32,7 @@ export default function Welcome() {
 
       <div className="space-y-6 flex-grow">
         <button 
-          onClick={() => navigate("/upload-material", { state: { isRedemption } })}
+          onClick={() => navigate("/upload-material", { state: { isRedemption, isDebugRedemption } })}
           className="w-full p-8 bg-surface-container rounded-[40px] text-left relative group active:scale-[0.98] transition-all"
         >
           <div className="flex items-start justify-between mb-6">
@@ -41,7 +51,7 @@ export default function Welcome() {
         </button>
 
         <button 
-          onClick={() => navigate("/create-companion", { state: { isRedemption } })}
+          onClick={() => navigate("/create-companion", { state: { isRedemption, isDebugRedemption } })}
           className="w-full p-8 bg-surface-container rounded-[40px] text-left relative group active:scale-[0.98] transition-all"
         >
           <div className="flex items-start justify-between mb-6">

@@ -1,38 +1,95 @@
-import { Star, CheckCircle2, ArrowRight, Lock } from "lucide-react";
+import { Star, CheckCircle2, ArrowRight, Lock, ChevronRight, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { storage } from "../services/storage";
+import { storage, PointsInfo, PointTransaction } from "../services/storage";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Points() {
   const [points, setPoints] = useState(0);
+  const [pointsInfo, setPointsInfo] = useState<PointsInfo | null>(null);
+  const [isDebugMode, setIsDebugMode] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const navigate = useNavigate();
   const REDEEM_THRESHOLD = 200;
 
   useEffect(() => {
-    const data = storage.getPoints();
-    setPoints(data.total || 0);
+    const fetchPoints = () => {
+      const data = storage.getPoints();
+      setPointsInfo(data);
+      setPoints(data.total || 0);
+    };
+    
+    fetchPoints();
+    
+    // Poll for updates in case Home.tsx adds points in the background
+    const interval = setInterval(fetchPoints, 2000);
+    return () => clearInterval(interval);
   }, []);
 
+  const today = new Date().toLocaleDateString();
+  const loginCompleted = pointsInfo?.lastLoginDate === today;
+  const interactionCompleted = pointsInfo?.lastInteractionDate === today && (pointsInfo?.dailyInteractionPoints || 0) > 0;
+  const onlineCompleted = (pointsInfo?.onlineMinutes || 0) >= 10;
+
   const tasks = [
-    { id: 1, title: '每日首次登录', reward: 10, completed: true, description: '每天第一次打开APP即可获得' },
-    { id: 2, title: '完成1次猫咪互动', reward: 5, completed: false, description: '在首页点击猫咪进行互动' },
-    { id: 3, title: '单日登录时长超10分钟', reward: 10, completed: false, description: '累计在线时间达到10分钟' },
+    { id: 1, title: '每日首次登录', reward: 10, completed: loginCompleted, description: '每天第一次打开APP即可获得' },
+    { id: 2, title: '完成1次猫咪互动', reward: 5, completed: interactionCompleted, description: '在首页点击猫咪进行互动' },
+    { id: 3, title: '单日登录时长超10分钟', reward: 10, completed: onlineCompleted, description: '累计在线时间达到10分钟' },
   ];
+
+  const effectivePoints = isDebugMode ? Math.max(points, REDEEM_THRESHOLD) : points;
 
   return (
     <div className="min-h-screen bg-background p-6 pb-24">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold text-primary">积分中心</h1>
-        <p className="text-on-surface-variant text-sm opacity-70">完成任务，解锁更多猫咪伙伴</p>
+      <header className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-primary">积分中心</h1>
+          <p className="text-on-surface-variant text-sm opacity-70">完成任务，解锁更多猫咪伙伴</p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-full">
+            <span className="text-[10px] font-bold text-on-surface-variant">测试: 满200分</span>
+            <button 
+              onClick={() => setIsDebugMode(!isDebugMode)}
+              className={`w-8 h-4 rounded-full transition-colors relative ${isDebugMode ? 'bg-primary' : 'bg-outline-variant/50'}`}
+            >
+              <div className="w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform" style={{ transform: isDebugMode ? 'translateX(18px)' : 'translateX(2px)' }} />
+            </button>
+          </div>
+          <button 
+            onClick={() => {
+              const p = storage.getPoints();
+              p.total = 0; // 依赖底层的自愈逻辑恢复到真实的最低分
+              p.history = []; // 清空历史记录，保持明细干净
+              storage.savePoints(p);
+              
+              // 立即重新获取以触发自愈，并更新 UI
+              const healedP = storage.getPoints();
+              setPoints(healedP.total);
+              setPointsInfo(healedP);
+            }}
+            className="text-[10px] text-on-surface-variant underline opacity-50 hover:opacity-100 mr-2"
+          >
+            重置真实积分
+          </button>
+        </div>
       </header>
 
-      <div className="miao-card bg-primary text-white p-8 mb-8 flex flex-col items-center justify-center relative overflow-hidden">
+      <div 
+        onClick={() => setShowHistory(true)}
+        className="miao-card bg-primary text-white p-8 mb-8 flex flex-col items-center justify-center relative overflow-hidden cursor-pointer active:scale-95 transition-transform"
+      >
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         
+        <div className="absolute top-4 right-4 bg-white/20 px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-white/30 transition-colors">
+          <span className="text-[10px] font-bold tracking-wider">积分明细</span>
+          <ChevronRight size={12} />
+        </div>
+
         <Star className="mb-2 opacity-80" size={32} fill="currentColor" />
         <p className="text-xs font-bold tracking-widest uppercase opacity-80 mb-1">当前积分余额</p>
-        <h2 className="text-5xl font-black">{points.toLocaleString()}</h2>
+        <h2 className="text-5xl font-black">{effectivePoints.toLocaleString()}</h2>
       </div>
 
       <section className="space-y-6">
@@ -75,29 +132,29 @@ export default function Points() {
       <section className="mt-10">
         <h2 className="text-lg font-bold text-on-surface mb-4">积分兑换</h2>
         <div className={`miao-card p-6 flex flex-col items-center justify-center text-center transition-all ${
-          points < REDEEM_THRESHOLD 
+          effectivePoints < REDEEM_THRESHOLD 
             ? "bg-surface-container-low border-dashed border-2 border-outline-variant opacity-80" 
             : "bg-primary/5 border-2 border-primary/20"
         }`}>
           <div className={`w-16 h-16 rounded-full shadow-sm flex items-center justify-center mb-4 ${
-            points < REDEEM_THRESHOLD ? "bg-white text-on-surface-variant/40" : "bg-white text-primary"
+            effectivePoints < REDEEM_THRESHOLD ? "bg-white text-on-surface-variant/40" : "bg-white text-primary"
           }`}>
-            {points < REDEEM_THRESHOLD ? <Lock size={32} /> : <Star size={32} />}
+            {effectivePoints < REDEEM_THRESHOLD ? <Lock size={32} /> : <Star size={32} />}
           </div>
           <h3 className="font-bold text-on-surface mb-1">解锁新伙伴</h3>
           <p className="text-xs text-on-surface-variant opacity-70 mb-2">消耗 200 积分，即可生成一只全新的猫咪伙伴</p>
           
-          {points < REDEEM_THRESHOLD && (
+          {effectivePoints < REDEEM_THRESHOLD && (
             <p className="text-[10px] font-black text-primary mb-4 uppercase tracking-widest">
-              还差 {REDEEM_THRESHOLD - points} 积分即可解锁
+              还差 {REDEEM_THRESHOLD - effectivePoints} 积分即可解锁
             </p>
           )}
 
           <button 
-            disabled={points < REDEEM_THRESHOLD}
-            onClick={() => navigate("/welcome", { state: { isRedemption: true } })}
+            disabled={effectivePoints < REDEEM_THRESHOLD}
+            onClick={() => navigate("/welcome", { state: { isRedemption: true, isDebugRedemption: isDebugMode } })}
             className={`w-full py-3 text-sm font-bold rounded-2xl transition-all active:scale-95 ${
-              points < REDEEM_THRESHOLD 
+              effectivePoints < REDEEM_THRESHOLD 
                 ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
                 : "bg-primary text-white shadow-lg shadow-primary/20"
             }`}
@@ -106,6 +163,50 @@ export default function Points() {
           </button>
         </div>
       </section>
+
+      <AnimatePresence>
+        {showHistory && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm"
+          >
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-outline-variant/30 bg-surface">
+              <h2 className="text-xl font-bold text-on-surface">积分明细</h2>
+              <button 
+                onClick={() => setShowHistory(false)}
+                className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {(!pointsInfo?.history || pointsInfo.history.length === 0) ? (
+                <div className="flex flex-col items-center justify-center h-40 text-on-surface-variant opacity-50">
+                  <Star size={32} className="mb-2" />
+                  <p className="text-sm">暂无积分记录</p>
+                </div>
+              ) : (
+                pointsInfo.history.map((tx: PointTransaction) => (
+                  <div key={tx.id} className="flex items-center justify-between p-4 bg-surface-container rounded-2xl">
+                    <div>
+                      <p className="font-bold text-on-surface text-sm mb-1">{tx.reason}</p>
+                      <p className="text-[10px] text-on-surface-variant opacity-70">
+                        {new Date(tx.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className={`font-black text-lg ${tx.type === 'earn' ? 'text-primary' : 'text-on-surface'}`}>
+                      {tx.type === 'earn' ? '+' : '-'}{tx.amount}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

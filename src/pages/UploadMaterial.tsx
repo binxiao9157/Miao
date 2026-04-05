@@ -11,6 +11,9 @@ export default function UploadMaterial() {
   const [nickname, setNickname] = useState(location.state?.name || "");
   const [showToast, setShowToast] = useState<string | null>(null);
 
+  const isRedemption = location.state?.isRedemption || false;
+  const isDebugRedemption = location.state?.isDebugRedemption || false;
+
   useEffect(() => {
     if (location.state?.image) {
       setSelectedImage(location.state.image);
@@ -80,7 +83,7 @@ export default function UploadMaterial() {
     }
     
     // 跳转到生成进度页，并传递图片和昵称数据
-    navigate("/generation-progress", { state: { image: selectedImage, name: nickname } });
+    navigate("/generation-progress", { state: { image: selectedImage, name: nickname, isRedemption, isDebugRedemption } });
   };
 
   const isReady = selectedImage && nickname.trim();

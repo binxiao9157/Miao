@@ -11,9 +11,16 @@ export default function SwitchCompanion() {
   const [points, setPoints] = useState(0);
 
   useEffect(() => {
-    setCats(storage.getCatList());
-    setActiveId(storage.getActiveCatId());
-    setPoints(storage.getPoints().total);
+    const fetchData = () => {
+      setCats(storage.getCatList());
+      setActiveId(storage.getActiveCatId());
+      setPoints(storage.getPoints().total);
+    };
+    
+    fetchData();
+    
+    const interval = setInterval(fetchData, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleSwitch = (id: string) => {
