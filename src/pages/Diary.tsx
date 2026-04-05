@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, ChangeEvent } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles, Trash2, CheckCircle, Loader2 } from "lucide-react";
 import { storage, DiaryEntry } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
@@ -15,6 +16,8 @@ export default function Diary() {
   const [showPostToast, setShowPostToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [showShareToast, setShowShareToast] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -44,7 +47,7 @@ export default function Diary() {
     setDiaries(updatedDiaries);
     storage.saveDiaries(updatedDiaries);
     
-    // 1. 关闭弹窗 (相当于 Navigator.pop)
+    // [FIX] 自动关闭弹窗逻辑 (相当于 Navigator.pop)
     setIsPosting(false);
     
     // 2. 重置状态
@@ -94,6 +97,11 @@ export default function Diary() {
   };
 
   const handleDelete = (id: string) => {
+    const entryToDelete = diaries.find(d => d.id === id);
+    if (entryToDelete?.media && entryToDelete.media.startsWith('blob:')) {
+      URL.revokeObjectURL(entryToDelete.media); // 物理清理内存中的 Blob 文件
+    }
+
     const updated = storage.deleteDiary(id);
     setDiaries(updated);
     setDeletingId(null);
@@ -227,14 +235,16 @@ export default function Diary() {
         )}
       </div>
 
-      {/* 发布弹窗 */}
-      <AnimatePresence>
-        {isPosting && (
+      {createPortal(
+        <>
+          {/* 发布弹窗 */}
+          <AnimatePresence>
+            {isPosting && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end justify-center p-4 sm:p-6"
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-6"
             onClick={() => setIsPosting(false)}
           >
             <motion.div 
@@ -242,10 +252,11 @@ export default function Diary() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="bg-background w-full max-w-lg rounded-[40px] p-6 pb-10 shadow-2xl flex flex-col max-h-[90vh]"
+              className="bg-background w-full max-w-lg rounded-t-[32px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center mb-6">
+              {/* 弹窗头部 (固定) */}
+              <div className="flex justify-between items-center p-6 pb-4 shrink-0">
                 <div>
                   <h2 className="text-2xl font-black text-on-surface">记录此刻</h2>
                   <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Capture the moment</p>
@@ -255,7 +266,8 @@ export default function Diary() {
                 </button>
               </div>
 
-              <div className="flex-grow overflow-y-auto custom-scrollbar pr-1">
+              {/* 弹窗内容区 (可滚动) */}
+              <div className="flex-grow overflow-y-auto custom-scrollbar p-6 pt-0">
                 <textarea 
                   autoFocus
                   value={newContent}
@@ -265,7 +277,7 @@ export default function Diary() {
                 />
 
                 {selectedMedia && (
-                  <div className="relative w-32 h-32 rounded-3xl overflow-hidden mb-6 group shadow-lg">
+                  <div className="relative w-32 h-32 rounded-3xl overflow-hidden mb-2 group shadow-lg">
                     {selectedMedia.type === 'video' ? (
                       <video src={selectedMedia.url} className="w-full h-full object-cover" />
                     ) : (
@@ -281,7 +293,8 @@ export default function Diary() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-outline-variant/30">
+              {/* 弹窗底部操作栏 (固定) */}
+              <div className="flex items-center justify-between p-6 pt-4 border-t border-outline-variant/30 shrink-0 bg-background">
                 <div className="flex gap-3">
                   <button 
                     onClick={() => fileInputRef.current?.click()}
@@ -305,10 +318,12 @@ export default function Diary() {
                     onChange={handleFileChange} 
                   />
                 </div>
+                {/* [FIX] 发布按钮位置：确保在右下角，并使用品牌色 */}
                 <button 
                   onClick={handlePost}
                   disabled={(!newContent.trim() && !selectedMedia) || isLoading}
-                  className="miao-btn-primary !w-auto px-8 h-12 disabled:opacity-30 disabled:scale-100 flex items-center gap-2"
+                  className="px-8 h-12 rounded-full font-bold flex items-center gap-2 transition-all disabled:opacity-30 disabled:scale-100 active:scale-95"
+                  style={{ backgroundColor: '#FF9D76', color: 'white' }}
                 >
                   {isLoading ? (
                     <>
@@ -350,8 +365,10 @@ export default function Diary() {
               <div className="grid grid-cols-2 gap-8">
                 <button 
                   onClick={() => {
-                    alert("正在检测微信安装状态...\n(模拟：已安装，正在分享至好友)");
                     setSharingEntry(null);
+                    setShareMessage("正在检测微信环境...\nWeb端暂不支持直接唤起微信，请复制链接分享");
+                    setShowShareToast(true);
+                    setTimeout(() => setShowShareToast(false), 3000);
                   }}
                   className="flex flex-col items-center gap-3 group"
                 >
@@ -363,8 +380,10 @@ export default function Diary() {
 
                 <button 
                   onClick={() => {
-                    alert("正在检测微信安装状态...\n(模拟：已安装，正在分享至朋友圈)");
                     setSharingEntry(null);
+                    setShareMessage("正在检测微信环境...\nWeb端暂不支持直接唤起微信，请复制链接分享");
+                    setShowShareToast(true);
+                    setTimeout(() => setShowShareToast(false), 3000);
                   }}
                   className="flex flex-col items-center gap-3 group"
                 >
@@ -496,6 +515,23 @@ export default function Diary() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* 分享提示 Toast */}
+      <AnimatePresence>
+        {showShareToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[130] bg-on-surface text-surface px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3 max-w-[80vw]"
+          >
+            <Share2 size={20} className="text-primary flex-shrink-0" />
+            <span className="text-sm font-black whitespace-pre-wrap leading-relaxed">{shareMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+        </>,
+        document.body
+      )}
     </div>
   );
 }
