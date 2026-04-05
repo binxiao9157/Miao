@@ -128,6 +128,7 @@ export default function CatPlayer() {
               <p className="text-sm text-on-surface-variant mb-8 leading-relaxed">
                 网络波动或视频文件暂时无法访问，请重试。<br/>
                 <span className="text-[10px] opacity-50 block mt-2 font-mono break-all">{errorDetails}</span>
+                <span className="text-[8px] opacity-30 block mt-2 font-mono break-all">URL: {cat.videoPath}</span>
               </p>
               <div className="flex flex-col gap-3">
                 <button
@@ -227,6 +228,7 @@ export default function CatPlayer() {
           loop
           muted
           playsInline
+          referrerPolicy="no-referrer"
           className="w-full h-full object-contain"
           onPlay={() => {
             console.log("[DEBUG] Video play event triggered");

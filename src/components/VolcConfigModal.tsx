@@ -38,17 +38,47 @@ export default function VolcConfigModal({ isOpen, onClose }: Props) {
               <button onClick={onClose}><X size={20} /></button>
             </div>
             <div className="space-y-4 mb-8">
-              {Object.keys(keys).map((key) => (
-                <div key={key} className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{key}</label>
-                  <input 
-                    type="password"
-                    value={keys[key as keyof typeof keys]}
-                    onChange={(e) => setKeys({...keys, [key]: e.target.value})}
-                    className="w-full p-3 rounded-xl border border-gray-200 text-sm"
-                  />
-                </div>
-              ))}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">API Key</label>
+                <input 
+                  type="password"
+                  placeholder="ARK_API_KEY"
+                  value={keys.VOLC_API_KEY}
+                  onChange={(e) => setKeys({...keys, VOLC_API_KEY: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Access Key</label>
+                <input 
+                  type="password"
+                  placeholder="VOLC_ACCESS_KEY"
+                  value={keys.VOLC_ACCESS_KEY}
+                  onChange={(e) => setKeys({...keys, VOLC_ACCESS_KEY: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Secret Key</label>
+                <input 
+                  type="password"
+                  placeholder="VOLC_SECRET_KEY"
+                  value={keys.VOLC_SECRET_KEY}
+                  onChange={(e) => setKeys({...keys, VOLC_SECRET_KEY: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Model ID / Endpoint ID</label>
+                <input 
+                  type="text"
+                  placeholder="ep-..."
+                  value={keys.VOLC_MODEL_ID}
+                  onChange={(e) => setKeys({...keys, VOLC_MODEL_ID: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                />
+                <p className="text-[10px] text-gray-400">输入以 ep- 开头的推理接入点 ID</p>
+              </div>
             </div>
             <button 
               onClick={handleSave}

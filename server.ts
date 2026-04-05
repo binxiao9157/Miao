@@ -88,6 +88,9 @@ async function startServer() {
       // Allow frontend to override API key and model ID for demo purposes
       const frontendApiKey = req.headers['x-volc-api-key'] as string;
       const frontendModelId = req.headers['x-volc-model-id'] as string;
+      const frontendAccessKey = req.headers['x-volc-access-key'] as string;
+      const frontendSecretKey = req.headers['x-volc-secret-key'] as string;
+      
       const finalApiKey = frontendApiKey || ARK_API_KEY;
       const finalModelId = frontendModelId || ARK_MODEL_ID;
 
@@ -103,7 +106,9 @@ async function startServer() {
         image_length: dataUrl ? dataUrl.length : 0,
         image_size_mb: dataUrl ? (dataUrl.length / 1024 / 1024).toFixed(2) + "MB" : "0MB",
         usingFrontendKey: !!frontendApiKey,
-        usingFrontendModelId: !!frontendModelId
+        usingFrontendModelId: !!frontendModelId,
+        hasFrontendAccessKey: !!frontendAccessKey,
+        hasFrontendSecretKey: !!frontendSecretKey
       });
 
       const response = await axios.post(

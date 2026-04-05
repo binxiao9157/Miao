@@ -32,6 +32,8 @@ export class VolcanoService {
 
     const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
     const modelId = localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId;
+    const accessKey = localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey;
+    const secretKey = localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey;
 
     try {
       const response = await axios.post("/api/generate-video", {
@@ -42,7 +44,9 @@ export class VolcanoService {
         headers: {
           'Content-Type': 'application/json',
           'X-Volc-API-Key': apiKey,
-          'X-Volc-Model-Id': modelId
+          'X-Volc-Model-Id': modelId,
+          'X-Volc-Access-Key': accessKey,
+          'X-Volc-Secret-Key': secretKey
         }
       });
       return response.data;
@@ -81,12 +85,16 @@ export class VolcanoService {
 
     const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
     const modelId = localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId;
+    const accessKey = localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey;
+    const secretKey = localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey;
 
     try {
       const response = await axios.get(`/api/video-status/${taskId}`, {
         headers: {
           'X-Volc-API-Key': apiKey,
-          'X-Volc-Model-Id': modelId
+          'X-Volc-Model-Id': modelId,
+          'X-Volc-Access-Key': accessKey,
+          'X-Volc-Secret-Key': secretKey
         }
       });
       return response.data;
