@@ -167,6 +167,23 @@ export default function Profile() {
             </div>
             <ChevronRight size={16} className="text-red-300" />
           </button>
+
+          <div className="mt-8 p-4 bg-gray-50 rounded-2xl">
+            <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">调试设置 (API Key)</p>
+            <input 
+              type="password"
+              placeholder="输入火山引擎 API Key"
+              defaultValue={localStorage.getItem('VOLC_API_KEY') || ''}
+              onBlur={(e) => {
+                if (e.target.value) {
+                  localStorage.setItem('VOLC_API_KEY', e.target.value);
+                } else {
+                  localStorage.removeItem('VOLC_API_KEY');
+                }
+              }}
+              className="w-full p-3 rounded-xl border border-gray-200 text-sm"
+            />
+          </div>
         </div>
       </div>
 

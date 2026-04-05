@@ -1,8 +1,11 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Camera, ArrowRight, Upload, PawPrint, ArrowLeft } from "lucide-react";
+import { Camera, ArrowRight, Upload, PawPrint, ArrowLeft, Settings } from "lucide-react";
+import VolcConfigModal from "../components/VolcConfigModal";
+import { useState } from "react";
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const [showConfigModal, setShowConfigModal] = useState(false);
   const location = useLocation();
   const isRedemption = location.state?.isRedemption || false;
   const isDebugRedemption = location.state?.isDebugRedemption || false;
@@ -66,10 +69,15 @@ export default function Welcome() {
       </div>
 
       <div className="pt-12 pb-4 text-center">
-        <p className="text-[10px] text-on-surface-variant/40 tracking-widest uppercase">
+        <button 
+          onClick={() => setShowConfigModal(true)}
+          className="text-[10px] text-on-surface-variant/40 tracking-widest uppercase flex items-center justify-center gap-2 w-full"
+        >
+          <Settings size={10} />
           © 2026 MIAO · 纯粹的猫咪生活
-        </p>
+        </button>
       </div>
+      <VolcConfigModal isOpen={showConfigModal} onClose={() => setShowConfigModal(false)} />
     </div>
   );
 }

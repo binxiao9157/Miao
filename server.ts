@@ -85,8 +85,14 @@ async function startServer() {
         }
       };
 
+      // Allow frontend to override API key and model ID for demo purposes
+      const frontendApiKey = req.headers['x-volc-api-key'] as string;
+      const frontendModelId = req.headers['x-volc-model-id'] as string;
+      const finalApiKey = frontendApiKey || ARK_API_KEY;
+      const finalModelId = frontendModelId || ARK_MODEL_ID;
+
       console.log("Submitting task to Ark:", {
-        model: ARK_MODEL_ID,
+        model: finalModelId,
         url: ARK_BASE_URL,
         requestBody: {
           ...requestBody,
@@ -95,15 +101,17 @@ async function startServer() {
           )
         },
         image_length: dataUrl ? dataUrl.length : 0,
-        image_size_mb: dataUrl ? (dataUrl.length / 1024 / 1024).toFixed(2) + "MB" : "0MB"
+        image_size_mb: dataUrl ? (dataUrl.length / 1024 / 1024).toFixed(2) + "MB" : "0MB",
+        usingFrontendKey: !!frontendApiKey,
+        usingFrontendModelId: !!frontendModelId
       });
 
       const response = await axios.post(
         ARK_BASE_URL,
-        requestBody,
+        { ...requestBody, model: finalModelId },
         {
           headers: {
-            'Authorization': `Bearer ${ARK_API_KEY}`,
+            'Authorization': `Bearer ${finalApiKey}`,
             'Content-Type': 'application/json'
           },
           maxContentLength: Infinity,
@@ -178,13 +186,16 @@ async function startServer() {
   // Polling endpoint
   app.get("/api/video-status/:taskId", async (req, res) => {
     const { taskId } = req.params;
+    const frontendApiKey = req.headers['x-volc-api-key'] as string;
+    const frontendModelId = req.headers['x-volc-model-id'] as string;
+    const finalApiKey = frontendApiKey || ARK_API_KEY;
 
     try {
       const response = await axios.get(
         `${ARK_BASE_URL}/${taskId}`,
         {
           headers: {
-            'Authorization': `Bearer ${ARK_API_KEY}`
+            'Authorization': `Bearer ${finalApiKey}`
           },
           timeout: 15000 // 15 seconds timeout
         }

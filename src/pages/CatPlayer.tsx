@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Play, Pause, Download, Trash2, Heart, Share2 } from "lucide-react";
+import { ArrowLeft, Play, Pause, Download, Trash2, Heart, Share2, AlertCircle } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
 import { FileManager } from "../services/fileManager";
 import { motion, AnimatePresence } from "motion/react";
@@ -11,6 +11,8 @@ export default function CatPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cat, setCat] = useState<CatInfo | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(true);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -20,8 +22,11 @@ export default function CatPlayer() {
     const list = storage.getCatList();
     const found = list.find(c => c.id === id);
     if (found) {
+      console.log("[DEBUG] Found cat info:", found);
       setCat(found);
     } else {
+      console.error("[DEBUG] Cat not found for ID:", id);
+      setErrorDetails("找不到该猫咪的数据记录");
       navigate("/");
     }
 
@@ -74,10 +79,74 @@ export default function CatPlayer() {
     navigate("/cat-history");
   };
 
+  const handleVideoError = (e: any) => {
+    const videoElement = videoRef.current;
+    let errorMsg = "视频加载失败";
+    
+    console.error("[DEBUG] Video playback error event:", e);
+    if (videoElement && videoElement.error) {
+      const code = videoElement.error.code;
+      const message = videoElement.error.message;
+      console.error("[DEBUG] Video element error details:", { code, message });
+      
+      switch (code) {
+        case 1: errorMsg = "视频加载被中止 (Aborted)"; break;
+        case 2: errorMsg = "网络错误，无法下载视频 (Network Error)"; break;
+        case 3: errorMsg = "视频解码失败 (Decode Error)"; break;
+        case 4: errorMsg = "视频格式不支持或链接失效 (Source Not Supported)"; break;
+      }
+    }
+
+    setErrorDetails(errorMsg);
+    setIsLoading(false);
+  };
+
+  const handleLoadedData = () => {
+    console.log("[DEBUG] Video can play");
+    setIsLoading(false);
+    setErrorDetails(null);
+  };
+
   if (!cat) return null;
 
   return (
     <div className="h-screen bg-black relative overflow-hidden flex flex-col">
+      {/* 错误提示 */}
+      <AnimatePresence>
+        {errorDetails && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-surface-container rounded-[32px] p-8 w-full max-w-sm text-center"
+            >
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-6 mx-auto">
+                <AlertCircle size={32} />
+              </div>
+              <h3 className="text-xl font-black text-on-surface mb-2">视频加载失败</h3>
+              <p className="text-sm text-on-surface-variant mb-8 leading-relaxed">
+                网络波动或视频文件暂时无法访问，请重试。<br/>
+                <span className="text-[10px] opacity-50 block mt-2 font-mono break-all">{errorDetails}</span>
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full py-4 bg-primary text-white font-black rounded-2xl active:scale-95 transition-transform"
+                >
+                  重试
+                </button>
+                <button
+                  onClick={() => navigate("/")}
+                  className="w-full py-4 bg-surface-container-highest text-on-surface font-black rounded-2xl active:scale-95 transition-transform"
+                >
+                  返回首页
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       {/* 删除确认弹窗 */}
       <AnimatePresence>
         {showDeleteConfirm && (
@@ -156,11 +225,33 @@ export default function CatPlayer() {
           src={cat.videoPath}
           autoPlay
           loop
+          muted
           playsInline
           className="w-full h-full object-contain"
-          onPlay={() => setIsPlaying(true)}
+          onPlay={() => {
+            console.log("[DEBUG] Video play event triggered");
+            setIsPlaying(true);
+            setIsLoading(false);
+          }}
           onPause={() => setIsPlaying(false)}
+          onCanPlay={() => {
+            console.log("[DEBUG] Video can play");
+            setIsLoading(false);
+            setErrorDetails(null);
+          }}
+          onError={handleVideoError}
         />
+
+        {/* 加载指示器 */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full"
+            />
+          </div>
+        )}
 
         {/* 播放/暂停指示器 */}
         <AnimatePresence>

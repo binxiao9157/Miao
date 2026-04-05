@@ -30,6 +30,9 @@ export class VolcanoService {
       return { id: 'mock_task_' + Date.now() };
     }
 
+    const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
+    const modelId = localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId;
+
     try {
       const response = await axios.post("/api/generate-video", {
         prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
@@ -37,7 +40,9 @@ export class VolcanoService {
       }, {
         timeout: 180000, // Increased to 180 seconds
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Volc-API-Key': apiKey,
+          'X-Volc-Model-Id': modelId
         }
       });
       return response.data;
@@ -74,8 +79,16 @@ export class VolcanoService {
       return { status: 'running' };
     }
 
+    const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
+    const modelId = localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId;
+
     try {
-      const response = await axios.get(`/api/video-status/${taskId}`);
+      const response = await axios.get(`/api/video-status/${taskId}`, {
+        headers: {
+          'X-Volc-API-Key': apiKey,
+          'X-Volc-Model-Id': modelId
+        }
+      });
       return response.data;
     } catch (error: any) {
       if (error.response) {
@@ -120,18 +133,35 @@ export class VolcanoService {
 
         try {
           const result = await this.getTaskResult(taskId);
+          console.log(`[DEBUG] Task ${taskId} status: ${result.status}`);
 
           const status = result.status;
           if (onProgress) onProgress(status);
 
           if (status === 'succeeded') {
             clearInterval(timer);
-            const videoUrl = result.content?.video_url || result.output?.video_url || result.response?.video_url || result.video_url;
+            console.log("[DEBUG] Task succeeded. Full result:", JSON.stringify(result, null, 2));
             
-            if (videoUrl) {
+            // 优先从 output 或 content 中获取标准的 video_url
+            let videoUrl = 
+              result.output?.video_url || 
+              result.content?.video_url || 
+              result.data?.video_url ||
+              result.video_url;
+
+            // 如果上述都没有，尝试从 response 结构中找
+            if (!videoUrl && result.response?.video?.uri) {
+              console.warn("[DEBUG] Found URI instead of URL:", result.response.video.uri);
+              videoUrl = result.response.video.uri;
+            }
+            
+            console.log("[DEBUG] Extracted video URL:", videoUrl);
+            
+            if (videoUrl && (videoUrl.startsWith('http') || videoUrl.startsWith('/api'))) {
               resolve(videoUrl);
             } else {
-              reject(new Error(`任务成功但未找到视频 URL。`));
+              console.error("[DEBUG] Invalid or missing video URL in response");
+              reject(new Error(`任务成功但未获取到有效的视频播放地址。`));
             }
           } else if (status === 'failed' || status === 'cancelled') {
             clearInterval(timer);
