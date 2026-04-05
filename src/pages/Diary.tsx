@@ -3,9 +3,11 @@ import { createPortal } from "react-dom";
 import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles, Trash2, CheckCircle, Loader2 } from "lucide-react";
 import { storage, DiaryEntry } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
+import { useAuthContext } from "../context/AuthContext";
 import CommentItem from "../components/CommentItem";
 
 export default function Diary() {
+  const { user } = useAuthContext();
   const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [sharingEntry, setSharingEntry] = useState<DiaryEntry | null>(null);
@@ -117,7 +119,7 @@ export default function Diary() {
 
   return (
     <div className="min-h-screen bg-background pb-32">
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 py-8 flex justify-between items-center">
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 py-6 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-on-surface">日常记录</h1>
           <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest mt-1">Daily Moments</p>
@@ -149,11 +151,16 @@ export default function Diary() {
             >
               <div className="p-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-black text-xs">
-                    M
+                  <div className="w-10 h-10 bg-primary/10 rounded-full overflow-hidden border-2 border-white shadow-sm">
+                    <img 
+                      src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
+                      alt="Avatar" 
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
                   </div>
                   <div>
-                    <p className="text-sm font-black text-on-surface">我的猫咪</p>
+                    <p className="text-sm font-black text-on-surface">{user?.nickname || "喵星人"}</p>
                     <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
                       {new Date(entry.createdAt).toLocaleDateString()}
                     </p>

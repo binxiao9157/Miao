@@ -11,14 +11,23 @@ export default function EditProfile() {
   const [avatar, setAvatar] = useState(user?.avatar || "");
   const [isSaving, setIsSaving] = useState(false);
   const [showActionSheet, setShowActionSheet] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = () => {
+    if (!nickname.trim()) return;
+    
     setIsSaving(true);
+    // 模拟保存延迟，增强交互感
     setTimeout(() => {
       updateProfile({ nickname, avatar });
       setIsSaving(false);
-      navigate(-1);
+      setShowSuccessToast(true);
+      
+      // 1.5秒后返回上一页
+      setTimeout(() => {
+        navigate(-1);
+      }, 1500);
     }, 800);
   };
 
@@ -27,8 +36,37 @@ export default function EditProfile() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAvatar(reader.result as string);
-        setShowActionSheet(false);
+        const img = new Image();
+        img.onload = () => {
+          // 使用 Canvas 进行压缩，防止 Base64 过大导致 localStorage 溢出
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 400;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // 导出压缩后的 Base64
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          setAvatar(compressedBase64);
+          setShowActionSheet(false);
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -39,9 +77,9 @@ export default function EditProfile() {
   };
 
   const handleMockCamera = () => {
-    // Simulate taking a photo with a random image
     const newSeed = Math.floor(Math.random() * 1000);
-    setAvatar(`https://picsum.photos/seed/${newSeed}/400/400`);
+    const mockUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${newSeed}`;
+    setAvatar(mockUrl);
     setShowActionSheet(false);
   };
 
@@ -71,24 +109,38 @@ export default function EditProfile() {
 
       <div className="flex flex-col items-center mb-10">
         <motion.div 
-          className="relative group cursor-pointer"
+          className="relative group cursor-pointer z-10"
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowActionSheet(true)}
         >
-          <div className="w-32 h-32 rounded-[40px] overflow-hidden shadow-2xl border-4 border-white">
+          <div className="w-32 h-32 rounded-[40px] overflow-hidden shadow-2xl border-4 border-white bg-white">
             <img 
-              src={avatar || "https://picsum.photos/seed/miao_user/200/200"} 
+              src={avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
               alt="Avatar" 
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
             />
           </div>
-          <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-orange-500 text-white rounded-2xl flex items-center justify-center shadow-lg border-4 border-background group-active:scale-90 transition-transform">
+          {/* 相机图标层级提升，确保点击有效 */}
+          <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-orange-500 text-white rounded-2xl flex items-center justify-center shadow-lg border-4 border-background group-active:scale-90 transition-transform z-20">
             <Camera size={22} />
           </div>
         </motion.div>
         <p className="mt-6 text-xs text-on-surface-variant font-bold opacity-40 tracking-widest uppercase">点击更换头像</p>
       </div>
+
+      <AnimatePresence>
+        {showSuccessToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-12 left-1/2 -translate-x-1/2 z-[300] bg-green-500 text-white px-8 py-3 rounded-full shadow-2xl font-bold text-sm"
+          >
+            修改成功！
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="space-y-6">
         <div className="space-y-2">

@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   DIARIES: 'miao_diaries',
   TIME_LETTERS: 'miao_time_letters',
   POINTS: 'miao_points',
+  USER_AVATAR: 'user_avatar_key',
 };
 
 export interface UserInfo {
@@ -81,10 +82,22 @@ export interface PointsInfo {
 export const storage = {
   saveUserInfo: (info: UserInfo) => {
     localStorage.setItem(STORAGE_KEYS.USER_INFO, JSON.stringify(info));
+    // 同步保存头像到独立键名，确保持久化
+    if (info.avatar) {
+      localStorage.setItem(STORAGE_KEYS.USER_AVATAR, info.avatar);
+    }
   },
   
   getUserInfo: (): UserInfo | null => {
-    return storage.safeParse<UserInfo | null>(STORAGE_KEYS.USER_INFO, null);
+    const info = storage.safeParse<UserInfo | null>(STORAGE_KEYS.USER_INFO, null);
+    if (info) {
+      // 优先从独立键名读取头像，确保同步
+      const savedAvatar = localStorage.getItem(STORAGE_KEYS.USER_AVATAR);
+      if (savedAvatar) {
+        info.avatar = savedAvatar;
+      }
+    }
+    return info;
   },
   
   saveToken: (token: string) => {
