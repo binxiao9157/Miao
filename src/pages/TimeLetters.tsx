@@ -41,6 +41,7 @@ export default function TimeLetters() {
     setContent("");
     setDays(1);
     setView('list');
+    triggerToast("封存成功！信件已存入本地时光机");
   };
 
   const handleLetterClick = (letter: TimeLetter) => {
@@ -137,71 +138,77 @@ export default function TimeLetters() {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="min-h-screen bg-background p-8 flex flex-col"
+      className="min-h-[100dvh] bg-background flex flex-col"
     >
-      <header className="flex items-center justify-between mb-12">
-        <button onClick={() => setView('list')} className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant">
-          <ArrowLeft size={24} />
-        </button>
-        <div className="text-center">
-          <h1 className="text-xl font-black text-on-surface">写给未来</h1>
-          <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Write to future</p>
-        </div>
-        <div className="w-12" />
-      </header>
-
-      <div className="flex-grow space-y-10">
-        <div className="space-y-4">
-          <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-2">信件内容</label>
-          <textarea 
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="写下你想对未来自己或猫咪说的话..."
-            className="w-full h-80 p-8 bg-surface-container rounded-[48px] border-none outline-none resize-none text-on-surface font-medium placeholder:text-on-surface-variant/30 leading-relaxed"
-          />
-        </div>
-
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-2">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">封存时长</label>
-            <span className="text-sm font-black text-primary">{days} 天后开启</span>
+      <div className="flex-grow overflow-y-auto p-8 pb-32">
+        <header className="flex items-center justify-between mb-12">
+          <button onClick={() => setView('list')} className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant">
+            <ArrowLeft size={24} />
+          </button>
+          <div className="text-center">
+            <h1 className="text-xl font-black text-on-surface">写给未来</h1>
+            <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Write to future</p>
           </div>
-          
-          <div className="grid grid-cols-5 gap-3">
-            {[1, 3, 7, 30, 100].map(d => (
-              <button
-                key={d}
-                onClick={() => setDays(d)}
-                className={`py-4 rounded-2xl font-black text-xs transition-all ${
-                  days === d ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-surface-container text-on-surface-variant"
-                }`}
-              >
-                {d}D
-              </button>
-            ))}
-          </div>
-          
-          <div className="px-2">
-            <input 
-              type="range" 
-              min="1" 
-              max="365" 
-              value={days} 
-              onChange={(e) => setDays(parseInt(e.target.value))}
-              className="w-full h-2 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary"
+          <div className="w-12" />
+        </header>
+
+        <div className="space-y-10">
+          <div className="space-y-4">
+            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-2">信件内容</label>
+            <textarea 
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="写下你想对未来自己或猫咪说的话..."
+              className="w-full h-80 p-8 bg-surface-container rounded-[48px] border-none outline-none resize-none text-on-surface font-medium placeholder:text-on-surface-variant/30 leading-relaxed"
             />
           </div>
-        </div>
-      </div>
 
-      <button 
-        onClick={handleSaveLetter}
-        disabled={!content.trim()}
-        className="miao-btn-primary mt-12 disabled:opacity-30 disabled:scale-100"
-      >
-        <Send size={20} />
-        封存信件
-      </button>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between px-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant">封存时长</label>
+              <span className="text-sm font-black text-primary">{days} 天后开启</span>
+            </div>
+            
+            <div className="grid grid-cols-5 gap-3">
+              {[1, 3, 7, 30, 100].map(d => (
+                <button
+                  key={d}
+                  onClick={() => setDays(d)}
+                  className={`py-4 rounded-2xl font-black text-xs transition-all ${
+                    days === d ? "bg-primary text-white shadow-lg shadow-primary/20 scale-105" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                  }`}
+                >
+                  {d}D
+                </button>
+              ))}
+            </div>
+            
+            <div className="px-2">
+              <input 
+                type="range" 
+                min="1" 
+                max="365" 
+                value={days} 
+                onChange={(e) => setDays(parseInt(e.target.value))}
+                className="w-full h-2 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary"
+              />
+            </div>
+          </div>
+        </div>
+
+        <button 
+          onClick={handleSaveLetter}
+          disabled={!content.trim()}
+          className="w-full mt-12 h-14 rounded-full font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-30 disabled:scale-100 active:scale-95 shadow-lg"
+          style={{ backgroundColor: '#FF9D76', color: 'white' }}
+        >
+          <Send size={20} />
+          封存信件
+        </button>
+        
+        {/* 底部安全间距，确保能滚过导航栏 */}
+        <div className="h-24" />
+      </div>
     </motion.div>
   );
 
