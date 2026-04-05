@@ -59,8 +59,15 @@ export default function Points() {
           <button 
             onClick={() => {
               const p = storage.getPoints();
-              p.total = 0; // 依赖底层的自愈逻辑恢复到真实的最低分
-              p.history = []; // 清空历史记录，保持明细干净
+              // 重置所有任务状态以触发真正的重新计算
+              p.total = 0;
+              p.history = [];
+              p.lastLoginDate = null;
+              p.lastInteractionDate = null;
+              p.dailyInteractionPoints = 0;
+              p.onlineMinutes = 0;
+              p.lastOnlineUpdate = Date.now();
+              
               storage.savePoints(p);
               
               // 立即重新获取以触发自愈，并更新 UI
