@@ -264,7 +264,33 @@ export const storage = {
   },
 
   saveDiaries: (diaries: DiaryEntry[]) => {
-    localStorage.setItem(STORAGE_KEYS.DIARIES, JSON.stringify(diaries));
+    try {
+      localStorage.setItem(STORAGE_KEYS.DIARIES, JSON.stringify(diaries));
+      return diaries;
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+        console.warn("LocalStorage quota exceeded, attempting to prune old media...");
+        // 策略：如果空间不足，清除最早的 5 条带有媒体文件的日记的媒体内容（保留文字）
+        let prunedCount = 0;
+        const prunedDiaries = [...diaries].reverse().map(d => {
+          if (d.media && prunedCount < 5) {
+            prunedCount++;
+            return { ...d, media: undefined, mediaType: undefined };
+          }
+          return d;
+        }).reverse();
+
+        try {
+          localStorage.setItem(STORAGE_KEYS.DIARIES, JSON.stringify(prunedDiaries));
+          console.log(`Successfully pruned ${prunedCount} old media entries to save space.`);
+          return prunedDiaries;
+        } catch (retryError) {
+          console.error("Failed to save even after pruning:", retryError);
+          throw retryError;
+        }
+      }
+      throw e;
+    }
   },
 
   deleteDiary: (id: string) => {
@@ -275,17 +301,13 @@ export const storage = {
   },
 
   deleteComment: (diaryId: string, commentId: string) => {
-    console.log("storage: deleteComment called", { diaryId, commentId });
     const diaries = storage.getDiaries();
     const diary = diaries.find(d => d.id === diaryId);
-    console.log("storage: diary found", diary);
     if (diary) {
       diary.comments = diary.comments.filter(c => c.id !== commentId);
-      console.log("storage: comments after filter", diary.comments);
-      storage.saveDiaries(diaries);
-      return [...diaries];
+      return storage.saveDiaries(diaries);
     }
-    return [...diaries];
+    return diaries;
   },
 
   // Time Letters storage

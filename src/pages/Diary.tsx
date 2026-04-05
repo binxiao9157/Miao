@@ -28,39 +28,49 @@ export default function Diary() {
   }, []);
 
   const handlePost = async () => {
-    if (!newContent.trim() && !selectedMedia) return;
+    if ((!newContent.trim() && !selectedMedia) || isLoading) return;
 
-    setIsLoading(true);
-    
-    // 模拟保存延迟
-    await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      setIsLoading(true);
+      
+      // 模拟保存延迟与媒体文件处理耗时
+      await new Promise(resolve => setTimeout(resolve, 1200));
 
-    const newEntry: DiaryEntry = {
-      id: 'diary_' + Date.now(),
-      content: newContent,
-      media: selectedMedia?.url,
-      mediaType: selectedMedia?.type,
-      createdAt: Date.now(),
-      likes: 0,
-      isLiked: false,
-      comments: [],
-    };
+      const newEntry: DiaryEntry = {
+        id: 'diary_' + Date.now(),
+        content: newContent,
+        media: selectedMedia?.url,
+        mediaType: selectedMedia?.type,
+        createdAt: Date.now(),
+        likes: 0,
+        isLiked: false,
+        comments: [],
+      };
 
-    const updatedDiaries = [newEntry, ...diaries];
-    setDiaries(updatedDiaries);
-    storage.saveDiaries(updatedDiaries);
-    
-    // [FIX] 自动关闭弹窗逻辑 (相当于 Navigator.pop)
-    setIsPosting(false);
-    
-    // 2. 重置状态
-    setNewContent("");
-    setSelectedMedia(null);
-    setIsLoading(false);
+      // 1. 写入持久化存储
+      const currentDiaries = storage.getDiaries();
+      const updatedDiaries = [newEntry, ...currentDiaries];
+      const savedDiaries = storage.saveDiaries(updatedDiaries) || updatedDiaries;
+      
+      // 2. 更新本地状态刷新列表 (使用保存后的数据，可能包含自动清理后的结果)
+      setDiaries(savedDiaries);
+      
+      // 3. 重置输入状态
+      setNewContent("");
+      setSelectedMedia(null);
+      
+      // 4. 显示成功提示
+      setShowPostToast(true);
+      setTimeout(() => setShowPostToast(false), 2000);
 
-    // 3. 显示成功提示
-    setShowPostToast(true);
-    setTimeout(() => setShowPostToast(false), 2000);
+    } catch (error) {
+      console.error("发布日记失败:", error);
+      alert("发布失败，请稍后重试");
+    } finally {
+      // 无论成功还是失败，强制关闭加载状态并关闭弹窗 (相当于 Navigator.pop)
+      setIsLoading(false);
+      setIsPosting(false);
+    }
   };
 
   const handleLike = (id: string) => {
@@ -74,8 +84,8 @@ export default function Diary() {
       }
       return d;
     });
-    setDiaries(updated);
-    storage.saveDiaries(updated);
+    const saved = storage.saveDiaries(updated) || updated;
+    setDiaries(saved);
   };
 
   const handleComment = (id: string) => {
@@ -89,8 +99,8 @@ export default function Diary() {
       }
       return d;
     });
-    setDiaries(updated);
-    storage.saveDiaries(updated);
+    const saved = storage.saveDiaries(updated) || updated;
+    setDiaries(saved);
     setCommentText("");
     setCommentingId(null);
   };
@@ -101,7 +111,8 @@ export default function Diary() {
 
   const handleDelete = (id: string) => {
     const updated = storage.deleteDiary(id);
-    setDiaries(updated);
+    const saved = storage.saveDiaries(updated) || updated;
+    setDiaries(saved);
     setDeletingId(null);
   };
 
@@ -111,7 +122,44 @@ export default function Diary() {
       const type = file.type.startsWith('video') ? 'video' : 'image';
       const reader = new FileReader();
       reader.onloadend = () => {
-        setSelectedMedia({ url: reader.result as string, type });
+        if (type === 'image') {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 800; // 日记图片可以稍微大一点，但也要限制
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height *= MAX_SIZE / width;
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width *= MAX_SIZE / height;
+                height = MAX_SIZE;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            
+            // 导出压缩后的 Base64 (JPEG 格式体积更小)
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+            setSelectedMedia({ url: compressedBase64, type: 'image' });
+          };
+          img.src = reader.result as string;
+        } else {
+          // 视频暂时不压缩（Web 端压缩较复杂），但提醒用户限制大小
+          if (file.size > 2 * 1024 * 1024) {
+            alert("视频文件太大啦，请选择 2MB 以内的视频哦");
+            return;
+          }
+          setSelectedMedia({ url: reader.result as string, type: 'video' });
+        }
       };
       reader.readAsDataURL(file);
     }
