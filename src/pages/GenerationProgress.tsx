@@ -134,6 +134,22 @@ export default function GenerationProgress() {
                 重新尝试
               </button>
               <button 
+                onClick={async () => {
+                  if ('caches' in window) {
+                    const names = await caches.keys();
+                    await Promise.all(names.map(name => caches.delete(name)));
+                  }
+                  if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map(reg => reg.unregister()));
+                  }
+                  window.location.reload();
+                }}
+                className="w-full py-3 bg-white text-[#5D4037]/60 rounded-full font-bold text-sm border border-[#5D4037]/10 active:scale-95 transition-all"
+              >
+                清理缓存并重置 PWA
+              </button>
+              <button 
                 onClick={() => {
                   resetGenerationState();
                   navigate("/upload-material", { replace: true });

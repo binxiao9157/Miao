@@ -1,0 +1,23 @@
+{
+  "name": "Miao",
+  "short_name": "Miao",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF5F0",
+  "theme_color": "#FF9D76",
+  "description": "遇见你的数字猫咪",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/miao-icon/192/192",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://picsum.photos/seed/miao-icon/512/512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

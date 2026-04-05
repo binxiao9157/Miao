@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -39,22 +40,26 @@ export default function InstallPromptBanner() {
   if (!isVisible) return null;
 
   return (
-    <div className="w-full bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between mb-6">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
-          <Download size={20} />
+    <motion.div 
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 rounded-[24px] p-5 flex items-center justify-between mb-8 shadow-sm"
+    >
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-primary shadow-sm">
+          <Download size={24} />
         </div>
         <div>
-          <p className="font-bold text-on-surface text-sm">安装 Miao 桌面版</p>
-          <p className="text-[10px] text-on-surface-variant opacity-60">获取更流畅的类原生体验</p>
+          <p className="font-black text-on-surface text-sm">下载 Miao 桌面客户端</p>
+          <p className="text-[10px] font-bold text-on-surface-variant opacity-60 uppercase tracking-wider">获取类原生的流畅治愈体验</p>
         </div>
       </div>
       <button 
         onClick={handleInstall}
-        className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold active:scale-95 transition-transform"
+        className="px-6 py-2.5 bg-primary text-white rounded-xl text-xs font-black shadow-lg shadow-primary/20 active:scale-95 transition-all"
       >
-        安装
+        立即安装
       </button>
-    </div>
+    </motion.div>
   );
 }

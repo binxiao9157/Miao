@@ -150,6 +150,10 @@ export default function CreateCompanion() {
       console.error("Generation failed:", error);
       triggerToast(error.message || "生成失败，请重试");
       setIsGenerating(false);
+      // 如果是 PWA 相关错误，建议清理缓存
+      if (error.message.includes("503") || error.message.includes("任务 ID")) {
+        setGenerationStatus("PWA 缓存异常，建议清理");
+      }
     }
   };
 
@@ -286,6 +290,25 @@ export default function CreateCompanion() {
               </>
             )}
           </button>
+          
+          {generationStatus === "PWA 缓存异常，建议清理" && (
+            <button 
+              onClick={async () => {
+                if ('caches' in window) {
+                  const names = await caches.keys();
+                  await Promise.all(names.map(name => caches.delete(name)));
+                }
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  await Promise.all(regs.map(reg => reg.unregister()));
+                }
+                window.location.reload();
+              }}
+              className="w-full mt-4 py-3 bg-white text-[#5D4037]/40 rounded-full font-bold text-xs border border-[#5D4037]/10 active:scale-95 transition-all"
+            >
+              清理缓存并重置 PWA
+            </button>
+          )}
         </div>
       </div>
 

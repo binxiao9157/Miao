@@ -49,7 +49,21 @@ export class VolcanoService {
           'X-Volc-Secret-Key': secretKey
         }
       });
-      return response.data;
+      
+      console.log("[DEBUG] Submit task response:", response.data);
+      
+      // 兼容不同的返回结构 (id 或 task_id)
+      const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;
+      
+      if (!taskId) {
+        console.error("[DEBUG] Invalid response structure:", response.data);
+        throw new Error("服务器返回数据格式错误，未获取到任务 ID");
+      }
+
+      return {
+        ...response.data,
+        id: taskId
+      };
     } catch (error: any) {
       if (error.response) {
         console.error("提交失败详情 (HTTP Error):", error.response.status, error.response.data);
