@@ -224,9 +224,14 @@ export default function GenerationProgress() {
                 loop
                 muted
                 playsInline
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
-              <div className="absolute inset-0 bg-black/20"></div>
+              {/* 模糊底层补位 */}
+              <div 
+                className="absolute inset-0 -z-10 bg-cover bg-center blur-3xl opacity-50"
+                style={{ backgroundImage: `url(${storage.getActiveCat()?.avatar})` }}
+              />
+              <div className="absolute inset-0 bg-black/40"></div>
             </div>
 
             {/* 成功信息浮层 - 半透明毛玻璃 */}

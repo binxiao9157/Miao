@@ -15,6 +15,7 @@ export default function CatPlayer() {
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(true);
 
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showToast, setShowToast] = useState<string | null>(null);
 
@@ -24,6 +25,7 @@ export default function CatPlayer() {
     if (found) {
       console.log("[DEBUG] Found cat info:", found);
       setCat(found);
+      setVideoAspectRatio(null);
     } else {
       console.error("[DEBUG] Cat not found for ID:", id);
       setErrorDetails("找不到该猫咪的数据记录");
@@ -221,9 +223,20 @@ export default function CatPlayer() {
 
       {/* 视频播放器 */}
       <div 
-        className="flex-grow flex items-center justify-center relative"
+        className="flex-grow flex items-center justify-center relative bg-black overflow-hidden"
         onClick={togglePlay}
       >
+        {/* 背景补位：使用模糊的头像或视频首帧填充 */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src={cat.avatar || `https://picsum.photos/seed/${cat.breed}/1080/1920`} 
+            alt="" 
+            className="w-full h-full object-cover opacity-30 blur-2xl"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-black/40"></div>
+        </div>
+
         <video 
           ref={videoRef}
           src={cat.videoPath}
@@ -232,7 +245,17 @@ export default function CatPlayer() {
           muted
           playsInline
           referrerPolicy="no-referrer"
-          className="w-full h-full object-cover"
+          onLoadedMetadata={(e) => {
+            const video = e.target as HTMLVideoElement;
+            if (video.videoWidth && video.videoHeight) {
+              setVideoAspectRatio(video.videoWidth / video.videoHeight);
+            }
+          }}
+          className={`relative z-10 w-full h-full transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'} ${
+            videoAspectRatio && videoAspectRatio >= 1 
+              ? 'object-contain' 
+              : 'object-cover'
+          }`}
           onPlay={() => {
             console.log("[DEBUG] Video play event triggered");
             setIsPlaying(true);

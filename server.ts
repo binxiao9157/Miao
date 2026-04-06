@@ -80,8 +80,8 @@ async function startServer() {
         model: ARK_MODEL_ID,
         content: contentArray,
         parameters: {
-          // 请求 9:16 比例以适配手机全屏
-          size: "540x960"
+          // 改为 16:9 比例以兼顾完整场景展示，手机端通过 object-fit: contain 配合模糊背景实现沉浸感
+          size: "854x480"
         }
       };
 

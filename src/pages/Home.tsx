@@ -32,6 +32,8 @@ export default function Home() {
   const [showControls, setShowControls] = useState(false); // 控制按钮显示状态
   const [interactionBubble, setInteractionBubble] = useState<{text: string, id: number} | null>(null);
   
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const onlineTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -52,6 +54,7 @@ export default function Home() {
           : VIDEOS.DEFAULT;
         
         setCurrentVideo(videoSource);
+        setVideoAspectRatio(null); // Reset ratio on video change
       }
     };
 
@@ -384,6 +387,12 @@ export default function Home() {
           playsInline
           preload="auto"
           onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={(e) => {
+            const video = e.target as HTMLVideoElement;
+            if (video.videoWidth && video.videoHeight) {
+              setVideoAspectRatio(video.videoWidth / video.videoHeight);
+            }
+          }}
           loop={true}
           onError={handleVideoError}
           onLoadedData={() => setIsInitialized(true)}
@@ -394,7 +403,12 @@ export default function Home() {
             setLoadError(false); // 成功播放时清除错误状态
           }}
           onWaiting={() => setIsBuffering(true)}
-          className={`absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-150 ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 w-full h-full z-10 transition-opacity duration-300 ${isVideoReady ? 'opacity-100' : 'opacity-0'} ${
+            // 智能适配：如果视频是横屏或正方形，在竖屏手机上使用 contain 避免过度裁剪
+            videoAspectRatio && videoAspectRatio >= 1 
+              ? 'object-contain' 
+              : 'object-cover'
+          }`}
         />
         
         {/* 初始加载状态 */}
