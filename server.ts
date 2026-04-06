@@ -31,11 +31,13 @@ async function startServer() {
   const VOLC_ACCESS_KEY = process.env.VOLC_ACCESS_KEY;
   const VOLC_SECRET_KEY = process.env.VOLC_SECRET_KEY;
 
+  const ARK_T2I_URL = "https://ark.cn-beijing.volces.com/api/v3/images/generations";
+
   // API Route for Image Generation (Ark T2I)
   app.post("/api/generate-image", async (req, res) => {
     const { prompt } = req.body;
     const finalApiKey = req.headers['x-volc-api-key'] as string || ARK_API_KEY;
-    const finalModelId = ARK_T2I_MODEL_ID; // Use T2I model
+    const finalModelId = req.headers['x-volc-t2i-model-id'] as string || ARK_T2I_MODEL_ID;
 
     try {
       if (!finalApiKey) {
@@ -44,18 +46,17 @@ async function startServer() {
 
       const requestBody = {
         model: finalModelId,
-        content: [
-          {
-            type: "text",
-            text: prompt
-          }
-        ],
-        parameters: {
-          size: "1024x1024"
-        }
+        prompt: prompt,
+        size: "1024x1024"
       };
 
-      const response = await axios.post(ARK_BASE_URL, requestBody, {
+      console.log("Submitting T2I task to Ark:", {
+        model: finalModelId,
+        url: ARK_T2I_URL,
+        prompt: prompt.substring(0, 50) + "..."
+      });
+
+      const response = await axios.post(ARK_T2I_URL, requestBody, {
         headers: {
           'Authorization': `Bearer ${finalApiKey}`,
           'Content-Type': 'application/json'
@@ -63,15 +64,42 @@ async function startServer() {
         timeout: 60000
       });
 
-      res.json(response.data);
+      // Synchronous response: return a "fake" taskId that is actually the URL
+      // or return a structure that the frontend can handle.
+      // To maintain compatibility with polling, we'll return the data directly
+      // but the frontend will need to handle it.
+      // Actually, let's return a response that looks like a task submission
+      // but we'll modify the polling endpoint to handle it.
+      
+      const imageUrl = response.data?.data?.[0]?.url;
+      if (imageUrl) {
+        console.log("Ark T2I Success (Sync):", imageUrl.substring(0, 50) + "...");
+        // Return a special ID that indicates it's a direct URL
+        res.json({ id: `url:${imageUrl}`, status: 'succeeded', image_url: imageUrl });
+      } else {
+        throw new Error("未获取到生成的图片地址");
+      }
     } catch (error: any) {
-      res.status(500).json({ error: error.response?.data || error.message });
+      const errorResponse = error.response?.data;
+      console.error("Ark T2I API Error:", {
+        message: error.message,
+        status: error.response?.status,
+        data: errorResponse
+      });
+      res.status(500).json({ error: errorResponse || error.message });
     }
   });
 
   // Image status polling
   app.get("/api/image-status/:taskId", async (req, res) => {
     const { taskId } = req.params;
+    
+    // Handle the "url:" prefix for synchronous results
+    if (taskId.startsWith('url:')) {
+      const url = taskId.substring(4);
+      return res.json({ status: 'succeeded', image_url: url });
+    }
+
     const finalApiKey = req.headers['x-volc-api-key'] as string || ARK_API_KEY;
 
     try {
@@ -100,25 +128,28 @@ async function startServer() {
       let dataUrl = "";
       if (image_base64) {
         let cleanBase64 = image_base64.replace(/\s/g, '');
-        let mimeType = 'image/png'; // Default
         
-        if (cleanBase64.includes('base64,')) {
-          const parts = cleanBase64.split('base64,');
-          const header = parts[0];
-          cleanBase64 = parts[1];
-          
-          // Extract MIME type from header like "data:image/jpeg;"
-          const match = header.match(/data:([^;]+);/);
-          if (match) {
-            mimeType = match[1];
+        if (cleanBase64.startsWith('http')) {
+          // 如果是远程 URL，直接使用
+          dataUrl = cleanBase64;
+        } else {
+          let mimeType = 'image/png'; // Default
+          if (cleanBase64.includes('base64,')) {
+            const parts = cleanBase64.split('base64,');
+            const header = parts[0];
+            cleanBase64 = parts[1];
+            
+            // Extract MIME type from header like "data:image/jpeg;"
+            const match = header.match(/data:([^;]+);/);
+            if (match) {
+              mimeType = match[1];
+            }
           }
+          dataUrl = `data:${mimeType};base64,${cleanBase64}`;
         }
-        
-        dataUrl = `data:${mimeType};base64,${cleanBase64}`;
       }
 
       // Seedance 1.5 Pro V3 任务接口规范
-      // 根据用户反馈，还原为 content 在根节点的结构
       const contentArray: any[] = [];
       if (dataUrl) {
         contentArray.push({
@@ -137,8 +168,9 @@ async function startServer() {
         model: ARK_MODEL_ID,
         content: contentArray,
         parameters: {
-          // 改为 16:9 比例以兼顾完整场景展示，手机端通过 object-fit: contain 配合模糊背景实现沉浸感
-          size: "854x480"
+          size: "854x480",
+          // 添加随机种子以确保并行生成的 4 段视频具有多样性，避免模型内部缓存或默认行为导致结果过于接近
+          seed: Math.floor(Math.random() * 1000000)
         }
       };
 
@@ -178,7 +210,7 @@ async function startServer() {
           },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
-          timeout: 150000 // Increased to 150 seconds
+          timeout: 300000 // Increased to 300 seconds
         }
       );
 

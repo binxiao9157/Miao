@@ -81,80 +81,26 @@ export default function CreateCompanion() {
     }
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = () => {
     if (!catName.trim() || !selectedBreed || !selectedColor) {
       triggerToast("请填写完整信息后再生成哦！");
       return;
     }
 
-    setIsGenerating(true);
-    setGenerationStatus("正在构思猫咪的模样...");
-    
-    try {
-      const breed = catService.breeds.find(b => b.id === selectedBreed);
-      const color = catService.colors.find(c => c.id === selectedColor);
-      
-      setGenerationStatus("正在处理图像数据...");
-      const imageBase64 = await getBase64FromUrl(breed?.image || "", selectedBreed);
-      
-      setGenerationStatus("正在提交生成任务...");
-      const prompt = catService.getPrompt(selectedBreed, selectedColor);
-      
-      // Do not send the breed placeholder image to the API, so the AI relies entirely on the text prompt (Text-to-Video)
-      const submitResult = await VolcanoService.submitTask(null, prompt);
-      const taskId = submitResult.id;
+    const breed = catService.breeds.find(b => b.id === selectedBreed);
+    const color = catService.colors.find(c => c.id === selectedColor);
 
-      if (!taskId) {
-        throw new Error("提交任务失败: 未获取到任务 ID");
-      }
-      
-      setGenerationStatus(`正在赋予灵魂...`);
-      
-      const videoUrl = await VolcanoService.pollTaskResult(
-        taskId,
-        (status) => {
-          if (status === 'running') {
-            setGenerationStatus("AI 正在绘制视频帧...");
-          }
-        }
-      );
-
-      setGenerationStatus("猫咪正在赶来的路上...");
-      
-      if (isRedemption && !isDebugRedemption) {
-        const success = storage.deductPoints(200, "解锁新伙伴");
-        if (!success) {
-          throw new Error("积分不足，兑换失败");
-        }
-      } else if (isRedemption && isDebugRedemption) {
-        // Debug mode: don't deduct points, just simulate it
-        console.log("Debug mode: Skipped point deduction");
-      }
-
-      catService.saveCat({
-        id: taskId,
-        name: catName,
-        breed: breed?.name || "",
-        color: color?.name || "",
-        avatar: breed?.image || "",
-        source: 'created',
-        videoPath: videoUrl,
-        remoteVideoUrl: videoUrl
-      });
-      
-      refreshCatStatus();
-      catService.playMeow();
-      setIsGenerating(false);
-      setShowSuccess(true);
-    } catch (error: any) {
-      console.error("Generation failed:", error);
-      triggerToast(error.message || "生成失败，请重试");
-      setIsGenerating(false);
-      // 如果是 PWA 相关错误，建议清理缓存
-      if (error.message.includes("503") || error.message.includes("任务 ID")) {
-        setGenerationStatus("PWA 缓存异常，建议清理");
-      }
-    }
+    // 跳转到生成进度页，执行两步式生成 (T2I -> I2V)
+    navigate("/generation-progress", { 
+      state: { 
+        image: null, // T2I 模式
+        name: catName, 
+        breed: breed?.name || "", 
+        furColor: color?.name || "",
+        isRedemption, 
+        isDebugRedemption 
+      } 
+    });
   };
 
   // 交互逻辑：只有输入了昵称且选择了品种后，按钮才变为高亮可点击状态

@@ -14,6 +14,7 @@ export const VolcanoConfig = {
   
   ApiKey: import.meta.env.VITE_VOLC_API_KEY,
   ModelId: import.meta.env.VITE_VOLC_MODEL_ID || 'doubao-seedance-1-5-pro-251215',
+  T2IModelId: import.meta.env.VITE_VOLC_T2I_MODEL_ID || 'doubao-t2i-v2',
   BaseUrl: 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
 };
 
@@ -58,7 +59,7 @@ export class VolcanoService {
         prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
         image_base64: imageBase64,
       }, {
-        timeout: 180000, // Increased to 180 seconds
+        timeout: 310000, // Increased to 310 seconds
         headers: {
           'Content-Type': 'application/json',
           'X-Volc-API-Key': apiKey,
@@ -155,6 +156,7 @@ export class VolcanoService {
     const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
     const accessKey = localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey;
     const secretKey = localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey;
+    const t2iModelId = localStorage.getItem('VOLC_T2I_MODEL_ID') || VolcanoConfig.T2IModelId;
 
     try {
       const response = await axios.post("/api/generate-image", {
@@ -165,7 +167,8 @@ export class VolcanoService {
           'Content-Type': 'application/json',
           'X-Volc-API-Key': apiKey,
           'X-Volc-Access-Key': accessKey,
-          'X-Volc-Secret-Key': secretKey
+          'X-Volc-Secret-Key': secretKey,
+          'X-Volc-T2I-Model-Id': t2iModelId
         }
       });
       
@@ -177,7 +180,16 @@ export class VolcanoService {
 
       return { id: taskId };
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || `文生图提交失败: ${error.message}`);
+      let errorMsg = "文生图提交失败";
+      if (error.response?.data) {
+        const data = error.response.data;
+        // Handle nested error object from server.ts
+        const innerError = data.error?.error || data.error || data;
+        errorMsg = typeof innerError === 'string' ? innerError : (innerError.message || JSON.stringify(innerError));
+      } else {
+        errorMsg = error.message;
+      }
+      throw new Error(errorMsg);
     }
   }
 
@@ -213,11 +225,20 @@ export class VolcanoService {
             else reject(new Error("任务成功但未获取到图片地址"));
           } else if (result.status === 'failed') {
             clearInterval(timer);
-            reject(new Error("图片生成失败"));
+            const errorInfo = result.error || result.message || "未知错误";
+            reject(new Error(`图片生成失败: ${typeof errorInfo === 'string' ? errorInfo : JSON.stringify(errorInfo)}`));
           }
-        } catch (error) {
+        } catch (error: any) {
           clearInterval(timer);
-          reject(error);
+          let errorMsg = "查询图片状态失败";
+          if (error.response?.data) {
+            const data = error.response.data;
+            const innerError = data.error?.error || data.error || data;
+            errorMsg = typeof innerError === 'string' ? innerError : (innerError.message || JSON.stringify(innerError));
+          } else {
+            errorMsg = error.message;
+          }
+          reject(new Error(errorMsg));
         }
       }, 3000);
     });

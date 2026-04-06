@@ -21,6 +21,7 @@ export default function Home() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false); 
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false); 
+  
   const [loadError, setLoadError] = useState(false); 
   const [showControls, setShowControls] = useState(false); 
   const [interactionBubble, setInteractionBubble] = useState<{text: string, id: number} | null>(null);
