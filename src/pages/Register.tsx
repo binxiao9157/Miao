@@ -40,7 +40,7 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col p-8 bg-background relative">
+    <div className="min-h-screen flex flex-col p-8 bg-background relative overflow-y-auto no-scrollbar">
       {/* Decorative elements */}
       <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>

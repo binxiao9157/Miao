@@ -20,24 +20,28 @@ export default function MainLayout() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-background relative overflow-hidden">
-      <main className={`flex-grow flex flex-col relative ${isHome ? '' : 'pb-28'}`}>
+    <div className="w-full h-full flex flex-col bg-background relative overflow-hidden">
+      <main className="flex-grow relative w-full h-full">
         {/* Keep Home alive by rendering it always. Use opacity/z-index instead of display:none to prevent video blanking issues in browsers */}
-        <div className={`absolute inset-0 ${isHome ? 'z-0 opacity-100' : '-z-10 opacity-0 pointer-events-none'}`}>
+        <div className={`absolute inset-0 w-full h-full ${isHome ? 'z-0 opacity-100' : '-z-10 opacity-0 pointer-events-none'}`}>
           {hasCat && <HomePage />}
         </div>
         
         {/* Other routes will render here - 适配安全区 */}
         <div 
-          className={`absolute inset-0 z-10 bg-background overflow-y-auto ${isHome ? 'hidden' : 'block'}`}
-          style={{ 
-            paddingTop: 'env(safe-area-inset-top)',
-            paddingBottom: 'env(safe-area-inset-bottom)',
-            paddingLeft: 'env(safe-area-inset-left)',
-            paddingRight: 'env(safe-area-inset-right)'
-          }}
+          className={`absolute inset-0 z-10 bg-background overflow-y-auto no-scrollbar ${isHome ? 'hidden' : 'block'}`}
         >
-          <Outlet />
+          <div 
+            className="min-h-full flex flex-col"
+            style={{ 
+              paddingTop: 'env(safe-area-inset-top)',
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 8rem)', // 为底部导航栏留出足够空间
+              paddingLeft: 'env(safe-area-inset-left)',
+              paddingRight: 'env(safe-area-inset-right)'
+            }}
+          >
+            <Outlet />
+          </div>
         </div>
       </main>
       

@@ -56,7 +56,7 @@ export default function TimeLetters() {
   };
 
   const renderList = () => (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background">
       <AnimatePresence>
         {showToast && (
           <motion.div 
@@ -138,7 +138,7 @@ export default function TimeLetters() {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-background flex flex-col min-h-screen pb-32"
+      className="bg-background flex flex-col min-h-screen"
     >
       <div className="p-8">
         <header className="flex items-center justify-between mb-12">

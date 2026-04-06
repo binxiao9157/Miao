@@ -23,10 +23,23 @@
 @layer base {
   html {
     @apply w-full h-full;
+    /* 阻止 iOS 橡皮筋回弹效果，确保全屏体验 */
+    overscroll-behavior: none;
+    /* 优化移动端点击延迟 */
+    touch-action: manipulation;
   }
   body, #root {
-    @apply w-full min-h-full bg-background text-on-surface font-sans;
+    @apply w-full h-full bg-background text-on-surface font-sans;
     -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    /* 确保内容能够填充整个视口，包括刘海屏区域 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 }
 
