@@ -18,6 +18,16 @@ export const VolcanoConfig = {
 };
 
 /**
+ * 互动动作对应的 Prompt 模版
+ */
+export const ACTION_PROMPTS = {
+  click: "A human hand gently stroking the cat's head, the cat narrows its eyes in enjoyment, purring softly, cozy indoor nest background, realistic fur texture.",
+  longPress: "The cat curled up in the nest, rhythmic breathing, peaceful sleeping, occasional ear twitching, extreme close-up, warm cinematic lighting.",
+  doubleClick: "The cat pouncing on a feather toy, agile movements, playful expression, wide-angle shot of the cat nest, joyful atmosphere.",
+  swipe: "The cat happily eating cat food from a bowl, licking lips, looking up at the camera with big bright eyes, tail wagging, satisfied expression."
+};
+
+/**
  * 火山引擎方舟视频生成服务
  */
 export class VolcanoService {

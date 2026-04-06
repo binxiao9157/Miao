@@ -239,7 +239,7 @@ export default function CatPlayer() {
 
         <video 
           ref={videoRef}
-          src={cat.videoPath}
+          src={cat.videoPaths?.longPress || cat.videoPath}
           autoPlay
           loop
           muted

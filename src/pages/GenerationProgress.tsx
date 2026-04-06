@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, Loader2, CheckCircle2, AlertCircle, PartyPopper, Coins } from "lucide-react";
-import { VolcanoService } from "../services/volcanoService";
+import { VolcanoService, ACTION_PROMPTS } from "../services/volcanoService";
 import { FileManager } from "../services/fileManager";
 import { storage } from "../services/storage";
 import { useAuthContext } from "../context/AuthContext";
@@ -41,33 +41,46 @@ export default function GenerationProgress() {
 
     const startGeneration = async () => {
       try {
-        // 1. 提交任务
-        setStatus("正在分析图片...");
+        // 1. 提交任务 (并行提交 4 个)
+        setStatus("正在为小猫注入 4 种灵魂技能...");
         setProgress(20);
-        const submitResult = await VolcanoService.submitTask(image);
-        const taskId = submitResult.id;
+        
+        const actions = Object.keys(ACTION_PROMPTS) as Array<keyof typeof ACTION_PROMPTS>;
+        const submitPromises = actions.map(action => 
+          VolcanoService.submitTask(image, ACTION_PROMPTS[action])
+        );
+        
+        const submitResults = await Promise.all(submitPromises);
+        const taskGroup: { [key: string]: string } = {};
+        actions.forEach((action, index) => {
+          taskGroup[action] = submitResults[index].id;
+        });
 
-        if (!taskId) {
-          throw new Error("提交任务失败: 未获取到任务 ID");
-        }
+        console.log("[DEBUG] Task group submitted:", taskGroup);
 
-        // 2. 轮询结果
-        setStatus("猫咪数字化建模中...");
+        // 2. 轮询结果 (并行轮询 4 个)
+        setStatus("AI 正在绘制 4 段互动视频...");
         setProgress(50);
-        const videoUrl = await VolcanoService.pollTaskResult(
-          taskId, 
-          (pollingStatus) => {
-            if (pollingStatus === 'running') {
-              setStatus("AI 正在绘制视频帧...");
-            }
-          },
-          abortController.signal
+        
+        const pollPromises = actions.map(action => 
+          VolcanoService.pollTaskResult(
+            taskGroup[action],
+            undefined,
+            abortController.signal
+          )
         );
 
-        // 3. 下载视频
-        setStatus("正在下载视频...");
+        const videoUrls = await Promise.all(pollPromises);
+        const videoUrlMap: { [key: string]: string } = {};
+        actions.forEach((action, index) => {
+          videoUrlMap[action] = videoUrls[index];
+        });
+
+        // 3. 下载/保存视频
+        setStatus("正在同步互动技能到本地...");
         setProgress(80);
-        const localPath = await FileManager.downloadVideo(videoUrl, taskId, name || "我的 AI 猫咪", image);
+        const groupId = 'group_' + Date.now();
+        const finalPaths = await FileManager.downloadVideos(videoUrlMap, groupId, name || "我的 AI 猫咪", image);
 
         // 4. 完成
         setStatus("生成成功！");
@@ -79,14 +92,12 @@ export default function GenerationProgress() {
           if (!success) {
             throw new Error("积分不足，兑换失败");
           }
-        } else if (isRedemption && isDebugRedemption) {
-          console.log("Debug mode: Skipped point deduction");
         }
 
         // 确保活跃 ID 已设置
-        storage.setActiveCatId(taskId);
+        storage.setActiveCatId(groupId);
         
-        // 更新全局猫咪状态，防止重定向到空页面
+        // 更新全局猫咪状态
         refreshCatStatus();
         
         setTimeout(() => {
@@ -199,9 +210,9 @@ export default function GenerationProgress() {
             {/* 状态步骤列表 */}
             <div className="mt-12 w-full space-y-4 text-left">
               <StatusStep label="分析图片特征" active={progress >= 20} done={progress > 20} />
-              <StatusStep label="AI 视频建模" active={progress >= 50} done={progress > 50} />
-              <StatusStep label="渲染高清视频" active={progress >= 80} done={progress > 80} />
-              <StatusStep label="保存到本地" active={progress >= 100} done={progress === 100} />
+              <StatusStep label="注入 4 种灵魂技能" active={progress >= 50} done={progress > 50} />
+              <StatusStep label="渲染高清互动视频" active={progress >= 80} done={progress > 80} />
+              <StatusStep label="同步到本地猫窝" active={progress >= 100} done={progress === 100} />
             </div>
           </motion.div>
         )}
@@ -219,7 +230,7 @@ export default function GenerationProgress() {
             {/* 视频背景 */}
             <div className="absolute inset-0 z-0">
               <video 
-                src={storage.getActiveCat()?.videoPath}
+                src={storage.getActiveCat()?.videoPaths?.longPress || storage.getActiveCat()?.videoPath}
                 autoPlay
                 loop
                 muted
