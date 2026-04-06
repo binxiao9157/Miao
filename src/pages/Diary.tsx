@@ -166,7 +166,7 @@ export default function Diary() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-32">
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 py-6 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-on-surface">日常记录</h1>
@@ -214,17 +214,12 @@ export default function Diary() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => setDeletingId(entry.id)}
-                    className="w-8 h-8 flex items-center justify-center text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                  <button className="text-on-surface-variant/40">
-                    <MoreHorizontal size={20} />
-                  </button>
-                </div>
+                <button 
+                  onClick={() => setDeletingId(entry.id)}
+                  className="w-8 h-8 flex items-center justify-center text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 rounded-full transition-all mr-2"
+                >
+                  <Trash2 size={18} />
+                </button>
               </div>
 
               {entry.media && (
