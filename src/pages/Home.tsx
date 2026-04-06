@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, TouchEvent, RefObject } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Sparkles, Coins, RefreshCw, Loader2, AlertCircle, Settings, Plus, Bell } from "lucide-react";
+import { Coins, RefreshCw, Loader2, AlertCircle, Settings } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";
@@ -328,6 +328,13 @@ export default function Home() {
     const absDy = Math.abs(dy);
     const now = Date.now();
 
+    // 唤醒隐藏入口逻辑
+    const wakeupUI = () => {
+      setShowControls(true);
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+      tapTimeoutRef.current = setTimeout(() => setShowControls(false), 3000);
+    };
+
     if (isLongPressTriggered.current) {
       isLongPressTriggered.current = false;
       touchStartPos.current = null;
@@ -338,25 +345,21 @@ export default function Home() {
       // Swipe detected
       e.preventDefault(); // 阻止默认行为
       triggerInteraction('喂食成功', '吧唧吧唧... 🐟', 'swipe');
+      wakeupUI();
     } else if (absDx < 10 && absDy < 10) {
       if (now - lastTapTime.current < 300) {
         // Double tap
         if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
         triggerInteraction('开心玩耍', '好开心！ 🧶', 'doubleClick');
+        wakeupUI();
         lastTapTime.current = 0;
       } else {
         // Single tap
         lastTapTime.current = now;
-        tapTimeoutRef.current = setTimeout(() => {
+        setTimeout(() => {
           if (lastTapTime.current === now) {
             triggerInteraction('轻轻抚摸', '喵呜～ ❤️', 'click');
-            setShowControls(prev => {
-              const next = !prev;
-              if (next) {
-                setTimeout(() => setShowControls(false), 5000);
-              }
-              return next;
-            });
+            wakeupUI();
           }
         }, 300);
       }
@@ -386,17 +389,6 @@ export default function Home() {
     <div className="w-full h-full flex flex-col relative overflow-hidden bg-black touch-none">
       {/* 视频播放器区域 - 采用 Stack 堆叠布局实现无缝切换 */}
       <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden">
-        {/* 底层：动态占位图 */}
-        <img 
-          src={cat?.avatar || `https://picsum.photos/seed/${cat?.breed}-${cat?.color}/1080/1920`} 
-          alt="" 
-          className="absolute inset-0 w-full h-full object-cover z-0 opacity-40"
-          referrerPolicy="no-referrer"
-        />
-
-        {/* 隔离层：深色毛玻璃 */}
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-xl z-[5]"></div>
-
         {/* 1. 待机视频层 (Idle) */}
         <video
           ref={idleVideoRef}
@@ -419,9 +411,7 @@ export default function Home() {
             setLoadError(false);
           }}
           onError={handleVideoError}
-          className={`absolute inset-0 w-full h-full z-10 transition-opacity duration-500 ${isVideoReady ? 'opacity-100' : 'opacity-0'} ${
-            videoAspectRatio && videoAspectRatio >= 1 ? 'object-contain' : 'object-cover'
-          }`}
+          className={`absolute inset-0 w-full h-full z-10 transition-opacity duration-500 ${isVideoReady ? 'opacity-100' : 'opacity-0'} object-cover`}
         />
 
         {/* 2. 互动视频层 (Actions) - 预加载并覆盖在待机层之上 */}
@@ -438,9 +428,7 @@ export default function Home() {
               playsInline
               preload="auto"
               onEnded={() => setActiveAction(null)}
-              className={`absolute inset-0 w-full h-full z-20 transition-opacity duration-300 ${activeAction === key ? 'opacity-100' : 'opacity-0 pointer-events-none'} ${
-                videoAspectRatio && videoAspectRatio >= 1 ? 'object-contain' : 'object-cover'
-              }`}
+              className={`absolute inset-0 w-full h-full z-20 transition-opacity duration-300 ${activeAction === key ? 'opacity-100' : 'opacity-0' } object-cover pointer-events-none`}
             />
           );
         })}
@@ -498,60 +486,14 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 pointer-events-none"
+            className="absolute top-12 right-6 z-50"
           >
-            {/* 顶部控制项 */}
-            <div className="absolute top-12 left-6 flex flex-col gap-4 pointer-events-auto">
-              <button 
-                onClick={() => navigate("/profile")}
-                className="flex items-center gap-2 bg-black/20 backdrop-blur-xl p-1.5 pr-4 rounded-full border border-white/10 active:scale-95 transition-all"
-              >
-                <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20">
-                  <img 
-                    src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
-                    alt="User" 
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <span className="text-xs font-bold text-white truncate max-w-[80px]">{user?.nickname || "喵星人"}</span>
-              </button>
-
-              <div className="bg-black/20 backdrop-blur-xl px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 w-fit">
-                <Coins size={16} className="text-[#FF9D76]" />
-                <span className="text-sm font-black text-white">{points}</span>
-              </div>
-            </div>
-
-            <div className="absolute top-12 right-6 flex flex-col gap-4 pointer-events-auto">
-              <button 
-                onClick={() => navigate("/notifications")}
-                className="w-12 h-12 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all"
-              >
-                <Bell size={20} />
-              </button>
-              <button 
-                onClick={() => setShowRegenerateConfirm(true)}
-                className="w-12 h-12 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all"
-              >
-                <RefreshCw size={20} />
-              </button>
-              <button 
-                onClick={() => navigate("/switch-companion")}
-                className="w-12 h-12 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all"
-              >
-                <Plus size={22} />
-              </button>
-              <button 
-                onClick={() => navigate("/settings")}
-                className="w-12 h-12 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all"
-              >
-                <Settings size={20} />
-              </button>
-            </div>
-
-            {/* 积分展示 */}
-            {/* 已移动到左侧头像下方 */}
+            <button 
+              onClick={() => setShowRegenerateConfirm(true)}
+              className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center text-white active:scale-90 transition-all shadow-lg"
+            >
+              <Settings size={22} className="opacity-80" />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -28,6 +28,14 @@ export const ACTION_PROMPTS = {
 };
 
 /**
+ * 形象生成对应的 Prompt 模版
+ */
+export const IMAGE_PROMPTS = {
+  anchor: (breed: string, color: string) => 
+    `A ultra-realistic, high-detail portrait of a ${breed} cat with ${color} fur, sitting comfortably in a soft cat nest, cinematic lighting, 4k resolution, looking at the camera.`
+};
+
+/**
  * 火山引擎方舟视频生成服务
  */
 export class VolcanoService {
@@ -133,6 +141,86 @@ export class VolcanoService {
         throw new Error(`查询错误: ${error.message}`);
       }
     }
+  }
+
+  /**
+   * 提交文生图任务 (Text-to-Image)
+   */
+  public static async submitImageTask(prompt: string) {
+    if (VolcanoConfig.MOCK_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return { id: 'mock_img_task_' + Date.now() };
+    }
+
+    const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
+    const accessKey = localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey;
+    const secretKey = localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey;
+
+    try {
+      const response = await axios.post("/api/generate-image", {
+        prompt,
+      }, {
+        timeout: 60000,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Volc-API-Key': apiKey,
+          'X-Volc-Access-Key': accessKey,
+          'X-Volc-Secret-Key': secretKey
+        }
+      });
+      
+      const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;
+      
+      if (!taskId) {
+        throw new Error("文生图任务提交失败，未获取到 ID");
+      }
+
+      return { id: taskId };
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || `文生图提交失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 轮询文生图结果
+   */
+  public static async pollImageResult(taskId: string, signal?: AbortSignal): Promise<string> {
+    if (VolcanoConfig.MOCK_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return 'https://picsum.photos/seed/cat/800/800';
+    }
+
+    return new Promise((resolve, reject) => {
+      const timer = setInterval(async () => {
+        if (signal?.aborted) {
+          clearInterval(timer);
+          reject(new Error("任务中止"));
+          return;
+        }
+
+        try {
+          const response = await axios.get(`/api/image-status/${taskId}`, {
+            headers: {
+              'X-Volc-API-Key': localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey
+            }
+          });
+          
+          const result = response.data;
+          if (result.status === 'succeeded') {
+            clearInterval(timer);
+            const imageUrl = result.output?.image_url || result.data?.image_url || result.image_url;
+            if (imageUrl) resolve(imageUrl);
+            else reject(new Error("任务成功但未获取到图片地址"));
+          } else if (result.status === 'failed') {
+            clearInterval(timer);
+            reject(new Error("图片生成失败"));
+          }
+        } catch (error) {
+          clearInterval(timer);
+          reject(error);
+        }
+      }, 3000);
+    });
   }
 
   /**

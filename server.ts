@@ -14,12 +14,14 @@ async function startServer() {
 
   const ARK_API_KEY = process.env.VOLC_API_KEY;
   const ARK_MODEL_ID = process.env.VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215";
+  const ARK_T2I_MODEL_ID = process.env.VOLC_T2I_MODEL_ID || "doubao-t2i-v2";
   // 还原为用户确认可用的 Seedance 专用任务接口端点
   const ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks";
 
   console.log("Server Config:", {
     hasApiKey: !!ARK_API_KEY,
     modelId: ARK_MODEL_ID,
+    t2iModelId: ARK_T2I_MODEL_ID,
     isEndpointId: ARK_MODEL_ID.startsWith("ep-"),
     baseUrl: ARK_BASE_URL,
     nodeEnv: process.env.NODE_ENV
@@ -28,6 +30,61 @@ async function startServer() {
   // Volcengine AccessKey and SecretKey should be provided via environment variables
   const VOLC_ACCESS_KEY = process.env.VOLC_ACCESS_KEY;
   const VOLC_SECRET_KEY = process.env.VOLC_SECRET_KEY;
+
+  // API Route for Image Generation (Ark T2I)
+  app.post("/api/generate-image", async (req, res) => {
+    const { prompt } = req.body;
+    const finalApiKey = req.headers['x-volc-api-key'] as string || ARK_API_KEY;
+    const finalModelId = ARK_T2I_MODEL_ID; // Use T2I model
+
+    try {
+      if (!finalApiKey) {
+        return res.status(500).json({ error: "服务器未配置 API Key" });
+      }
+
+      const requestBody = {
+        model: finalModelId,
+        content: [
+          {
+            type: "text",
+            text: prompt
+          }
+        ],
+        parameters: {
+          size: "1024x1024"
+        }
+      };
+
+      const response = await axios.post(ARK_BASE_URL, requestBody, {
+        headers: {
+          'Authorization': `Bearer ${finalApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 60000
+      });
+
+      res.json(response.data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.response?.data || error.message });
+    }
+  });
+
+  // Image status polling
+  app.get("/api/image-status/:taskId", async (req, res) => {
+    const { taskId } = req.params;
+    const finalApiKey = req.headers['x-volc-api-key'] as string || ARK_API_KEY;
+
+    try {
+      const response = await axios.get(`${ARK_BASE_URL}/${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${finalApiKey}`
+        }
+      });
+      res.json(response.data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.response?.data || error.message });
+    }
+  });
 
   // API Route for Video Generation (Ark Task API)
   app.post("/api/generate-video", async (req, res) => {

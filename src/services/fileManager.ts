@@ -12,12 +12,14 @@ export class FileManager {
    * @param groupId 任务组 ID
    * @param catName 猫咪名字
    * @param avatarUrl 头像
+   * @param metadata 元数据 (品种、毛色、来源)
    */
   public static async downloadVideos(
     videoUrls: { [key: string]: string }, 
     groupId: string, 
     catName: string, 
-    avatarUrl: string
+    avatarUrl: string,
+    metadata?: { breed?: string; furColor?: string; source?: 'upload' | 'created' }
   ): Promise<{ [key: string]: string }> {
     const finalPaths: { [key: string]: string } = {};
     
@@ -29,10 +31,10 @@ export class FileManager {
     const newCat: CatInfo = {
       id: groupId,
       name: catName,
-      breed: 'AI 生成',
-      color: '未知',
+      breed: metadata?.breed || 'AI 生成',
+      color: metadata?.furColor || '未知',
       avatar: avatarUrl,
-      source: 'uploaded',
+      source: metadata?.source === 'created' ? 'created' : 'uploaded',
       videoPath: finalPaths.longPress || Object.values(finalPaths)[0], // 默认使用长按(休息)作为待机视频
       videoPaths: finalPaths,
       remoteVideoUrl: finalPaths.longPress || Object.values(finalPaths)[0],

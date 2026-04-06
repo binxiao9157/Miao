@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, Loader2, CheckCircle2, AlertCircle, PartyPopper, Coins } from "lucide-react";
-import { VolcanoService, ACTION_PROMPTS } from "../services/volcanoService";
+import { VolcanoService, ACTION_PROMPTS, IMAGE_PROMPTS } from "../services/volcanoService";
 import { FileManager } from "../services/fileManager";
 import { storage } from "../services/storage";
 import { useAuthContext } from "../context/AuthContext";
@@ -11,9 +11,9 @@ export default function GenerationProgress() {
   const location = useLocation();
   const navigate = useNavigate();
   const { refreshCatStatus } = useAuthContext();
-  const { image, name, isRedemption, isDebugRedemption } = location.state || {};
+  const { image, name, breed, furColor, isRedemption, isDebugRedemption } = location.state || {};
 
-  const [status, setStatus] = useState<string>("正在分析图片...");
+  const [status, setStatus] = useState<string>("正在准备生成...");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(true);
@@ -23,17 +23,18 @@ export default function GenerationProgress() {
     setIsGenerating(false);
     setError(null);
     setProgress(0);
-    setStatus("正在分析图片...");
+    setStatus("正在准备生成...");
   };
 
   const handleRetry = () => {
     resetGenerationState();
-    navigate("/upload-material", { state: { image, name: location.state?.name }, replace: true });
+    const target = image ? "/upload-material" : "/create-cat";
+    navigate(target, { state: { image, name, breed, furColor }, replace: true });
   };
 
   useEffect(() => {
-    if (!image) {
-      navigate("/upload-material", { replace: true });
+    if (!image && (!breed || !furColor)) {
+      navigate("/create-cat", { replace: true });
       return;
     }
 
@@ -41,13 +42,31 @@ export default function GenerationProgress() {
 
     const startGeneration = async () => {
       try {
-        // 1. 提交任务 (并行提交 4 个)
-        setStatus("正在为小猫注入 4 种灵魂技能...");
-        setProgress(20);
+        let anchorImage = image;
+
+        // 1. 如果没有图片，先执行 T2I 生成形象锚点 (0% - 20%)
+        if (!image && breed && furColor) {
+          setStatus("正在构思小猫的可爱形象...");
+          setProgress(5);
+          
+          const imgPrompt = IMAGE_PROMPTS.anchor(breed, furColor);
+          const submitRes = await VolcanoService.submitImageTask(imgPrompt);
+          setProgress(10);
+          
+          anchorImage = await VolcanoService.pollImageResult(submitRes.id, abortController.signal);
+          setProgress(20);
+        } else {
+          setStatus("正在分析图片...");
+          setProgress(20);
+        }
+
+        // 2. 提交 I2V 任务 (并行提交 4 个) (20% - 100%)
+        setStatus("正在教小猫学习 4 种互动技能...");
+        setProgress(30);
         
         const actions = Object.keys(ACTION_PROMPTS) as Array<keyof typeof ACTION_PROMPTS>;
         const submitPromises = actions.map(action => 
-          VolcanoService.submitTask(image, ACTION_PROMPTS[action])
+          VolcanoService.submitTask(anchorImage, ACTION_PROMPTS[action])
         );
         
         const submitResults = await Promise.all(submitPromises);
@@ -58,7 +77,7 @@ export default function GenerationProgress() {
 
         console.log("[DEBUG] Task group submitted:", taskGroup);
 
-        // 2. 轮询结果 (并行轮询 4 个)
+        // 3. 轮询结果 (并行轮询 4 个)
         setStatus("AI 正在绘制 4 段互动视频...");
         setProgress(50);
         
@@ -76,13 +95,19 @@ export default function GenerationProgress() {
           videoUrlMap[action] = videoUrls[index];
         });
 
-        // 3. 下载/保存视频
+        // 4. 下载/保存视频
         setStatus("正在同步互动技能到本地...");
-        setProgress(80);
+        setProgress(85);
         const groupId = 'group_' + Date.now();
-        const finalPaths = await FileManager.downloadVideos(videoUrlMap, groupId, name || "我的 AI 猫咪", image);
+        const finalPaths = await FileManager.downloadVideos(
+          videoUrlMap, 
+          groupId, 
+          name || breed || "我的 AI 猫咪", 
+          anchorImage,
+          { breed, furColor, source: image ? 'upload' : 'created' }
+        );
 
-        // 4. 完成
+        // 5. 完成
         setStatus("生成成功！");
         setProgress(100);
         
@@ -107,7 +132,7 @@ export default function GenerationProgress() {
         }, 1000);
 
       } catch (err: any) {
-        if (err.message === "任务轮询已中止") return;
+        if (err.message === "任务轮询已中止" || err.message === "任务中止") return;
         
         console.error("生成过程出错:", err);
         const errorMessage = err.message || "生成失败，请稍后重试";
@@ -120,7 +145,7 @@ export default function GenerationProgress() {
     return () => {
       abortController.abort();
     };
-  }, [image, navigate]);
+  }, [image, breed, furColor, navigate]);
 
   return (
     <div className="min-h-screen bg-[#FFF5F0] flex flex-col items-center justify-center p-8 text-center">
