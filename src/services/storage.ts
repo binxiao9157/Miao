@@ -2,18 +2,6 @@
  * 本地存储服务，模拟移动端的 SharedPreferences/MMKV
  */
 
-const STORAGE_KEYS = {
-  USER_INFO: 'miao_user_info',
-  TOKEN: 'miao_auth_token',
-  CAT_LIST: 'miao_cat_list',
-  ACTIVE_CAT_ID: 'miao_active_cat_id',
-  SETTINGS: 'miao_settings',
-  DIARIES: 'miao_diaries',
-  TIME_LETTERS: 'miao_time_letters',
-  POINTS: 'miao_points',
-  USER_AVATAR: 'user_avatar_key',
-};
-
 export interface UserInfo {
   username: string;
   nickname: string;
@@ -79,25 +67,82 @@ export interface PointsInfo {
   history: PointTransaction[];
 }
 
+const STORAGE_KEYS = {
+  USERS: 'miao_users', // 所有用户信息
+  CURRENT_USER: 'miao_current_user', // 当前登录用户
+  TOKEN: 'miao_auth_token',
+  USER_AVATAR: 'user_avatar_key', // 保持兼容性
+};
+
+const USER_DATA_KEYS = {
+  CAT_LIST: 'miao_cat_list',
+  ACTIVE_CAT_ID: 'miao_active_cat_id',
+  SETTINGS: 'miao_settings',
+  DIARIES: 'miao_diaries',
+  TIME_LETTERS: 'miao_time_letters',
+  POINTS: 'miao_points',
+};
+
+// 动态生成用户相关的 Key
+const getUserKey = (key: string) => {
+  const currentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+  if (!currentUser) return `guest_${key}`;
+  try {
+    const user = JSON.parse(currentUser) as UserInfo;
+    return `u_${user.username}_${key}`;
+  } catch (e) {
+    return `guest_${key}`;
+  }
+};
+
 export const storage = {
+  // Helper for safe JSON parsing
+  safeParse: <T>(key: string, defaultValue: T): T => {
+    try {
+      const data = localStorage.getItem(key);
+      if (!data) return defaultValue;
+      const parsed = JSON.parse(data);
+      return parsed === null ? defaultValue : (parsed as T);
+    } catch (e) {
+      console.error(`Error parsing storage key "${key}":`, e);
+      return defaultValue;
+    }
+  },
+
+  // 用户管理
   saveUserInfo: (info: UserInfo) => {
-    localStorage.setItem(STORAGE_KEYS.USER_INFO, JSON.stringify(info));
-    // 同步保存头像到独立键名，确保持久化
+    // 1. 保存到当前登录用户
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(info));
+    
+    // 2. 保存到用户列表（模拟数据库）
+    const users = storage.safeParse<UserInfo[]>(STORAGE_KEYS.USERS, []);
+    const index = users.findIndex(u => u.username === info.username);
+    if (index >= 0) {
+      users[index] = info;
+    } else {
+      users.push(info);
+    }
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+
+    // 3. 同步保存头像
     if (info.avatar) {
-      localStorage.setItem(STORAGE_KEYS.USER_AVATAR, info.avatar);
+      localStorage.setItem(getUserKey(STORAGE_KEYS.USER_AVATAR), info.avatar);
     }
   },
   
   getUserInfo: (): UserInfo | null => {
-    const info = storage.safeParse<UserInfo | null>(STORAGE_KEYS.USER_INFO, null);
+    const info = storage.safeParse<UserInfo | null>(STORAGE_KEYS.CURRENT_USER, null);
     if (info) {
-      // 优先从独立键名读取头像，确保同步
-      const savedAvatar = localStorage.getItem(STORAGE_KEYS.USER_AVATAR);
+      const savedAvatar = localStorage.getItem(getUserKey(STORAGE_KEYS.USER_AVATAR));
       if (savedAvatar) {
         info.avatar = savedAvatar;
       }
     }
     return info;
+  },
+
+  getAllUsers: (): UserInfo[] => {
+    return storage.safeParse<UserInfo[]>(STORAGE_KEYS.USERS, []);
   },
   
   saveToken: (token: string) => {
@@ -117,43 +162,44 @@ export const storage = {
       localStorage.removeItem(STORAGE_KEYS.TOKEN);
     } catch (e) {}
   },
+
+  clearCurrentUser: () => {
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem(STORAGE_KEYS.TOKEN);
+  },
   
   clearAll: () => {
-    Object.values(STORAGE_KEYS).forEach(key => {
-      try {
-        localStorage.removeItem(key);
-      } catch (e) {}
-    });
-  },
-
-  // Helper for safe JSON parsing
-  safeParse: <T>(key: string, defaultValue: T): T => {
-    try {
-      const data = localStorage.getItem(key);
-      if (!data) return defaultValue;
-      const parsed = JSON.parse(data);
-      return parsed === null ? defaultValue : (parsed as T);
-    } catch (e) {
-      console.error(`Error parsing storage key "${key}":`, e);
-      return defaultValue;
+    // 彻底清除当前用户的所有数据（注销账号用）
+    const user = storage.getUserInfo();
+    if (user) {
+      const prefix = `u_${user.username}_`;
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(prefix)) {
+          localStorage.removeItem(key);
+        }
+      });
+      // 从用户列表中移除
+      const users = storage.getAllUsers().filter(u => u.username !== user.username);
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
     }
+    storage.clearCurrentUser();
   },
 
   // Cat Management
   getCatList: (): CatInfo[] => {
-    return storage.safeParse<CatInfo[]>(STORAGE_KEYS.CAT_LIST, []);
+    return storage.safeParse<CatInfo[]>(getUserKey(USER_DATA_KEYS.CAT_LIST), []);
   },
 
   saveCatList: (cats: CatInfo[]) => {
-    localStorage.setItem(STORAGE_KEYS.CAT_LIST, JSON.stringify(cats));
+    localStorage.setItem(getUserKey(USER_DATA_KEYS.CAT_LIST), JSON.stringify(cats));
   },
 
   getActiveCatId: (): string | null => {
-    return localStorage.getItem(STORAGE_KEYS.ACTIVE_CAT_ID);
+    return localStorage.getItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID));
   },
 
   setActiveCatId: (id: string) => {
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_CAT_ID, id);
+    localStorage.setItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID), id);
   },
 
   getActiveCat: (): CatInfo | null => {
@@ -182,7 +228,7 @@ export const storage = {
 
   // Points Management
   getPoints: (): PointsInfo => {
-    const p = storage.safeParse<PointsInfo>(STORAGE_KEYS.POINTS, {
+    const p = storage.safeParse<PointsInfo>(getUserKey(USER_DATA_KEYS.POINTS), {
       total: 0,
       lastLoginDate: null,
       dailyInteractionPoints: 0,
@@ -194,7 +240,7 @@ export const storage = {
 
     if (!p.history) p.history = [];
 
-    // Self-healing for the previous bug where points were reset to 0
+    // Self-healing
     const today = new Date().toLocaleDateString();
     let expectedMinimum = 0;
     if (p.lastLoginDate === today) expectedMinimum += 10;
@@ -203,14 +249,14 @@ export const storage = {
 
     if (p.total < expectedMinimum) {
       p.total = expectedMinimum;
-      localStorage.setItem(STORAGE_KEYS.POINTS, JSON.stringify(p));
+      localStorage.setItem(getUserKey(USER_DATA_KEYS.POINTS), JSON.stringify(p));
     }
 
     return p;
   },
 
   savePoints: (points: PointsInfo) => {
-    localStorage.setItem(STORAGE_KEYS.POINTS, JSON.stringify(points));
+    localStorage.setItem(getUserKey(USER_DATA_KEYS.POINTS), JSON.stringify(points));
   },
 
   addPoints: (amount: number, reason: string = '系统奖励') => {
@@ -247,11 +293,11 @@ export const storage = {
   },
 
   saveSettings: (settings: AppSettings) => {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    localStorage.setItem(getUserKey(USER_DATA_KEYS.SETTINGS), JSON.stringify(settings));
   },
 
   getSettings: (): AppSettings => {
-    return storage.safeParse<AppSettings>(STORAGE_KEYS.SETTINGS, { 
+    return storage.safeParse<AppSettings>(getUserKey(USER_DATA_KEYS.SETTINGS), { 
       greetingsEnabled: true, 
       pushNotifications: true,
       timeLetterReminder: true
@@ -260,17 +306,16 @@ export const storage = {
 
   // Diary storage
   getDiaries: (): DiaryEntry[] => {
-    return storage.safeParse<DiaryEntry[]>(STORAGE_KEYS.DIARIES, []);
+    return storage.safeParse<DiaryEntry[]>(getUserKey(USER_DATA_KEYS.DIARIES), []);
   },
 
   saveDiaries: (diaries: DiaryEntry[]) => {
     try {
-      localStorage.setItem(STORAGE_KEYS.DIARIES, JSON.stringify(diaries));
+      localStorage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(diaries));
       return diaries;
     } catch (e) {
       if (e instanceof DOMException && e.name === 'QuotaExceededError') {
         console.warn("LocalStorage quota exceeded, attempting to prune old media...");
-        // 策略：如果空间不足，清除最早的 5 条带有媒体文件的日记的媒体内容（保留文字）
         let prunedCount = 0;
         const prunedDiaries = [...diaries].reverse().map(d => {
           if (d.media && prunedCount < 5) {
@@ -281,11 +326,9 @@ export const storage = {
         }).reverse();
 
         try {
-          localStorage.setItem(STORAGE_KEYS.DIARIES, JSON.stringify(prunedDiaries));
-          console.log(`Successfully pruned ${prunedCount} old media entries to save space.`);
+          localStorage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(prunedDiaries));
           return prunedDiaries;
         } catch (retryError) {
-          console.error("Failed to save even after pruning:", retryError);
           throw retryError;
         }
       }
@@ -312,11 +355,11 @@ export const storage = {
 
   // Time Letters storage
   getTimeLetters: (): TimeLetter[] => {
-    return storage.safeParse<TimeLetter[]>(STORAGE_KEYS.TIME_LETTERS, []);
+    return storage.safeParse<TimeLetter[]>(getUserKey(USER_DATA_KEYS.TIME_LETTERS), []);
   },
 
   saveTimeLetters: (letters: TimeLetter[]) => {
-    localStorage.setItem(STORAGE_KEYS.TIME_LETTERS, JSON.stringify(letters));
+    localStorage.setItem(getUserKey(USER_DATA_KEYS.TIME_LETTERS), JSON.stringify(letters));
   },
 
   clearMediaCache: () => {
@@ -326,7 +369,7 @@ export const storage = {
   },
 
   deleteCat: () => {
-    localStorage.removeItem(STORAGE_KEYS.CAT_LIST);
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_CAT_ID);
+    localStorage.removeItem(getUserKey(USER_DATA_KEYS.CAT_LIST));
+    localStorage.removeItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID));
   }
 };

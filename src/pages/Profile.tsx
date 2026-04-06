@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, PawPrint } from "lucide-react";
-import { useAuth } from "../hooks/useAuth";
+import { useAuthContext } from "../context/AuthContext";
 import { storage } from "../services/storage";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
@@ -8,7 +8,7 @@ import InstallPromptBanner from "../components/InstallPromptBanner";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuthContext();
   const [stats, setStats] = useState({ days: 0, entries: 0 });
   const [activeCat, setActiveCat] = useState<any>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -32,13 +32,13 @@ export default function Profile() {
   }, []);
 
   const handleLogout = () => {
-    logout();
+    logout(); // AuthContext 中的 logout 已包含内存重置与 storage.clearCurrentUser()
     navigate("/login", { replace: true });
   };
 
   const handleDeleteAccount = () => {
-    storage.clearAll();
-    logout();
+    storage.clearAll(); // 物理删除当前用户的所有数据
+    logout(); // 内存清理
     navigate("/register", { replace: true });
   };
 

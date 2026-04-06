@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
-import { PawPrint } from "lucide-react";
+import { useAuthContext } from "../context/AuthContext";
+import { PawPrint, Eye, EyeOff } from "lucide-react";
 import { storage } from "../services/storage";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login } = useAuthContext();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   const handleLogin = () => {
@@ -30,12 +31,12 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-between p-8 bg-background relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center p-8 bg-background relative">
       {/* Decorative elements */}
-      <div className="absolute -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
-      <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl"></div>
+      <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="w-full flex flex-col items-center pt-8 relative z-10">
+      <div className="w-full flex flex-col items-center pt-8 pb-12 relative z-10">
         {/* Logo Section */}
         <div className="flex items-center gap-3 mb-10 group">
           <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={36} />
@@ -75,13 +76,22 @@ export default function Login() {
               onChange={(e) => setUsername(e.target.value)}
               className="miao-input" 
             />
-            <input 
-              type="password" 
-              placeholder="密码" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="miao-input" 
-            />
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                placeholder="密码" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="miao-input pr-12" 
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30 hover:opacity-60 transition-opacity"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}

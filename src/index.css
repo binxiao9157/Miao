@@ -21,8 +21,11 @@
 }
 
 @layer base {
-  html, body, #root {
-    @apply w-full h-full overflow-hidden bg-background text-on-surface font-sans;
+  html {
+    @apply w-full h-full;
+  }
+  body, #root {
+    @apply w-full min-h-full bg-background text-on-surface font-sans;
     -webkit-font-smoothing: antialiased;
   }
 }

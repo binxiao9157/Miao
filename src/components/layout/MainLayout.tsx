@@ -3,7 +3,6 @@ import { BookOpen, Mail, Home, Star, User } from "lucide-react";
 import { motion } from "motion/react";
 import HomePage from "../../pages/Home";
 import { useAuthContext } from "../../context/AuthContext";
-import { useStatusBar } from "../../hooks/useStatusBar";
 
 export default function MainLayout() {
   const navigate = useNavigate();
@@ -12,9 +11,6 @@ export default function MainLayout() {
 
   const isHome = location.pathname === "/";
   
-  // 动态管理状态栏样式
-  useStatusBar(isHome ? 'immersive' : 'light');
-
   const navItems = [
     { icon: BookOpen, label: "日志", path: "/diary" },
     { icon: Mail, label: "时光", path: "/time-letters" },

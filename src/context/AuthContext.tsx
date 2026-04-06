@@ -34,9 +34,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = (username: string, password: string): boolean => {
-    const savedUser = storage.getUserInfo();
-    if (savedUser && savedUser.username === username && savedUser.password === password) {
+    const users = storage.getAllUsers();
+    const savedUser = users.find(u => u.username === username && u.password === password);
+    
+    if (savedUser) {
+      // 1. 设置当前用户（这会改变 storage 的 getUserKey 行为）
+      storage.saveUserInfo(savedUser);
       storage.saveToken('mock_token_' + Date.now());
+      
+      // 2. 更新内存状态
       setIsAuthenticated(true);
       setUser(savedUser);
       refreshCatStatus();
@@ -46,15 +52,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = (info: UserInfo): void => {
+    // 1. 保存用户信息并设为当前用户
     storage.saveUserInfo(info);
     storage.saveToken('mock_token_' + Date.now());
+    
+    // 2. 更新内存状态
     setUser(info);
     setIsAuthenticated(true);
-    refreshCatStatus();
+    refreshCatStatus(); // 新账号此时 catList 必为空
   };
 
   const logout = () => {
-    storage.removeToken();
+    // 1. 清除当前用户标识和 Token
+    storage.clearCurrentUser();
+    
+    // 2. 重置所有内存状态，防止数据污染
     setUser(null);
     setIsAuthenticated(false);
     setHasCat(false);

@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
-import { ArrowLeft, User, Lock, ShieldCheck, PawPrint } from "lucide-react";
+import { useAuthContext } from "../context/AuthContext";
+import { ArrowLeft, User, Lock, ShieldCheck, PawPrint, Eye, EyeOff } from "lucide-react";
 import { storage } from "../services/storage";
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register } = useAuthContext();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
 
   const handleRegister = () => {
@@ -38,10 +40,10 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col p-8 bg-background relative overflow-hidden">
+    <div className="min-h-screen flex flex-col p-8 bg-background relative">
       {/* Decorative elements */}
-      <div className="absolute -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
-      <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl"></div>
+      <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>
 
       <header className="relative z-10 mb-12">
         <button 
@@ -79,12 +81,19 @@ export default function Register() {
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
               <input 
-                type="password" 
+                type={showPassword ? "text" : "password"} 
                 placeholder="请输入您的密码" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="miao-input pl-12" 
+                className="miao-input pl-12 pr-12" 
               />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30 hover:opacity-60 transition-opacity"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
@@ -93,12 +102,19 @@ export default function Register() {
             <div className="relative">
               <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
               <input 
-                type="password" 
+                type={showConfirmPassword ? "text" : "password"} 
                 placeholder="请再次输入您的密码" 
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="miao-input pl-12" 
+                className="miao-input pl-12 pr-12" 
               />
+              <button 
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30 hover:opacity-60 transition-opacity"
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
         </div>
