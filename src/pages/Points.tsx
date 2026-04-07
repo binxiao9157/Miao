@@ -41,8 +41,10 @@ export default function Points() {
 
   return (
     <div 
-      className="min-h-full bg-background p-6"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+      className="bg-background p-6"
+      style={{ 
+        paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)'
+      }}
     >
       <header className="mb-8 flex justify-between items-start">
         <div>
@@ -173,6 +175,9 @@ export default function Points() {
           </button>
         </div>
       </section>
+
+      {/* 底部占位，确保不被导航栏遮挡 */}
+      <div className="h-32" />
 
       <AnimatePresence>
         {showHistory && (
