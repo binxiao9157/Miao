@@ -53,24 +53,24 @@ export default function Login() {
 
   return (
     <div 
-      className="min-h-screen overflow-y-auto flex flex-col items-center px-8 pb-8 bg-background relative"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
+      className="min-h-screen overflow-y-auto flex flex-col items-center px-8 bg-background relative"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}
     >
       {/* Decorative elements */}
       <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="w-full flex flex-col items-center pt-8 pb-12 relative z-10">
+      <div className="w-full flex-1 flex flex-col items-center justify-center py-4 relative z-10">
         {/* Logo Section */}
-        <div className="flex items-center gap-3 mb-10 group">
-          <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={36} />
-          <span className="text-4xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter">Miao</span>
+        <div className="flex items-center gap-2 mb-4 group">
+          <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={28} />
+          <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter">Miao</span>
         </div>
         
         {/* Title Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-black text-on-surface mb-3 tracking-tight">欢迎来到 Miao</h1>
-          <p className="text-on-surface-variant/80 text-lg font-medium">以喵星之名，守护你的每一份温暖</p>
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-black text-on-surface mb-1 tracking-tight">欢迎来到 Miao</h1>
+          <p className="text-on-surface-variant/80 text-sm font-medium">以喵星之名，守护你的每一份温暖</p>
         </div>
 
         {/* Cat Image Container */}
@@ -78,14 +78,14 @@ export default function Login() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="relative w-80 h-80 mb-14 flex items-center justify-center"
+          className="relative w-full max-w-[240px] aspect-square mb-8 flex items-center justify-center"
         >
-          {/* Outer soft glow/border - thick and soft as in design */}
-          <div className="absolute inset-0 bg-[#FEF6F0] rounded-[72px] shadow-[0_20px_50px_rgba(232,159,113,0.1)]"></div>
-          <div className="absolute inset-0 bg-[#FEF6F0] rounded-[72px] border-[16px] border-[#FEF6F0]"></div>
+          {/* Outer soft glow/border */}
+          <div className="absolute inset-0 bg-[#FEF6F0] rounded-[48px] shadow-[0_10px_30px_rgba(232,159,113,0.1)]"></div>
+          <div className="absolute inset-0 bg-[#FEF6F0] rounded-[48px] border-[12px] border-[#FEF6F0]"></div>
           
           {/* Inner Image Container */}
-          <div className="relative w-[88%] h-[88%] bg-white rounded-[56px] shadow-xl overflow-hidden">
+          <div className="relative w-[88%] h-[88%] bg-white rounded-[36px] shadow-lg overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.img 
                 key={catImage || 'default'}
@@ -103,14 +103,14 @@ export default function Login() {
         </motion.div>
 
         {/* Form Section */}
-        <div className="w-full max-w-sm space-y-5">
-          <div className="space-y-4">
+        <div className="w-full max-w-sm space-y-3">
+          <div className="space-y-3">
             <input 
               type="text" 
               placeholder="用户名" 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="miao-input" 
+              className="miao-input py-3" 
             />
             <div className="relative">
               <input 
@@ -118,7 +118,7 @@ export default function Login() {
                 placeholder="密码" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="miao-input pr-12" 
+                className="miao-input py-3 pr-12" 
               />
               <button 
                 type="button"
@@ -130,13 +130,13 @@ export default function Login() {
             </div>
           </div>
 
-          {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
+          {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
 
-          <div className="pt-6 space-y-5">
-            <button onClick={handleLogin} className="miao-btn-primary">
+          <div className="pt-4 space-y-3">
+            <button onClick={handleLogin} className="miao-btn-primary py-3">
               登录
             </button>
-            <button onClick={() => navigate("/register")} className="miao-btn-secondary">
+            <button onClick={() => navigate("/register")} className="miao-btn-secondary py-3">
               注册
             </button>
           </div>
@@ -144,13 +144,13 @@ export default function Login() {
       </div>
 
       {/* Footer Section */}
-      <div className="pb-8 text-center space-y-4 relative z-10">
-        <div className="flex items-center justify-center gap-4 text-sm font-medium text-on-surface-variant/60">
+      <div className="py-6 text-center space-y-2 relative z-10">
+        <div className="flex items-center justify-center gap-4 text-[12px] font-medium text-on-surface-variant/60">
           <span>隐私政策</span>
-          <span className="w-1.5 h-1.5 bg-on-surface-variant/20 rounded-full"></span>
+          <span className="w-1 h-1 bg-on-surface-variant/20 rounded-full"></span>
           <span>服务条款</span>
         </div>
-        <p className="text-[11px] text-on-surface-variant/40 font-bold tracking-[0.2em] uppercase">
+        <p className="text-[10px] text-on-surface-variant/40 font-bold tracking-[0.2em] uppercase">
           © 2026 MIAO SANCTUARY
         </p>
       </div>
