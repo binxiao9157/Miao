@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles, Trash2, CheckCircle, Loader2 } from "lucide-react";
+import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles, Trash2, CheckCircle, Loader2, ArrowUpRight } from "lucide-react";
 import { storage, DiaryEntry } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";
 import CommentItem from "../components/CommentItem";
+import { shareService } from "../services/shareService";
 
 export default function Diary() {
   const { user } = useAuthContext();
   const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [sharingEntry, setSharingEntry] = useState<DiaryEntry | null>(null);
+  const [showWeChatGuide, setShowWeChatGuide] = useState(false);
   const [newContent, setNewContent] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
@@ -181,6 +183,33 @@ export default function Diary() {
         }
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleShareAction = async () => {
+    if (!sharingEntry) return;
+
+    const options = {
+      title: "Miao - 日常记录",
+      text: sharingEntry.content.substring(0, 30) + (sharingEntry.content.length > 30 ? "..." : ""),
+      url: window.location.href,
+    };
+
+    const result = await shareService.share(options);
+
+    if (result.method === 'wechat') {
+      setSharingEntry(null);
+      setShowWeChatGuide(true);
+    } else if (result.method === 'copy') {
+      setSharingEntry(null);
+      setShareMessage(result.success ? "链接已复制，快去发给好友吧～" : "复制失败，请手动复制链接");
+      setShowShareToast(true);
+      setTimeout(() => setShowShareToast(false), 3000);
+    } else if (result.method === 'native') {
+      setSharingEntry(null);
+      if (!result.success) {
+        // 用户取消或失败，不显示提示
+      }
     }
   };
 
@@ -446,12 +475,7 @@ export default function Diary() {
 
               <div className="grid grid-cols-2 gap-8">
                 <button 
-                  onClick={() => {
-                    setSharingEntry(null);
-                    setShareMessage("正在检测微信环境...\nWeb端暂不支持直接唤起微信，请复制链接分享");
-                    setShowShareToast(true);
-                    setTimeout(() => setShowShareToast(false), 3000);
-                  }}
+                  onClick={handleShareAction}
                   className="flex flex-col items-center gap-3 group"
                 >
                   <div className="w-16 h-16 bg-[#07C160] rounded-3xl flex items-center justify-center text-white shadow-lg shadow-green-500/20 active:scale-90 transition-all">
@@ -461,12 +485,7 @@ export default function Diary() {
                 </button>
 
                 <button 
-                  onClick={() => {
-                    setSharingEntry(null);
-                    setShareMessage("正在检测微信环境...\nWeb端暂不支持直接唤起微信，请复制链接分享");
-                    setShowShareToast(true);
-                    setTimeout(() => setShowShareToast(false), 3000);
-                  }}
+                  onClick={handleShareAction}
                   className="flex flex-col items-center gap-3 group"
                 >
                   <div className="w-16 h-16 bg-gradient-to-br from-[#07C160] to-[#00B050] rounded-3xl flex items-center justify-center text-white shadow-lg shadow-green-500/20 active:scale-90 transition-all">
@@ -485,6 +504,41 @@ export default function Diary() {
                 取消
               </button>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 微信分享引导 */}
+      <AnimatePresence>
+        {showWeChatGuide && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-end p-8"
+            onClick={() => setShowWeChatGuide(false)}
+          >
+            <div className="flex flex-col items-end text-white">
+              <motion.div
+                animate={{ y: [0, -10, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+                className="mb-4"
+              >
+                <ArrowUpRight size={64} className="text-primary" />
+              </motion.div>
+              <h3 className="text-2xl font-black mb-2">点击右上角分享</h3>
+              <p className="text-lg opacity-80">点击右上角的三个点 <span className="font-bold">···</span></p>
+              <p className="text-lg opacity-80">选择分享给好友或朋友圈</p>
+            </div>
+            
+            <div className="mt-auto w-full text-center">
+              <button 
+                onClick={() => setShowWeChatGuide(false)}
+                className="px-12 py-4 bg-white/10 border border-white/20 rounded-full text-white font-black backdrop-blur-md active:scale-95 transition-all"
+              >
+                我知道了
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
