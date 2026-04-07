@@ -156,10 +156,22 @@ export default function Home() {
         setActiveAction(null);
       }
 
-      // Resume idle video playback
-      if (idleVideoRef.current) {
-        idleVideoRef.current.play().catch(() => {});
-      }
+      // Force play all videos to ensure they are ready
+      const playVideos = async () => {
+        try {
+          if (idleVideoRef.current) await idleVideoRef.current.play();
+          // Pre-play and pause action videos to warm them up
+          Object.values(actionRefs).forEach(ref => {
+            if (ref.current) {
+              ref.current.play().then(() => ref.current?.pause()).catch(() => {});
+            }
+          });
+        } catch (err) {
+          console.error("Video play failed:", err);
+        }
+      };
+      
+      playVideos();
 
       // 刷新问候语逻辑，确保设置即时生效
       const settings = storage.getSettings();
@@ -178,10 +190,7 @@ export default function Home() {
     } else {
       // Pause all videos when leaving the tab to save resources
       idleVideoRef.current?.pause();
-      clickVideoRef.current?.pause();
-      doubleClickVideoRef.current?.pause();
-      swipeVideoRef.current?.pause();
-      longPressVideoRef.current?.pause();
+      Object.values(actionRefs).forEach(ref => ref.current?.pause());
     }
   }, [location.pathname, cat?.id]);
 
@@ -287,7 +296,7 @@ export default function Home() {
   };
 
   const handleTimeUpdate = () => {
-    if (idleVideoRef.current && idleVideoRef.current.currentTime > 0.1 && !isVideoReady) {
+    if (idleVideoRef.current && idleVideoRef.current.currentTime > 0 && !isVideoReady) {
       setIsVideoReady(true);
     }
   };
@@ -387,13 +396,13 @@ export default function Home() {
   }
 
   return (
-    <div className="w-full h-full flex flex-col relative overflow-hidden bg-black touch-none">
+    <div className="w-full h-full flex flex-col relative overflow-hidden bg-black touch-none z-0">
       {/* 视频播放器区域 - 采用 Stack 堆叠布局实现无缝切换 */}
-      <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden">
+      <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden z-10">
         {/* 1. 待机视频层 (Idle) */}
         <video
           ref={idleVideoRef}
-          src={cat?.videoPaths?.longPress || cat?.videoPath || cat?.remoteVideoUrl || VIDEOS.DEFAULT}
+          src={cat?.videoPath || cat?.remoteVideoUrl || cat?.videoPaths?.longPress || VIDEOS.DEFAULT}
           autoPlay
           muted
           playsInline
@@ -405,14 +414,17 @@ export default function Home() {
               setVideoAspectRatio(video.videoWidth / video.videoHeight);
             }
           }}
-          onLoadedData={() => setIsInitialized(true)}
+          onLoadedData={() => {
+            setIsInitialized(true);
+            idleVideoRef.current?.play().catch(() => {});
+          }}
           onPlaying={() => {
             setIsInitialized(true);
             setIsVideoReady(true);
             setLoadError(false);
           }}
           onError={handleVideoError}
-          className={`absolute inset-0 w-full h-full z-10 transition-opacity duration-500 ${isVideoReady ? 'opacity-100' : 'opacity-0'} object-cover`}
+          className={`absolute inset-0 w-full h-full z-10 transition-opacity duration-500 ${isVideoReady ? 'opacity-100' : 'opacity-100'} object-cover`}
         />
 
         {/* 2. 互动视频层 (Actions) - 预加载并覆盖在待机层之上 */}
