@@ -291,7 +291,7 @@ async function startServer() {
           headers: {
             'Authorization': `Bearer ${finalApiKey}`
           },
-          timeout: 15000 // 15 seconds timeout
+          timeout: 60000 // Increased to 60 seconds
         }
       );
       
@@ -339,6 +339,10 @@ async function startServer() {
 
   process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
   });
 }
 

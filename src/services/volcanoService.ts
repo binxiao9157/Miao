@@ -123,6 +123,7 @@ export class VolcanoService {
 
     try {
       const response = await axios.get(`/api/video-status/${taskId}`, {
+        timeout: 60000, // Added 60 seconds timeout
         headers: {
           'X-Volc-API-Key': apiKey,
           'X-Volc-Model-Id': modelId,
@@ -132,6 +133,9 @@ export class VolcanoService {
       });
       return response.data;
     } catch (error: any) {
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error("查询状态超时，请检查网络连接或稍后重试");
+      }
       if (error.response) {
         console.error("查询失败详情 (HTTP Error):", error.response.status, error.response.data);
         throw new Error(error.response.data.error || `查询失败 (${error.response.status})`);

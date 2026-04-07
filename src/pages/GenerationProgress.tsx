@@ -197,7 +197,11 @@ export default function GenerationProgress() {
             setStatus("正在使用 Gemini 引擎构思形象...");
             
             try {
-              const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+              const apiKey = process.env.GEMINI_API_KEY;
+              if (!apiKey) {
+                throw new Error("未配置 Gemini API Key，无法使用备用引擎");
+              }
+              const ai = new GoogleGenAI({ apiKey });
               const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash-image",
                 contents: { parts: [{ text: imgPrompt }] },

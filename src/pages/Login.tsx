@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthContext } from "../context/AuthContext";
 import { PawPrint, Eye, EyeOff } from "lucide-react";
 import { storage } from "../services/storage";
+import { motion, AnimatePresence } from "motion/react";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,6 +12,26 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [catImage, setCatImage] = useState<string | null>(null);
+
+  // Default cat image fallback
+  const DEFAULT_CAT_IMAGE = "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=1000&auto=format&fit=crop";
+
+  useEffect(() => {
+    // 1. 实现数据读取逻辑 (Data Fetching)
+    // 在登录页面初始化时，检查本地持久化存储
+    const lastImage = storage.getLastCatImage();
+    console.log("[DEBUG] Login Page - Last Cat Image:", lastImage ? "Found" : "Not Found");
+    if (lastImage) {
+      setCatImage(lastImage);
+    }
+    
+    // 记住上次登录的用户名
+    const lastUsername = storage.getLastUsername();
+    if (lastUsername) {
+      setUsername(lastUsername);
+    }
+  }, []);
 
   const handleLogin = () => {
     if (!username || !password) {
@@ -31,7 +52,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-8 bg-background relative overflow-y-auto no-scrollbar">
+    <div className="min-h-screen overflow-y-auto flex flex-col items-center p-8 bg-background relative">
       {/* Decorative elements */}
       <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>
@@ -50,21 +71,33 @@ export default function Login() {
         </div>
 
         {/* Cat Image Container */}
-        <div className="relative w-80 h-80 mb-14 flex items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="relative w-80 h-80 mb-14 flex items-center justify-center"
+        >
           {/* Outer soft glow/border - thick and soft as in design */}
           <div className="absolute inset-0 bg-[#FEF6F0] rounded-[72px] shadow-[0_20px_50px_rgba(232,159,113,0.1)]"></div>
           <div className="absolute inset-0 bg-[#FEF6F0] rounded-[72px] border-[16px] border-[#FEF6F0]"></div>
           
           {/* Inner Image Container */}
           <div className="relative w-[88%] h-[88%] bg-white rounded-[56px] shadow-xl overflow-hidden">
-            <img 
-              src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=1000&auto=format&fit=crop" 
-              alt="Orange Tabby Cat" 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+            <AnimatePresence mode="wait">
+              <motion.img 
+                key={catImage || 'default'}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.6 }}
+                src={catImage || DEFAULT_CAT_IMAGE} 
+                alt="Cat Companion" 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
 
         {/* Form Section */}
         <div className="w-full max-w-sm space-y-5">

@@ -78,6 +78,9 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'miao_current_user', // 当前登录用户
   TOKEN: 'miao_auth_token',
   USER_AVATAR: 'user_avatar_key', // 保持兼容性
+  LAST_CAT_IMAGE: 'miao_last_cat_image', // 全局最后一次使用的猫咪图片
+  LAST_CAT_BREED: 'miao_last_cat_breed', // 全局最后一次使用的猫咪品种
+  LAST_USERNAME: 'miao_last_username', // 记住上次登录的用户名
 };
 
 const USER_DATA_KEYS = {
@@ -97,11 +100,90 @@ const getUserKey = (key: string) => {
     const user = JSON.parse(currentUser) as UserInfo;
     return `u_${user.username}_${key}`;
   } catch (e) {
+    console.error("Error parsing current user in getUserKey:", e);
     return `guest_${key}`;
   }
 };
 
 export const storage = {
+  // Helper for safe localStorage access
+  setItem: (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.error(`Error setting storage key "${key}":`, e);
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+        // Handle quota exceeded gracefully by pruning
+        console.warn("LocalStorage quota exceeded, attempting to prune storage...");
+        storage.pruneStorage();
+        try {
+          // Retry after pruning
+          localStorage.setItem(key, value);
+          console.log(`Retry setting storage key "${key}" succeeded after pruning.`);
+        } catch (retryError) {
+          console.error(`Retry setting storage key "${key}" failed even after pruning:`, retryError);
+        }
+      }
+    }
+  },
+
+  // Prune storage to free up space
+  pruneStorage: () => {
+    try {
+      // Iterate over all keys in localStorage to find diaries across all users
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.endsWith(USER_DATA_KEYS.DIARIES)) {
+          try {
+            const data = localStorage.getItem(key);
+            if (data) {
+              const diaries = JSON.parse(data) as DiaryEntry[];
+              let pruned = false;
+              const cleanedDiaries = diaries.map((d, index) => {
+                if (d.media && index >= 1) { // Keep media for only the most recent entry
+                  pruned = true;
+                  return { ...d, media: undefined, mediaType: undefined };
+                }
+                return d;
+              });
+              if (pruned) {
+                localStorage.setItem(key, JSON.stringify(cleanedDiaries));
+                console.log(`Pruned diary media for key ${key} to free space.`);
+              }
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+
+      // 2. Prune cat list (if more than 5 cats, keep only the active one and recent ones)
+      const cats = storage.getCatList();
+      if (cats.length > 5) {
+        const activeId = storage.getActiveCatId();
+        const cleanedCats = cats.filter((c, index) => c.id === activeId || index < 5);
+        if (cleanedCats.length < cats.length) {
+          localStorage.setItem(getUserKey(USER_DATA_KEYS.CAT_LIST), JSON.stringify(cleanedCats));
+          console.log("Pruned cat list to free space.");
+        }
+      }
+      
+      // 3. Clear global last cat image if still full (it will be re-synced later)
+      // But we are usually trying to set this, so clearing it might not help much if it's the one we want.
+      
+    } catch (e) {
+      console.error("Error during storage pruning:", e);
+    }
+  },
+
+  removeItem: (key: string) => {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.error(`Error removing storage key "${key}":`, e);
+    }
+  },
+
   // Helper for safe JSON parsing
   safeParse: <T>(key: string, defaultValue: T): T => {
     try {
@@ -118,7 +200,9 @@ export const storage = {
   // 用户管理
   saveUserInfo: (info: UserInfo) => {
     // 1. 保存到当前登录用户
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(info));
+    storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(info));
+    storage.setItem(STORAGE_KEYS.LAST_USERNAME, info.username);
+
     
     // 2. 保存到用户列表（模拟数据库）
     const users = storage.safeParse<UserInfo[]>(STORAGE_KEYS.USERS, []);
@@ -128,11 +212,11 @@ export const storage = {
     } else {
       users.push(info);
     }
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    storage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
 
     // 3. 同步保存头像
     if (info.avatar) {
-      localStorage.setItem(getUserKey(STORAGE_KEYS.USER_AVATAR), info.avatar);
+      storage.setItem(getUserKey(STORAGE_KEYS.USER_AVATAR), info.avatar);
     }
   },
   
@@ -152,7 +236,7 @@ export const storage = {
   },
   
   saveToken: (token: string) => {
-    localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+    storage.setItem(STORAGE_KEYS.TOKEN, token);
   },
   
   getToken: () => {
@@ -164,14 +248,12 @@ export const storage = {
   },
   
   removeToken: () => {
-    try {
-      localStorage.removeItem(STORAGE_KEYS.TOKEN);
-    } catch (e) {}
+    storage.removeItem(STORAGE_KEYS.TOKEN);
   },
 
   clearCurrentUser: () => {
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    storage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    storage.removeItem(STORAGE_KEYS.TOKEN);
   },
   
   clearAll: () => {
@@ -191,21 +273,33 @@ export const storage = {
     storage.clearCurrentUser();
   },
 
+  getLastUsername: (): string => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.LAST_USERNAME) || "";
+    } catch (e) {
+      return "";
+    }
+  },
+
   // Cat Management
   getCatList: (): CatInfo[] => {
     return storage.safeParse<CatInfo[]>(getUserKey(USER_DATA_KEYS.CAT_LIST), []);
   },
 
   saveCatList: (cats: CatInfo[]) => {
-    localStorage.setItem(getUserKey(USER_DATA_KEYS.CAT_LIST), JSON.stringify(cats));
+    storage.setItem(getUserKey(USER_DATA_KEYS.CAT_LIST), JSON.stringify(cats));
   },
 
   getActiveCatId: (): string | null => {
-    return localStorage.getItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID));
+    try {
+      return localStorage.getItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID));
+    } catch (e) {
+      return null;
+    }
   },
 
   setActiveCatId: (id: string) => {
-    localStorage.setItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID), id);
+    storage.setItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID), id);
   },
 
   getActiveCat: (): CatInfo | null => {
@@ -232,6 +326,37 @@ export const storage = {
     storage.setActiveCatId(info.id);
   },
 
+  // 获取全局最后一次使用的猫咪图片
+  getLastCatImage: (): string | null => {
+    try {
+      const lastUsername = storage.getLastUsername();
+      if (lastUsername) {
+        const listKey = `u_${lastUsername}_${USER_DATA_KEYS.CAT_LIST}`;
+        const activeIdKey = `u_${lastUsername}_${USER_DATA_KEYS.ACTIVE_CAT_ID}`;
+        
+        const listData = localStorage.getItem(listKey);
+        const activeId = localStorage.getItem(activeIdKey);
+        
+        if (listData) {
+          const list = JSON.parse(listData) as CatInfo[];
+          const active = list.find(c => c.id === activeId) || list[0];
+          if (active) {
+            return active.avatar;
+          }
+        }
+      }
+      return localStorage.getItem(STORAGE_KEYS.LAST_CAT_IMAGE);
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // 强制同步当前活跃猫咪到全局缓存
+  syncLastCat: () => {
+    // No longer needed as we derive it dynamically
+    return true;
+  },
+
   // Points Management
   getPoints: (): PointsInfo => {
     const p = storage.safeParse<PointsInfo>(getUserKey(USER_DATA_KEYS.POINTS), {
@@ -255,14 +380,14 @@ export const storage = {
 
     if (p.total < expectedMinimum) {
       p.total = expectedMinimum;
-      localStorage.setItem(getUserKey(USER_DATA_KEYS.POINTS), JSON.stringify(p));
+      storage.setItem(getUserKey(USER_DATA_KEYS.POINTS), JSON.stringify(p));
     }
 
     return p;
   },
 
   savePoints: (points: PointsInfo) => {
-    localStorage.setItem(getUserKey(USER_DATA_KEYS.POINTS), JSON.stringify(points));
+    storage.setItem(getUserKey(USER_DATA_KEYS.POINTS), JSON.stringify(points));
   },
 
   addPoints: (amount: number, reason: string = '系统奖励') => {
@@ -299,7 +424,7 @@ export const storage = {
   },
 
   saveSettings: (settings: AppSettings) => {
-    localStorage.setItem(getUserKey(USER_DATA_KEYS.SETTINGS), JSON.stringify(settings));
+    storage.setItem(getUserKey(USER_DATA_KEYS.SETTINGS), JSON.stringify(settings));
   },
 
   getSettings: (): AppSettings => {
@@ -316,30 +441,8 @@ export const storage = {
   },
 
   saveDiaries: (diaries: DiaryEntry[]) => {
-    try {
-      localStorage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(diaries));
-      return diaries;
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-        console.warn("LocalStorage quota exceeded, attempting to prune old media...");
-        let prunedCount = 0;
-        const prunedDiaries = [...diaries].reverse().map(d => {
-          if (d.media && prunedCount < 5) {
-            prunedCount++;
-            return { ...d, media: undefined, mediaType: undefined };
-          }
-          return d;
-        }).reverse();
-
-        try {
-          localStorage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(prunedDiaries));
-          return prunedDiaries;
-        } catch (retryError) {
-          throw retryError;
-        }
-      }
-      throw e;
-    }
+    storage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(diaries));
+    return diaries;
   },
 
   deleteDiary: (id: string) => {
@@ -365,7 +468,7 @@ export const storage = {
   },
 
   saveTimeLetters: (letters: TimeLetter[]) => {
-    localStorage.setItem(getUserKey(USER_DATA_KEYS.TIME_LETTERS), JSON.stringify(letters));
+    storage.setItem(getUserKey(USER_DATA_KEYS.TIME_LETTERS), JSON.stringify(letters));
   },
 
   clearMediaCache: () => {
@@ -375,7 +478,7 @@ export const storage = {
   },
 
   deleteCat: () => {
-    localStorage.removeItem(getUserKey(USER_DATA_KEYS.CAT_LIST));
-    localStorage.removeItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID));
+    storage.removeItem(getUserKey(USER_DATA_KEYS.CAT_LIST));
+    storage.removeItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID));
   }
 };

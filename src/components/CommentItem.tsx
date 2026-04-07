@@ -11,7 +11,7 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const itemRef = useRef<HTMLDivElement>(null);
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimer = useRef<any>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -41,8 +41,11 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(comment.content);
-    alert('已复制');
+    try {
+      navigator.clipboard.writeText(comment.content);
+    } catch (e) {
+      console.error("Failed to copy to clipboard:", e);
+    }
     setIsMenuOpen(false);
   };
 

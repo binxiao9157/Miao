@@ -24,12 +24,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const info = storage.getUserInfo();
-    const token = storage.getToken();
-    if (info && token) {
-      setUser(info);
-      setIsAuthenticated(true);
-    }
+    // 强制每次冷启动都显示登录页，清除之前的会话状态
+    storage.clearCurrentUser();
+    
+    // 仅刷新猫咪状态（如果有的话）
     refreshCatStatus();
   }, []);
 
@@ -45,6 +43,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // 2. 更新内存状态
       setIsAuthenticated(true);
       setUser(savedUser);
+      
+      // 3. 立即同步猫咪形象到全局缓存
+      storage.getActiveCat();
+      
       refreshCatStatus();
       return true;
     }
@@ -63,10 +65,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    // 1. 清除当前用户标识和 Token
+    // 1. 同步当前猫咪到全局，确保登录页能看到
+    storage.syncLastCat();
+    
+    // 2. 清除当前用户标识和 Token
     storage.clearCurrentUser();
     
-    // 2. 重置所有内存状态，防止数据污染
+    // 3. 重置所有内存状态，防止数据污染
     setUser(null);
     setIsAuthenticated(false);
     setHasCat(false);
