@@ -28,11 +28,16 @@ export default function TimeLetters() {
   const handleSaveLetter = () => {
     if (!content.trim()) return;
 
+    // 归一化日期逻辑：当前日期凌晨 + X天
+    const targetDate = new Date();
+    targetDate.setHours(0, 0, 0, 0);
+    const unlockAt = targetDate.getTime() + (days * 24 * 60 * 60 * 1000);
+
     const newLetter: TimeLetter = {
       id: 'letter_' + Date.now(),
       content,
       createdAt: Date.now(),
-      unlockAt: Date.now() + (days * 24 * 60 * 60 * 1000),
+      unlockAt: unlockAt,
     };
 
     const updated = [newLetter, ...letters];
@@ -51,8 +56,10 @@ export default function TimeLetters() {
       setSelectedLetter(letter);
       setView('detail');
     } else {
-      const daysLeft = Math.ceil((letter.unlockAt - Date.now()) / (1000 * 60 * 60 * 24));
-      triggerToast(`时间未到喵～ 还有 ${daysLeft} 天才能开启这封信。`);
+      const unlockDate = new Date(letter.unlockAt);
+      const month = unlockDate.getMonth() + 1;
+      const date = unlockDate.getDate();
+      triggerToast(`时光正在酿造这封信，请在 ${month} 月 ${date} 日后再来开启吧～`);
     }
   };
 
@@ -64,7 +71,7 @@ export default function TimeLetters() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-primary text-white px-6 py-3 rounded-full shadow-2xl font-black text-sm"
+            className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-primary text-white px-6 py-3 rounded-full shadow-2xl font-black text-sm text-center min-w-[280px]"
           >
             {showToast}
           </motion.div>
@@ -95,9 +102,20 @@ export default function TimeLetters() {
           </div>
         ) : (
           letters.map((letter) => {
-            const isUnlocked = Date.now() >= letter.unlockAt;
-            const daysLeft = Math.ceil((letter.unlockAt - Date.now()) / (1000 * 60 * 60 * 24));
+            const now = Date.now();
+            const isUnlocked = now >= letter.unlockAt;
             
+            // 计算剩余天数：目标日期凌晨 - 当前日期凌晨
+            const targetStart = new Date(letter.unlockAt).setHours(0,0,0,0);
+            const nowStart = new Date(now).setHours(0,0,0,0);
+            const daysLeft = Math.max(0, Math.ceil((targetStart - nowStart) / (1000 * 60 * 60 * 24)));
+            
+            const unlockDateStr = new Date(letter.unlockAt).toLocaleDateString('zh-CN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            }).replace(/\//g, '/');
+
             return (
               <motion.div 
                 initial={{ opacity: 0, x: -20 }}
@@ -119,11 +137,16 @@ export default function TimeLetters() {
                       {new Date(letter.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-sm text-on-surface-variant font-medium">
-                    {isUnlocked 
-                      ? "这封信已经可以开启了喵～" 
-                      : `距离解锁还有 ${daysLeft} 天`}
-                  </p>
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-sm text-on-surface-variant font-medium">
+                      {isUnlocked 
+                        ? "这封信已经可以开启了喵～" 
+                        : `距离解锁还有 ${daysLeft} 天`}
+                    </p>
+                    <p className="text-[10px] text-on-surface-variant/30 font-bold">
+                      解锁日期：{unlockDateStr}
+                    </p>
+                  </div>
                 </div>
                 
                 <ChevronRight className="text-on-surface-variant/20 group-hover:text-primary transition-colors" />
