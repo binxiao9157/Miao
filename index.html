@@ -9,20 +9,31 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Miao" />
-    <link rel="apple-touch-icon" href="https://picsum.photos/seed/miao-icon/180/180" />
+    <link rel="icon" type="image/png" href="https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=32&h=32&auto=format&fit=crop" />
+    <link rel="apple-touch-icon" href="https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=180&h=180&auto=format&fit=crop" />
     <!-- iOS Splash Screen Placeholder -->
-    <link rel="apple-touch-startup-image" href="https://picsum.photos/seed/miao-splash/1170/2532" />
+    <link rel="apple-touch-startup-image" href="https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=1170&h=2532&auto=format&fit=crop" />
     
     <!-- Open Graph / WeChat Social Meta Tags -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Miao - 日常记录" />
-    <meta property="og:description" content="记录与猫咪的每一个温暖瞬间" />
-    <meta property="og:image" content="https://picsum.photos/seed/miao-share/600/600" />
+    <meta property="og:title" content="Miao - 记录与猫咪的每一个瞬间" />
+    <meta property="og:description" content="开启您与猫咪的数字治愈之旅" />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=600&h=600&auto=format&fit=crop" />
     <meta property="og:url" content="https://miao-diary.app" />
+    <link rel="image_src" href="https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=600&h=600&auto=format&fit=crop" />
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=600&h=600&auto=format&fit=crop" />
+    <meta name="thumbnail" content="https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=600&h=600&auto=format&fit=crop" />
     
-    <title>Miao</title>
+    <!-- WeChat specific: First image in body is used as fallback -->
+    <meta itemprop="image" content="https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=600&h=600&auto=format&fit=crop" />
+    
+    <title>Miao - 遇见你的数字猫咪</title>
   </head>
   <body>
+    <!-- WeChat Share Image Fallback (Hidden) -->
+    <div style="display:none;">
+      <img src="https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=600&h=600&auto=format&fit=crop" alt="share" />
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
