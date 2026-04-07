@@ -1,7 +1,10 @@
+import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { BookOpen, Mail, Home, Star, User } from "lucide-react";
 import { motion } from "motion/react";
 import HomePage from "../../pages/Home";
+import DiaryPage from "../../pages/Diary";
+import TimeLettersPage from "../../pages/TimeLetters";
 import { useAuthContext } from "../../context/AuthContext";
 
 export default function MainLayout() {
@@ -10,6 +13,8 @@ export default function MainLayout() {
   const { hasCat } = useAuthContext();
 
   const isHome = location.pathname === "/";
+  const isDiary = location.pathname === "/diary";
+  const isTimeLetters = location.pathname === "/time-letters";
   
   const navItems = [
     { icon: BookOpen, label: "日志", path: "/diary" },
@@ -19,20 +24,49 @@ export default function MainLayout() {
     { icon: User, label: "Miao", path: "/profile" },
   ];
 
+  // 模拟 IndexedStack，保持页面状态并消除切换跳动
+  const renderPersistentTab = (path: string, Component: React.ComponentType) => {
+    const isActive = location.pathname === path;
+    return (
+      <div 
+        key={path}
+        className={`fixed inset-0 transition-opacity duration-300 ${isActive ? 'opacity-100 z-10' : 'opacity-0 -z-10 pointer-events-none'}`}
+      >
+        <div className="w-full h-full overflow-y-auto no-scrollbar bg-background">
+          <div 
+            className="min-h-full flex flex-col"
+            style={{ 
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)',
+              paddingLeft: 'env(safe-area-inset-left)',
+              paddingRight: 'env(safe-area-inset-right)'
+            }}
+          >
+            <Component />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={`w-full h-full relative overflow-hidden ${isHome ? 'bg-black' : 'bg-background'}`}>
-      {/* Keep Home alive by rendering it always. Use opacity/z-index instead of display:none to prevent video blanking issues in browsers */}
+      {/* Keep Home alive */}
       <div className={`fixed inset-0 ${isHome ? 'z-0 opacity-100' : '-z-10 opacity-0 pointer-events-none'}`}>
         {hasCat && <HomePage />}
       </div>
       
+      {/* Keep Diary alive */}
+      {hasCat && renderPersistentTab("/diary", DiaryPage)}
+      
+      {/* Keep TimeLetters alive */}
+      {hasCat && renderPersistentTab("/time-letters", TimeLettersPage)}
+      
       {/* Other routes will render here - 适配安全区 */}
-      {!isHome && (
+      {!isHome && !isDiary && !isTimeLetters && (
         <div className="relative z-10 w-full h-full flex flex-col overflow-y-auto no-scrollbar bg-background">
           <div 
             className="min-h-full flex flex-col"
             style={{ 
-              paddingTop: 'env(safe-area-inset-top)',
               paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)', // 为底部导航栏留出足够空间
               paddingLeft: 'env(safe-area-inset-left)',
               paddingRight: 'env(safe-area-inset-right)'

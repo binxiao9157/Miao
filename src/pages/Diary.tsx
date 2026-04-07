@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";
 import CommentItem from "../components/CommentItem";
 import { shareService } from "../services/shareService";
+import PageHeader from "../components/PageHeader";
 
 export default function Diary() {
   const { user } = useAuthContext();
@@ -214,22 +215,12 @@ export default function Diary() {
   };
 
   return (
-    <div className="min-h-full bg-background pb-32">
-      <header 
-        className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 pb-6 flex justify-between items-center"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
-      >
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-on-surface">日常记录</h1>
-          <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest mt-1">Daily Moments</p>
-        </div>
-        <button 
-          onClick={() => setIsPosting(true)}
-          className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all"
-        >
-          <Plus size={28} />
-        </button>
-      </header>
+    <div className="flex flex-col">
+      <PageHeader 
+        title="日常记录" 
+        subtitle="Daily Moments" 
+        onAddClick={() => setIsPosting(true)} 
+      />
 
       <div className="px-6 space-y-8">
         {diaries.length === 0 ? (

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send, Clock, ChevronRight } from "lucide-react";
 import { storage, TimeLetter } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
+import PageHeader from "../components/PageHeader";
 
 type ViewState = 'list' | 'write' | 'detail';
 
@@ -56,7 +57,7 @@ export default function TimeLetters() {
   };
 
   const renderList = () => (
-    <div className="min-h-full bg-background">
+    <div className="flex flex-col">
       <AnimatePresence>
         {showToast && (
           <motion.div 
@@ -70,21 +71,11 @@ export default function TimeLetters() {
         )}
       </AnimatePresence>
       
-      <header 
-        className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 pb-8 flex justify-between items-center"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
-      >
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-on-surface">时光信件</h1>
-          <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest mt-1">Time Capsules</p>
-        </div>
-        <button 
-          onClick={() => setView('write')}
-          className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all"
-        >
-          <Plus size={28} />
-        </button>
-      </header>
+      <PageHeader 
+        title="时光信件" 
+        subtitle="Time Capsules" 
+        onAddClick={() => setView('write')} 
+      />
 
       <div className="px-6 space-y-6">
         {letters.length === 0 ? (
@@ -143,8 +134,8 @@ export default function TimeLetters() {
       animate={{ opacity: 1, y: 0 }}
       className="bg-background flex flex-col min-h-screen"
     >
-      <div className="p-8">
-        <header className="flex items-center justify-between mb-12">
+      <div className="p-8" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <header className="flex items-center justify-between mb-12 pt-4">
           <button onClick={() => setView('list')} className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant">
             <ArrowLeft size={24} />
           </button>
@@ -217,8 +208,9 @@ export default function TimeLetters() {
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       className="min-h-screen bg-on-primary-container p-8 flex flex-col"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <header className="flex items-center justify-between mb-12">
+      <header className="flex items-center justify-between mb-12 pt-4">
         <button onClick={() => setView('list')} className="w-12 h-12 bg-white/10 backdrop-blur-xl rounded-2xl flex items-center justify-center text-white/80">
           <ArrowLeft size={24} />
         </button>
