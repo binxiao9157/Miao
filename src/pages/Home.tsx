@@ -27,7 +27,11 @@ export default function Home() {
   const [interactionBubble, setInteractionBubble] = useState<{text: string, id: number} | null>(null);
   
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
+  const [secretTapCount, setSecretTapCount] = useState(0);
+  const secretTapTimer = useRef<NodeJS.Timeout | null>(null);
   
+  const isDev = import.meta.env.DEV;
+
   const idleVideoRef = useRef<HTMLVideoElement>(null);
   const clickVideoRef = useRef<HTMLVideoElement>(null);
   const doubleClickVideoRef = useRef<HTMLVideoElement>(null);
@@ -387,6 +391,24 @@ export default function Home() {
     navigate("/upload-material");
   };
 
+  const handleSecretTap = () => {
+    setSecretTapCount(prev => {
+      const next = prev + 1;
+      if (next >= 5) {
+        setShowRegenerateConfirm(true);
+        // 同时震动反馈（如果支持）
+        if (window.navigator.vibrate) {
+          window.navigator.vibrate([50, 100, 50]);
+        }
+        return 0;
+      }
+      return next;
+    });
+
+    if (secretTapTimer.current) clearTimeout(secretTapTimer.current);
+    secretTapTimer.current = setTimeout(() => setSecretTapCount(0), 2000);
+  };
+
   if (!cat || !cat.name) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-black">
@@ -492,25 +514,24 @@ export default function Home() {
         />
       </div>
 
-      {/* 隐藏式功能按钮 - 仅在点击屏幕时浮现 */}
+      {/* 秘密入口触发区域 - 覆盖在右上角，完全透明 */}
+      <div 
+        className="absolute top-0 right-0 w-32 h-32 z-[60] touch-none"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleSecretTap();
+        }}
+      />
+
+      {/* 隐藏式功能按钮 - 已根据需求彻底移除常驻入口，仅通过上方秘密手势唤起确认弹窗 */}
+      {/* 如果需要在开发模式下强制显示，可以取消下方注释 */}
+      {/* 
       <AnimatePresence>
-        {showControls && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute right-6 z-50"
-            style={{ top: 'calc(env(safe-area-inset-top) + 1rem)' }}
-          >
-            <button 
-              onClick={() => setShowRegenerateConfirm(true)}
-              className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center text-white active:scale-90 transition-all shadow-lg"
-            >
-              <Settings size={22} className="opacity-80" />
-            </button>
-          </motion.div>
+        {(showControls && isDev) && (
+          <motion.div ... />
         )}
-      </AnimatePresence>
+      </AnimatePresence> 
+      */}
 
       {/* 问候气泡 - 自动消失 */}
       <AnimatePresence>
