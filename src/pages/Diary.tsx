@@ -21,7 +21,26 @@ export default function Diary() {
   const [commentText, setCommentText] = useState("");
   const [showShareToast, setShowShareToast] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!window.visualViewport) return;
+
+    const handleResize = () => {
+      const vh = window.visualViewport?.height || window.innerHeight;
+      // 在某些移动端浏览器中，innerHeight 会随键盘弹出而改变，有些则不会
+      // 我们计算差值来模拟 viewInsets.bottom
+      const offset = window.innerHeight - vh;
+      setKeyboardHeight(Math.max(0, offset));
+    };
+
+    window.visualViewport.addEventListener('resize', handleResize);
+    // 初始检查
+    handleResize();
+    
+    return () => window.visualViewport?.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     setDiaries(storage.getDiaries());
@@ -293,43 +312,53 @@ export default function Diary() {
           {/* 发布弹窗 */}
           <AnimatePresence>
             {isPosting && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-6"
-            onClick={() => setIsPosting(false)}
-          >
-            <motion.div 
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="bg-background w-full max-w-lg rounded-t-[32px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden"
-              onClick={e => e.stopPropagation()}
-            >
-              {/* 弹窗头部 (固定) */}
-              <div className="flex justify-between items-center p-6 pb-4 shrink-0">
-                <div>
-                  <h2 className="text-2xl font-black text-on-surface">记录此刻</h2>
-                  <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Capture the moment</p>
-                </div>
-                <button onClick={() => setIsPosting(false)} className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform">
-                  <X size={20} />
-                </button>
-              </div>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-6"
+                onClick={() => setIsPosting(false)}
+              >
+                <motion.div 
+                  initial={{ y: "100%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "100%" }}
+                  transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                  className="bg-background w-full max-w-lg rounded-t-[32px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden"
+                  style={{ 
+                    paddingBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : 'env(safe-area-inset-bottom)',
+                    transition: 'padding-bottom 0.2s ease-out'
+                  }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    // 点击非输入区域收起键盘
+                    if ((e.target as HTMLElement).tagName !== 'TEXTAREA' && (e.target as HTMLElement).tagName !== 'INPUT') {
+                      (document.activeElement as HTMLElement)?.blur();
+                    }
+                  }}
+                >
+                  {/* 弹窗头部 (固定) */}
+                  <div className="flex justify-between items-center p-6 pb-2 shrink-0">
+                    <div>
+                      <h2 className="text-2xl font-black text-on-surface">记录此刻</h2>
+                      <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Capture the moment</p>
+                    </div>
+                    <button onClick={() => setIsPosting(false)} className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform">
+                      <X size={20} />
+                    </button>
+                  </div>
+    
+                  {/* 弹窗内容区 (可滚动) */}
+                  <div className="flex-grow overflow-y-auto custom-scrollbar p-6 pt-4">
+                    <textarea 
+                      autoFocus
+                      value={newContent}
+                      onChange={(e) => setNewContent(e.target.value)}
+                      placeholder="这一刻在想什么..."
+                      className="w-full min-h-[120px] h-32 p-5 bg-surface-container rounded-[28px] border-none focus:ring-2 focus:ring-primary/20 outline-none resize-none mb-6 text-on-surface font-medium placeholder:text-on-surface-variant/40"
+                    />
 
-              {/* 弹窗内容区 (可滚动) */}
-              <div className="flex-grow overflow-y-auto custom-scrollbar p-6 pt-0">
-                <textarea 
-                  autoFocus
-                  value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
-                  placeholder="这一刻在想什么..."
-                  className="w-full h-40 p-5 bg-surface-container rounded-[28px] border-none focus:ring-2 focus:ring-primary/20 outline-none resize-none mb-6 text-on-surface font-medium placeholder:text-on-surface-variant/40"
-                />
-
-                {selectedMedia && (
+                    {selectedMedia && (
                   <div className="relative w-32 h-32 rounded-3xl overflow-hidden mb-2 group shadow-lg">
                     {selectedMedia.type === 'video' ? (
                       <video src={selectedMedia.url} className="w-full h-full object-cover" />
