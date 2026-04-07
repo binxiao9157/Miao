@@ -550,17 +550,30 @@ export default function Home() {
       </AnimatePresence> 
       */}
 
-      {/* 问候气泡 - 自动消失 */}
+      {/* 问候气泡 - 仿对话框样式与左侧滑入动画 */}
       <AnimatePresence>
         {greeting && (
           <motion.div 
-            initial={{ opacity: 0, y: 20, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute top-1/4 left-1/2 -translate-x-1/2 z-40"
+            key="greeting-bubble"
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50, transition: { duration: 0.3 } }}
+            transition={{ 
+              type: "spring", 
+              damping: 12, 
+              stiffness: 100,
+              restDelta: 0.001
+            }}
+            className="absolute top-[22%] left-8 z-40 pointer-events-none"
           >
-            <div className="bg-white/10 backdrop-blur-xl px-6 py-3 rounded-full border border-white/10 shadow-2xl">
-              <p className="text-sm font-black text-white tracking-wide">{greeting}</p>
+            <div className="relative">
+              {/* 装饰线条 - 增强手绘感 */}
+              <div className="absolute -top-4 -left-2 w-8 h-4 border-t-2 border-white/30 rounded-[50%] -rotate-[25deg]" />
+              <div className="absolute -bottom-2 -right-3 w-8 h-4 border-b-2 border-white/30 rounded-[50%] -rotate-[15deg]" />
+              
+              <div className="relative bg-white/10 backdrop-blur-xl px-10 py-5 rounded-[2.5rem_2rem_3rem_2.5rem] border-2 border-white/40 shadow-2xl">
+                <p className="text-sm font-black text-white tracking-wide text-center">{greeting}</p>
+              </div>
             </div>
           </motion.div>
         )}
@@ -577,8 +590,10 @@ export default function Home() {
             transition={{ type: "spring", damping: 15 }}
             className="absolute top-1/3 left-1/2 -translate-x-1/2 z-40 pointer-events-none"
           >
-            <div className="bg-white/90 backdrop-blur-md px-5 py-2.5 rounded-2xl shadow-xl border border-primary/20 flex items-center gap-2">
-              <span className="text-primary font-black text-sm">{interactionBubble.text}</span>
+            <div className="relative">
+              <div className="relative bg-white/10 backdrop-blur-xl px-8 py-4 rounded-[2rem_2.5rem_2rem_3rem] border-2 border-white/40 shadow-xl">
+                <span className="text-white font-black text-sm">{interactionBubble.text}</span>
+              </div>
             </div>
           </motion.div>
         )}
