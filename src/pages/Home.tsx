@@ -29,6 +29,7 @@ export default function Home() {
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
   const [secretTapCount, setSecretTapCount] = useState(0);
   const secretTapTimer = useRef<NodeJS.Timeout | null>(null);
+  const greetingTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const isDev = import.meta.env.DEV;
 
@@ -51,6 +52,36 @@ export default function Home() {
   const lastTapTime = useRef<number>(0);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggered = useRef(false);
+
+  const startGreetingTimer = () => {
+    // 清除旧的定时器
+    if (greetingTimerRef.current) {
+      clearTimeout(greetingTimerRef.current);
+    }
+
+    const settings = storage.getSettings();
+    if (settings.greetingsEnabled) {
+      const hour = new Date().getHours();
+      let text = null;
+      if (hour >= 7 && hour < 10) {
+        text = "早上好～";
+      } else if (hour >= 22 && hour < 24) {
+        text = "该休息啦～";
+      }
+
+      if (text) {
+        setGreeting(text);
+        // 10秒后自动消失
+        greetingTimerRef.current = setTimeout(() => {
+          setGreeting(null);
+        }, 10000);
+      } else {
+        setGreeting(null);
+      }
+    } else {
+      setGreeting(null);
+    }
+  };
 
   useEffect(() => {
     const refreshCat = () => {
@@ -86,15 +117,7 @@ export default function Home() {
       setPoints(pointsInfo.total);
     }
 
-    const settings = storage.getSettings();
-    if (settings.greetingsEnabled) {
-      const hour = new Date().getHours();
-      if (hour >= 7 && hour < 10) {
-        setGreeting("早上好～");
-      } else if (hour >= 22 && hour < 24) {
-        setGreeting("该休息啦～");
-      }
-    }
+    startGreetingTimer();
 
     onlineTimerRef.current = setInterval(() => {
       const p = storage.getPoints();
@@ -133,6 +156,7 @@ export default function Home() {
 
     return () => {
       if (onlineTimerRef.current) clearInterval(onlineTimerRef.current);
+      if (greetingTimerRef.current) clearTimeout(greetingTimerRef.current);
       
       // We no longer explicitly destroy the video here because Home is kept alive by MainLayout.
       // The component will only unmount if the user logs out or leaves the main app area.
@@ -177,24 +201,17 @@ export default function Home() {
       
       playVideos();
 
-      // 刷新问候语逻辑，确保设置即时生效
-      const settings = storage.getSettings();
-      if (settings.greetingsEnabled) {
-        const hour = new Date().getHours();
-        if (hour >= 7 && hour < 10) {
-          setGreeting("早上好～");
-        } else if (hour >= 22 && hour < 24) {
-          setGreeting("该休息啦～");
-        } else {
-          setGreeting(null);
-        }
-      } else {
-        setGreeting(null);
-      }
+      // 刷新问候语逻辑，并启动10秒定时器
+      startGreetingTimer();
     } else {
       // Pause all videos when leaving the tab to save resources
       idleVideoRef.current?.pause();
       Object.values(actionRefs).forEach(ref => ref.current?.pause());
+      // 离开页面时清除定时器
+      if (greetingTimerRef.current) {
+        clearTimeout(greetingTimerRef.current);
+        setGreeting(null);
+      }
     }
   }, [location.pathname, cat?.id]);
 
