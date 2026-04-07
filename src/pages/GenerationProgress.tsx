@@ -13,7 +13,7 @@ export default function GenerationProgress() {
   const location = useLocation();
   const navigate = useNavigate();
   const { refreshCatStatus } = useAuthContext();
-  const { image, name, breed, furColor, isRedemption, isDebugRedemption } = location.state || {};
+  const { image, name, breed, furColor, isRedemption, isDebugRedemption, redemptionAmount } = location.state || {};
 
   const [status, setStatus] = useState<string>("正在准备生成...");
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +139,7 @@ export default function GenerationProgress() {
       
       // 扣除积分 (如果是兑换)
       if (isRedemption && !isDebugRedemption) {
-        const success = storage.deductPoints(200, "解锁新伙伴");
+        const success = storage.deductPoints(redemptionAmount || 200, "解锁新伙伴");
         if (!success) {
           throw new Error("积分不足，兑换失败");
         }
@@ -443,7 +443,7 @@ export default function GenerationProgress() {
               {isRedemption && (
                 <div className="bg-white/5 rounded-2xl p-4 mb-8 flex items-center justify-center gap-2 border border-white/10">
                   <Coins size={16} className="text-[#FF9D76]" />
-                  <span className="text-xs font-bold text-[#FF9D76]">已消耗 200 积分</span>
+                  <span className="text-xs font-bold text-[#FF9D76]">已消耗 {redemptionAmount || 200} 积分</span>
                 </div>
               )}
 

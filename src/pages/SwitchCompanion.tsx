@@ -9,6 +9,7 @@ export default function SwitchCompanion() {
   const [cats, setCats] = useState<CatInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [points, setPoints] = useState(0);
+  const REDEEM_THRESHOLD = storage.getUnlockThreshold();
 
   useEffect(() => {
     const fetchData = () => {
@@ -30,8 +31,8 @@ export default function SwitchCompanion() {
   };
 
   const handleAddNew = () => {
-    if (points >= 200) {
-      navigate("/welcome", { state: { isRedemption: true } });
+    if (points >= REDEEM_THRESHOLD) {
+      navigate("/welcome", { state: { isRedemption: true, redemptionAmount: REDEEM_THRESHOLD } });
     }
   };
 
@@ -99,9 +100,9 @@ export default function SwitchCompanion() {
           {/* 添加新伙伴按钮 */}
           <button 
             onClick={handleAddNew}
-            disabled={points < 200}
+            disabled={points < REDEEM_THRESHOLD}
             className={`flex flex-col items-center justify-center p-4 rounded-[32px] border-2 border-dashed transition-all ${
-              points >= 200 
+              points >= REDEEM_THRESHOLD 
                 ? "bg-primary/5 border-primary/30 text-primary active:bg-primary/10" 
                 : "bg-surface-container-low border-outline-variant/30 text-on-surface-variant opacity-40 grayscale"
             }`}
@@ -112,15 +113,15 @@ export default function SwitchCompanion() {
             <span className="text-xs font-bold">添加新伙伴</span>
             <div className="mt-2 flex items-center gap-1 opacity-80">
               <Coins size={10} />
-              <span className="text-[10px] font-bold">200 积分</span>
+              <span className="text-[10px] font-bold">{REDEEM_THRESHOLD} 积分</span>
             </div>
           </button>
         </div>
 
-        {points < 200 && (
+        {points < REDEEM_THRESHOLD && (
           <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
             <p className="text-xs text-primary font-medium text-center leading-relaxed">
-              积分不足喵～ 还需要 {(200 - points)} 积分即可开启一段新的缘分。
+              积分不足喵～ 还需要 {(REDEEM_THRESHOLD - points)} 积分即可开启一段新的缘分。
               <br/>
               可以通过每日登录、互动、在线时长来获取积分。
             </p>

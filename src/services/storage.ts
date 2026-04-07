@@ -405,6 +405,14 @@ export const storage = {
     return points.total;
   },
 
+  getUnlockThreshold: (): number => {
+    const cats = storage.getCatList();
+    // 已有 1 只 -> 解锁第 2 只需 200 积分 (1 * 200)
+    // 已有 2 只 -> 解锁第 3 只需 400 积分 (2 * 200)
+    // 公式: threshold = ownedCats.length * 200
+    return cats.length * 200;
+  },
+
   deductPoints: (amount: number, reason: string = '积分消耗') => {
     const points = storage.getPoints();
     if (points.total >= amount) {

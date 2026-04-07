@@ -15,6 +15,7 @@ export default function CreateCompanion() {
   const { refreshCatStatus } = useAuthContext();
   const isRedemption = location.state?.isRedemption || false;
   const isDebugRedemption = location.state?.isDebugRedemption || false;
+  const redemptionAmount = location.state?.redemptionAmount || 200;
   
   const [selectedBreed, setSelectedBreed] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -98,7 +99,8 @@ export default function CreateCompanion() {
         breed: breed?.name || "", 
         furColor: color?.name || "",
         isRedemption, 
-        isDebugRedemption 
+        isDebugRedemption,
+        redemptionAmount
       } 
     });
   };
@@ -289,7 +291,7 @@ export default function CreateCompanion() {
               {isRedemption && (
                 <div className="bg-primary/5 rounded-2xl p-4 mb-8 flex items-center justify-center gap-2">
                   <Coins size={16} className="text-primary" />
-                  <span className="text-xs font-bold text-primary">已消耗 200 积分</span>
+                  <span className="text-xs font-bold text-primary">已消耗 {redemptionAmount || 200} 积分</span>
                 </div>
               )}
 

@@ -9,6 +9,7 @@ export default function Welcome() {
   const location = useLocation();
   const isRedemption = location.state?.isRedemption || false;
   const isDebugRedemption = location.state?.isDebugRedemption || false;
+  const redemptionAmount = location.state?.redemptionAmount || 200;
 
   const [showDebugDialog, setShowDebugDialog] = useState(false);
   const [debugClickCount, setDebugClickCount] = useState(0);
@@ -67,7 +68,7 @@ export default function Welcome() {
 
       <div className="space-y-6 flex-grow">
         <button 
-          onClick={() => navigate("/upload-material", { state: { isRedemption, isDebugRedemption } })}
+          onClick={() => navigate("/upload-material", { state: { isRedemption, isDebugRedemption, redemptionAmount } })}
           className="w-full p-8 bg-surface-container rounded-[40px] text-left relative group active:scale-[0.98] transition-all"
         >
           <div className="flex items-start justify-between mb-6">
@@ -86,7 +87,7 @@ export default function Welcome() {
         </button>
 
         <button 
-          onClick={() => navigate("/create-companion", { state: { isRedemption, isDebugRedemption } })}
+          onClick={() => navigate("/create-companion", { state: { isRedemption, isDebugRedemption, redemptionAmount } })}
           className="w-full p-8 bg-surface-container rounded-[40px] text-left relative group active:scale-[0.98] transition-all"
         >
           <div className="flex items-start justify-between mb-6">

@@ -10,7 +10,8 @@ export default function Points() {
   const [isDebugMode, setIsDebugMode] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const navigate = useNavigate();
-  const REDEEM_THRESHOLD = 200;
+  const REDEEM_THRESHOLD = storage.getUnlockThreshold();
+  const ownedCatsCount = storage.getCatList().length;
 
   useEffect(() => {
     const fetchPoints = () => {
@@ -53,7 +54,7 @@ export default function Points() {
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-full">
-            <span className="text-[10px] font-bold text-on-surface-variant">测试: 满200分</span>
+            <span className="text-[10px] font-bold text-on-surface-variant">测试: 满额积分</span>
             <button 
               onClick={() => setIsDebugMode(!isDebugMode)}
               className={`w-8 h-4 rounded-full transition-colors relative ${isDebugMode ? 'bg-primary' : 'bg-outline-variant/50'}`}
@@ -153,18 +154,18 @@ export default function Points() {
           }`}>
             {effectivePoints < REDEEM_THRESHOLD ? <Lock size={32} /> : <Star size={32} />}
           </div>
-          <h3 className="font-bold text-on-surface mb-1">解锁新伙伴</h3>
-          <p className="text-xs text-on-surface-variant opacity-70 mb-2">消耗 200 积分，即可生成一只全新的猫咪伙伴</p>
+          <h3 className="font-bold text-on-surface mb-1">解锁第 {ownedCatsCount + 1} 位伙伴</h3>
+          <p className="text-xs text-on-surface-variant opacity-70 mb-2">消耗 {REDEEM_THRESHOLD} 积分，即可生成一只全新的猫咪伙伴</p>
           
           {effectivePoints < REDEEM_THRESHOLD && (
             <p className="text-[10px] font-black text-primary mb-4 uppercase tracking-widest">
-              还差 {REDEEM_THRESHOLD - effectivePoints} 积分即可解锁
+              还差 {REDEEM_THRESHOLD - effectivePoints} 积分即可解锁第 {ownedCatsCount + 1} 位伙伴
             </p>
           )}
 
           <button 
             disabled={effectivePoints < REDEEM_THRESHOLD}
-            onClick={() => navigate("/welcome", { state: { isRedemption: true, isDebugRedemption: isDebugMode } })}
+            onClick={() => navigate("/welcome", { state: { isRedemption: true, isDebugRedemption: isDebugMode, redemptionAmount: REDEEM_THRESHOLD } })}
             className={`w-full py-3 text-sm font-bold rounded-2xl transition-all active:scale-95 ${
               effectivePoints < REDEEM_THRESHOLD 
                 ? "bg-gray-200 text-gray-400 cursor-not-allowed" 

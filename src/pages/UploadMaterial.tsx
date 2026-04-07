@@ -13,6 +13,7 @@ export default function UploadMaterial() {
 
   const isRedemption = location.state?.isRedemption || false;
   const isDebugRedemption = location.state?.isDebugRedemption || false;
+  const redemptionAmount = location.state?.redemptionAmount || 200;
 
   useEffect(() => {
     if (location.state?.image) {
@@ -83,7 +84,7 @@ export default function UploadMaterial() {
     }
     
     // 跳转到生成进度页，并传递图片和昵称数据
-    navigate("/generation-progress", { state: { image: selectedImage, name: nickname, isRedemption, isDebugRedemption } });
+    navigate("/generation-progress", { state: { image: selectedImage, name: nickname, isRedemption, isDebugRedemption, redemptionAmount } });
   };
 
   const isReady = selectedImage && nickname.trim();
