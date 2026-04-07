@@ -46,6 +46,18 @@ export default function Diary() {
   }, []);
 
   useEffect(() => {
+    if (commentingId) {
+      // 延迟一小会儿等待键盘弹出或弹窗渲染
+      setTimeout(() => {
+        const element = document.getElementById(commentingId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    }
+  }, [commentingId]);
+
+  useEffect(() => {
     setDiaries(storage.getDiaries());
   }, []);
 
@@ -244,6 +256,7 @@ export default function Diary() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               key={entry.id} 
+              id={entry.id}
               className="miao-card !p-0 overflow-hidden"
             >
               <div className="p-6 flex items-center justify-between">
@@ -548,27 +561,33 @@ export default function Diary() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-end justify-center p-4"
+            className="fixed inset-0 z-[150] bg-black/20 backdrop-blur-[2px] flex items-end justify-center p-4"
             onClick={() => setCommentingId(null)}
           >
             <motion.div 
-              initial={{ y: 50 }}
+              initial={{ y: 100 }}
               animate={{ y: 0 }}
-              exit={{ y: 50 }}
-              className="bg-background w-full max-w-lg rounded-[32px] p-4 pr-2 flex items-center gap-3 shadow-2xl border border-outline-variant/30"
+              exit={{ y: 100 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-primary-container/90 backdrop-blur-xl w-full max-w-lg rounded-[32px] p-2 pl-6 flex items-center gap-3 shadow-2xl border border-primary/10"
+              style={{ 
+                marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : 'env(safe-area-inset-bottom)',
+                transition: 'margin-bottom 0.2s ease-out'
+              }}
               onClick={e => e.stopPropagation()}
             >
               <input 
                 autoFocus
                 value={commentText}
                 onChange={e => setCommentText(e.target.value)}
-                placeholder="发表你的评论..."
-                className="flex-grow p-4 bg-transparent border-none outline-none text-on-surface font-medium placeholder:text-on-surface-variant/40"
+                placeholder="发表你的温暖评论..."
+                className="flex-grow py-4 bg-transparent border-none outline-none text-on-primary-container font-bold placeholder:text-on-primary-container/30"
                 onKeyDown={e => e.key === 'Enter' && handleComment(commentingId)}
               />
               <button 
                 onClick={() => handleComment(commentingId)}
-                className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center active:scale-90 transition-all shadow-lg shadow-primary/20"
+                disabled={!commentText.trim()}
+                className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center active:scale-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-30"
               >
                 <Send size={20} />
               </button>
