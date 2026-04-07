@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { storage, PointsInfo, PointTransaction } from "../services/storage";
 import { motion, AnimatePresence } from "framer-motion";
+import PageHeader from "../components/PageHeader";
 
 export default function Points() {
   const [points, setPoints] = useState(0);
@@ -41,57 +42,17 @@ export default function Points() {
   const effectivePoints = isDebugMode ? Math.max(points, REDEEM_THRESHOLD) : points;
 
   return (
-    <div 
-      className="bg-background p-6"
-      style={{ 
-        paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)'
-      }}
-    >
-      <header className="mb-8 flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">积分中心</h1>
-          <p className="text-on-surface-variant text-sm opacity-70">完成任务，解锁更多猫咪伙伴</p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-full">
-            <span className="text-[10px] font-bold text-on-surface-variant">测试: 满额积分</span>
-            <button 
-              onClick={() => setIsDebugMode(!isDebugMode)}
-              className={`w-8 h-4 rounded-full transition-colors relative ${isDebugMode ? 'bg-primary' : 'bg-outline-variant/50'}`}
-            >
-              <div className="w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform" style={{ transform: isDebugMode ? 'translateX(18px)' : 'translateX(2px)' }} />
-            </button>
-          </div>
-          <button 
-            onClick={() => {
-              const p = storage.getPoints();
-              // 重置所有任务状态以触发真正的重新计算
-              p.total = 0;
-              p.history = [];
-              p.lastLoginDate = null;
-              p.lastInteractionDate = null;
-              p.dailyInteractionPoints = 0;
-              p.onlineMinutes = 0;
-              p.lastOnlineUpdate = Date.now();
-              
-              storage.savePoints(p);
-              
-              // 立即重新获取以触发自愈，并更新 UI
-              const healedP = storage.getPoints();
-              setPoints(healedP.total);
-              setPointsInfo(healedP);
-            }}
-            className="text-[10px] text-on-surface-variant underline opacity-50 hover:opacity-100 mr-2"
-          >
-            重置真实积分
-          </button>
-        </div>
-      </header>
+    <div className="flex flex-col">
+      <PageHeader 
+        title="积分中心" 
+        subtitle="Points Center" 
+      />
 
-      <div 
-        onClick={() => setShowHistory(true)}
-        className="miao-card bg-primary text-white p-8 mb-8 flex flex-col items-center justify-center relative overflow-hidden cursor-pointer active:scale-95 transition-transform"
-      >
+      <div className="px-6">
+        <div 
+          onClick={() => setShowHistory(true)}
+          className="miao-card bg-primary text-white p-8 mb-8 flex flex-col items-center justify-center relative overflow-hidden cursor-pointer active:scale-95 transition-transform"
+        >
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         
@@ -178,7 +139,38 @@ export default function Points() {
       </section>
 
       {/* 底部占位，确保不被导航栏遮挡 */}
-      <div className="h-32" />
+      <div className="h-32 flex flex-col items-center justify-center gap-4 opacity-20 hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-full scale-75">
+          <span className="text-[10px] font-bold text-on-surface-variant">测试: 满额积分</span>
+          <button 
+            onClick={() => setIsDebugMode(!isDebugMode)}
+            className={`w-8 h-4 rounded-full transition-colors relative ${isDebugMode ? 'bg-primary' : 'bg-outline-variant/50'}`}
+          >
+            <div className="w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform" style={{ transform: isDebugMode ? 'translateX(18px)' : 'translateX(2px)' }} />
+          </button>
+        </div>
+        <button 
+          onClick={() => {
+            const p = storage.getPoints();
+            p.total = 0;
+            p.history = [];
+            p.lastLoginDate = null;
+            p.lastInteractionDate = null;
+            p.dailyInteractionPoints = 0;
+            p.onlineMinutes = 0;
+            p.lastOnlineUpdate = Date.now();
+            storage.savePoints(p);
+            const healedP = storage.getPoints();
+            setPoints(healedP.total);
+            setPointsInfo(healedP);
+          }}
+          className="text-[10px] text-on-surface-variant underline scale-75"
+        >
+          重置真实积分
+        </button>
+      </div>
+
+      </div>
 
       <AnimatePresence>
         {showHistory && (

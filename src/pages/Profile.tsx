@@ -5,6 +5,7 @@ import { storage } from "../services/storage";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import InstallPromptBanner from "../components/InstallPromptBanner";
+import PageHeader from "../components/PageHeader";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -49,25 +50,23 @@ export default function Profile() {
   ];
 
   return (
-    <div 
-      className="flex-1 bg-background px-6 pb-6 flex flex-col"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
-    >
-      <header className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-2 group">
-          <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={28} />
-          <h1 className="text-2xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">Miao</h1>
-        </div>
-        <button 
-          onClick={() => navigate("/notifications")}
-          className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
-        >
-          <Bell size={20} />
-        </button>
-      </header>
+    <div className="flex flex-col">
+      <PageHeader 
+        title="Miao" 
+        subtitle="Miao Sanctuary" 
+        action={
+          <button 
+            onClick={() => navigate("/notifications")}
+            className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
+          >
+            <Bell size={24} />
+          </button>
+        }
+      />
 
-      <div className="flex-grow">
-        <InstallPromptBanner />
+      <div className="px-6 pb-6 flex flex-col">
+        <div className="flex-grow">
+          <InstallPromptBanner />
         <section className="flex flex-col items-center mb-10">
           <div className="relative mb-4 group">
             <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-tr from-primary to-secondary shadow-xl overflow-hidden">
@@ -253,6 +252,7 @@ export default function Profile() {
           <Heart size={8} className="text-primary fill-current" />
         </div>
       </footer>
+      </div>
     </div>
   );
 }

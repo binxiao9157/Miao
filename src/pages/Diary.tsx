@@ -219,7 +219,14 @@ export default function Diary() {
       <PageHeader 
         title="日常记录" 
         subtitle="Daily Moments" 
-        onAddClick={() => setIsPosting(true)} 
+        action={
+          <button 
+            onClick={() => setIsPosting(true)}
+            className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all"
+          >
+            <Plus size={28} />
+          </button>
+        }
       />
 
       <div className="px-6 space-y-8">

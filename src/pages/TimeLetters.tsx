@@ -74,7 +74,14 @@ export default function TimeLetters() {
       <PageHeader 
         title="时光信件" 
         subtitle="Time Capsules" 
-        onAddClick={() => setView('write')} 
+        action={
+          <button 
+            onClick={() => setView('write')}
+            className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all"
+          >
+            <Plus size={28} />
+          </button>
+        }
       />
 
       <div className="px-6 space-y-6">
