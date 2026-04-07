@@ -56,7 +56,7 @@ export default function TimeLetters() {
   };
 
   const renderList = () => (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-full bg-background">
       <AnimatePresence>
         {showToast && (
           <motion.div 
@@ -70,7 +70,10 @@ export default function TimeLetters() {
         )}
       </AnimatePresence>
       
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 py-8 flex justify-between items-center">
+      <header 
+        className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl px-6 pb-8 flex justify-between items-center"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
+      >
         <div>
           <h1 className="text-3xl font-black tracking-tight text-on-surface">时光信件</h1>
           <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest mt-1">Time Capsules</p>

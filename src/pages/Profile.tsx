@@ -49,7 +49,10 @@ export default function Profile() {
   ];
 
   return (
-    <div className="min-h-screen bg-background p-6 pb-24 flex flex-col">
+    <div 
+      className="flex-1 bg-background px-6 pb-6 flex flex-col"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+    >
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-2 group">
           <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={28} />

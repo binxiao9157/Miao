@@ -26,7 +26,10 @@ export default function Notifications() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div 
+      className="min-h-screen bg-background px-6 pb-6"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+    >
       <header className="flex items-center mb-8">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant">
           <ArrowLeft size={24} />

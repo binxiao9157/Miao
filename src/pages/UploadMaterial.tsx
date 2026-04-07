@@ -89,7 +89,11 @@ export default function UploadMaterial() {
   const isReady = selectedImage && nickname.trim();
 
   return (
-    <div className="min-h-screen bg-[#FFF5F0] p-6 flex flex-col font-sans" onClick={() => (document.activeElement as HTMLElement)?.blur()}>
+    <div 
+      className="min-h-screen bg-[#FFF5F0] px-6 pb-6 flex flex-col font-sans" 
+      onClick={() => (document.activeElement as HTMLElement)?.blur()}
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+    >
       <header className="flex items-center mb-10">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-[#5D4037] active:scale-90 transition-transform">
           <ArrowLeft size={24} />

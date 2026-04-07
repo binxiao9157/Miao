@@ -45,7 +45,10 @@ export default function ChangePassword() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6 relative overflow-hidden">
+    <div 
+      className="min-h-screen bg-background px-6 pb-6 relative overflow-hidden"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+    >
       <AnimatePresence>
         {showToast && (
           <motion.div 

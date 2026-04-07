@@ -255,7 +255,10 @@ export default function GenerationProgress() {
   }, [image, breed, furColor, navigate]);
 
   return (
-    <div className="min-h-screen bg-[#FFF5F0] flex flex-col items-center justify-center p-8 text-center">
+    <div 
+      className="min-h-screen bg-[#FFF5F0] flex flex-col items-center justify-center px-8 pb-8 text-center"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
+    >
       <AnimatePresence mode="wait">
         {error ? (
           <motion.div 

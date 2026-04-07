@@ -487,7 +487,8 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute top-12 right-6 z-50"
+            className="absolute right-6 z-50"
+            style={{ top: 'calc(env(safe-area-inset-top) + 1rem)' }}
           >
             <button 
               onClick={() => setShowRegenerateConfirm(true)}

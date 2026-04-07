@@ -107,7 +107,10 @@ export default function CreateCompanion() {
   const isFormComplete = catName.trim() !== "" && selectedBreed !== null;
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div 
+      className="h-screen bg-background flex flex-col overflow-hidden"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+    >
       <AnimatePresence>
         {showToast && (
           <motion.div 

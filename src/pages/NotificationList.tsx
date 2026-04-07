@@ -96,7 +96,10 @@ export default function NotificationList() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6 pb-24 font-sans">
+    <div 
+      className="min-h-screen bg-background px-6 pb-24 font-sans"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+    >
       <header className="flex items-center justify-between mb-8">
         <div className="flex items-center">
           <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant active:scale-90 transition-transform">

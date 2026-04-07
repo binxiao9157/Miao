@@ -35,7 +35,7 @@ export default function MainLayout() {
             className="min-h-full flex flex-col"
             style={{ 
               paddingTop: 'env(safe-area-inset-top)',
-              paddingBottom: 'calc(env(safe-area-inset-bottom) + 8rem)', // 为底部导航栏留出足够空间
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)', // 为底部导航栏留出足够空间
               paddingLeft: 'env(safe-area-inset-left)',
               paddingRight: 'env(safe-area-inset-right)'
             }}
@@ -46,8 +46,11 @@ export default function MainLayout() {
       </main>
       
       <nav 
-        className="fixed left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/80 backdrop-blur-xl rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex justify-around items-center px-4 py-3 z-50 border border-white/50"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 2rem)' }}
+        className="fixed bottom-4 left-4 right-4 max-w-md mx-auto bg-white/90 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] flex justify-around items-center px-4 z-50 border border-white/50 rounded-3xl"
+        style={{ 
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)',
+          paddingTop: '0.75rem'
+        }}
       >
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
@@ -58,7 +61,7 @@ export default function MainLayout() {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className="relative flex flex-col items-center justify-center w-14 h-14 -mt-10"
+                className="relative flex flex-col items-center justify-center w-14 h-14 -mt-8"
               >
                 <div className={`absolute inset-0 rounded-full shadow-lg transition-all duration-300 ${
                   isActive ? "bg-primary scale-110 rotate-12" : "bg-primary/80"
@@ -85,8 +88,8 @@ export default function MainLayout() {
                 isActive ? "text-primary scale-110" : "text-on-surface-variant opacity-40 hover:opacity-100"
               }`}
             >
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-              <span className={`text-[9px] mt-1 font-black uppercase tracking-tighter ${isActive ? "opacity-100" : "opacity-0"}`}>
+              <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+              <span className={`text-[10px] mt-1 font-black uppercase tracking-tighter ${isActive ? "opacity-100" : "opacity-0"}`}>
                 {item.label}
               </span>
               {isActive && (

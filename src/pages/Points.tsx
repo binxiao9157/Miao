@@ -40,7 +40,10 @@ export default function Points() {
   const effectivePoints = isDebugMode ? Math.max(points, REDEEM_THRESHOLD) : points;
 
   return (
-    <div className="min-h-screen bg-background p-6 pt-10">
+    <div 
+      className="min-h-full bg-background p-6"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+    >
       <header className="mb-8 flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-primary">积分中心</h1>

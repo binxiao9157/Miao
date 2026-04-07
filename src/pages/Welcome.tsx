@@ -39,11 +39,15 @@ export default function Welcome() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col p-8 bg-background relative">
+    <div 
+      className="min-h-screen flex flex-col px-8 pb-8 bg-background relative"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
+    >
       {isRedemption && (
         <button 
           onClick={() => navigate(-1)} 
-          className="absolute top-6 left-6 w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform z-10 shadow-sm"
+          className="absolute left-6 w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform z-10 shadow-sm"
+          style={{ top: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
         >
           <ArrowLeft size={20} />
         </button>

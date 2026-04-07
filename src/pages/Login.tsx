@@ -52,7 +52,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen overflow-y-auto flex flex-col items-center p-8 bg-background relative">
+    <div 
+      className="min-h-screen overflow-y-auto flex flex-col items-center px-8 pb-8 bg-background relative"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
+    >
       {/* Decorative elements */}
       <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>
