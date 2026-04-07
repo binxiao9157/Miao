@@ -50,6 +50,7 @@ export interface DiaryEntry {
 
 export interface TimeLetter {
   id: string;
+  title?: string; // 新增标题字段，可选以兼容旧数据
   content: string;
   unlockAt: number;
   createdAt: number;

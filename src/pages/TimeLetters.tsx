@@ -13,6 +13,7 @@ export default function TimeLetters() {
   const [showToast, setShowToast] = useState<string | null>(null);
   
   // Write state
+  const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [days, setDays] = useState(1);
 
@@ -26,6 +27,10 @@ export default function TimeLetters() {
   };
 
   const handleSaveLetter = () => {
+    if (!title.trim()) {
+      triggerToast("请先输入信件标题哦");
+      return;
+    }
     if (!content.trim()) return;
 
     // 归一化日期逻辑：当前日期凌晨 + X天
@@ -35,7 +40,8 @@ export default function TimeLetters() {
 
     const newLetter: TimeLetter = {
       id: 'letter_' + Date.now(),
-      content,
+      title: title.trim(),
+      content: content.trim(),
       createdAt: Date.now(),
       unlockAt: unlockAt,
     };
@@ -44,6 +50,7 @@ export default function TimeLetters() {
     setLetters(updated);
     storage.saveTimeLetters(updated);
     
+    setTitle("");
     setContent("");
     setDays(1);
     setView('list');
@@ -128,19 +135,19 @@ export default function TimeLetters() {
                   {isUnlocked ? <Unlock size={28} /> : <Lock size={28} />}
                 </div>
                 
-                <div className="flex-grow">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-lg font-black text-on-surface">
-                      {isUnlocked ? "时光回响" : "封存中"}
+                <div className="flex-grow min-w-0">
+                  <div className="flex items-center justify-between mb-1 gap-2">
+                    <h3 className="text-lg font-black text-on-surface truncate flex-1">
+                      {letter.title || (isUnlocked ? "时光回响" : "封存中")}
                     </h3>
-                    <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest shrink-0">
                       {new Date(letter.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-0.5">
-                    <p className="text-sm text-on-surface-variant font-medium">
+                  <div className="flex flex-col gap-1">
+                    <p className={`text-sm text-on-surface-variant font-medium ${isUnlocked ? 'line-clamp-1' : ''}`}>
                       {isUnlocked 
-                        ? "这封信已经可以开启了喵～" 
+                        ? letter.content 
                         : `距离解锁还有 ${daysLeft} 天`}
                     </p>
                     <p className="text-[10px] text-on-surface-variant/30 font-bold">
@@ -149,7 +156,7 @@ export default function TimeLetters() {
                   </div>
                 </div>
                 
-                <ChevronRight className="text-on-surface-variant/20 group-hover:text-primary transition-colors" />
+                <ChevronRight className="text-on-surface-variant/20 group-hover:text-primary transition-colors shrink-0" />
               </motion.div>
             );
           })
@@ -177,14 +184,27 @@ export default function TimeLetters() {
         </header>
 
         <div className="space-y-10">
-          <div className="space-y-4">
-            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-2">信件内容</label>
-            <textarea 
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="写下你想对未来自己或猫咪说的话..."
-              className="w-full h-80 p-8 bg-surface-container rounded-[48px] border-none outline-none resize-none text-on-surface font-medium placeholder:text-on-surface-variant/30 leading-relaxed"
-            />
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-2">信件标题</label>
+              <input 
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="给未来的信起个题目吧..."
+                className="w-full p-6 bg-surface-container rounded-3xl border-none outline-none text-xl font-black text-on-surface placeholder:text-on-surface-variant/30"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-2">信件内容</label>
+              <textarea 
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="写下此刻想说的话..."
+                className="w-full h-64 p-8 bg-surface-container rounded-[48px] border-none outline-none resize-none text-on-surface font-medium placeholder:text-on-surface-variant/30 leading-relaxed"
+              />
+            </div>
           </div>
 
           <div className="space-y-6">
@@ -222,7 +242,7 @@ export default function TimeLetters() {
 
         <button 
           onClick={handleSaveLetter}
-          disabled={!content.trim()}
+          disabled={!title.trim() || !content.trim()}
           className="w-full mt-12 h-14 rounded-full font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-30 disabled:scale-100 active:scale-95 shadow-lg"
           style={{ backgroundColor: '#FF9D76', color: 'white' }}
         >
@@ -256,15 +276,21 @@ export default function TimeLetters() {
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full -ml-16 -mb-16" />
         
         <div className="relative z-10 flex flex-col h-full">
-          <div className="flex items-center gap-3 text-primary/40 mb-10">
-            <Calendar size={20} />
-            <span className="text-xs font-black tracking-widest uppercase">
-              写于 {new Date(selectedLetter?.createdAt || 0).toLocaleDateString()}
-            </span>
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center gap-3 text-primary/40">
+              <Calendar size={20} />
+              <span className="text-xs font-black tracking-widest uppercase">
+                写于 {new Date(selectedLetter?.createdAt || 0).toLocaleDateString()}
+              </span>
+            </div>
           </div>
+
+          <h2 className="text-2xl font-black text-on-surface mb-6 text-center">
+            {selectedLetter?.title || "时光回响"}
+          </h2>
           
-          <div className="flex-grow overflow-y-auto">
-            <p className="text-xl text-on-surface leading-[2] font-serif italic">
+          <div className="flex-grow overflow-y-auto custom-scrollbar">
+            <p className="text-xl text-on-surface leading-[2] font-serif italic whitespace-pre-wrap">
               {selectedLetter?.content}
             </p>
           </div>
