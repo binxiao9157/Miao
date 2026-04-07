@@ -27,6 +27,8 @@ export default function Diary() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_COMMENT_LENGTH = 100;
+
   useEffect(() => {
     if (!window.visualViewport) return;
 
@@ -123,7 +125,7 @@ export default function Diary() {
   };
 
   const handleComment = (id: string) => {
-    if (!commentText.trim()) return;
+    if (!commentText.trim() || commentText.length > MAX_COMMENT_LENGTH) return;
     const updated = diaries.map(d => {
       if (d.id === id) {
         return {
@@ -576,17 +578,35 @@ export default function Diary() {
               }}
               onClick={e => e.stopPropagation()}
             >
-              <input 
-                autoFocus
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                placeholder="发表你的温暖评论..."
-                className="flex-grow py-4 bg-transparent border-none outline-none text-on-primary-container font-bold placeholder:text-on-primary-container/30"
-                onKeyDown={e => e.key === 'Enter' && handleComment(commentingId)}
-              />
+              <div className="flex-grow relative flex items-end">
+                <textarea 
+                  autoFocus
+                  rows={1}
+                  value={commentText}
+                  onChange={e => {
+                    setCommentText(e.target.value.slice(0, MAX_COMMENT_LENGTH));
+                    // 简单的自动高度调整
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                  }}
+                  placeholder="发表你的温暖评论..."
+                  className="w-full py-4 bg-transparent border-none outline-none text-on-primary-container font-bold placeholder:text-on-primary-container/30 pr-12 resize-none max-h-32 custom-scrollbar"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleComment(commentingId);
+                    }
+                  }}
+                />
+                <span className={`absolute right-0 bottom-4 text-[10px] font-black transition-colors ${
+                  commentText.length >= MAX_COMMENT_LENGTH ? 'text-red-500' : 'text-on-primary-container/30'
+                }`}>
+                  {commentText.length}/{MAX_COMMENT_LENGTH}
+                </span>
+              </div>
               <button 
                 onClick={() => handleComment(commentingId)}
-                disabled={!commentText.trim()}
+                disabled={!commentText.trim() || commentText.length > MAX_COMMENT_LENGTH}
                 className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center active:scale-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-30"
               >
                 <Send size={20} />

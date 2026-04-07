@@ -66,8 +66,8 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
       onTouchEnd={clearTimer}
     >
       <div className="flex items-start gap-2">
-        <span className="text-xs font-black text-primary whitespace-nowrap">我:</span>
-        <p className="text-xs text-on-surface-variant font-medium leading-relaxed">{comment.content}</p>
+        <span className="text-xs font-black text-primary shrink-0 mt-0.5">我:</span>
+        <p className="flex-1 text-xs text-on-surface-variant font-medium leading-relaxed break-words whitespace-pre-wrap">{comment.content}</p>
       </div>
 
       {isMenuOpen && (
