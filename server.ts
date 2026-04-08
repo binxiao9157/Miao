@@ -116,7 +116,7 @@ async function startServer() {
 
   // API Route for Video Generation (Ark Task API)
   app.post("/api/generate-video", async (req, res) => {
-    const { prompt, image_base64 } = req.body;
+    const { prompt, image_base64, parameters } = req.body;
 
     try {
       if (!ARK_API_KEY) {
@@ -168,9 +168,12 @@ async function startServer() {
         model: ARK_MODEL_ID,
         content: contentArray,
         parameters: {
-          size: "854x480",
-          // 添加随机种子以确保并行生成的 4 段视频具有多样性，避免模型内部缓存或默认行为导致结果过于接近
-          seed: Math.floor(Math.random() * 1000000)
+          size: parameters?.resolution === "480p" ? "854x480" : (parameters?.size || "854x480"),
+          seed: parameters?.seed || 12345,
+          duration: parameters?.duration || 5,
+          audio: parameters?.audio || false,
+          // 开启首帧约束标记 (Seedance 专用)
+          first_frame_constraint: true
         }
       };
 

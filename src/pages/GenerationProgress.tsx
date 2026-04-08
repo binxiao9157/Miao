@@ -410,7 +410,7 @@ export default function GenerationProgress() {
             {/* 视频背景 */}
             <div className="absolute inset-0 z-0">
               <video 
-                src={storage.getActiveCat()?.videoPaths?.longPress || storage.getActiveCat()?.videoPath}
+                src={storage.getActiveCat()?.videoPaths?.petting || storage.getActiveCat()?.videoPath}
                 autoPlay
                 loop
                 muted

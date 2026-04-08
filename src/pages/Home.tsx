@@ -40,10 +40,10 @@ export default function Home() {
   const longPressVideoRef = useRef<HTMLVideoElement>(null);
 
   const actionRefs: { [key: string]: RefObject<HTMLVideoElement | null> } = {
-    click: clickVideoRef,
-    doubleClick: doubleClickVideoRef,
-    swipe: swipeVideoRef,
-    longPress: longPressVideoRef
+    rubbing: clickVideoRef,
+    feeding: doubleClickVideoRef,
+    teasing: swipeVideoRef,
+    petting: longPressVideoRef
   };
   
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -330,7 +330,7 @@ export default function Home() {
     isLongPressTriggered.current = false;
     longPressTimer.current = setTimeout(() => {
       isLongPressTriggered.current = true;
-      triggerInteraction('贴贴猫咪', '呼噜呼噜... 🐾', 'longPress');
+      triggerInteraction('摸头享受', '呼噜呼噜... 🐾', 'petting');
     }, 600);
   };
 
@@ -379,13 +379,13 @@ export default function Home() {
     if (absDx > 50 || absDy > 50) {
       // Swipe detected
       e.preventDefault(); // 阻止默认行为
-      triggerInteraction('喂食成功', '吧唧吧唧... 🐟', 'swipe');
+      triggerInteraction('逗猫棒玩耍', '好开心！ 🧶', 'teasing');
       wakeupUI();
     } else if (absDx < 10 && absDy < 10) {
       if (now - lastTapTime.current < 300) {
         // Double tap
         if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-        triggerInteraction('开心玩耍', '好开心！ 🧶', 'doubleClick');
+        triggerInteraction('喂食互动', '吧唧吧唧... 🐟', 'feeding');
         wakeupUI();
         lastTapTime.current = 0;
       } else {
@@ -393,7 +393,7 @@ export default function Home() {
         lastTapTime.current = now;
         setTimeout(() => {
           if (lastTapTime.current === now) {
-            triggerInteraction('轻轻抚摸', '喵呜～ ❤️', 'click');
+            triggerInteraction('蹭镜头互动', '喵呜～ ❤️', 'rubbing');
             wakeupUI();
           }
         }, 300);
@@ -445,7 +445,7 @@ export default function Home() {
         {/* 1. 待机视频层 (Idle) */}
         <video
           ref={idleVideoRef}
-          src={cat?.videoPath || cat?.remoteVideoUrl || cat?.videoPaths?.longPress || VIDEOS.DEFAULT}
+          src={cat?.videoPath || cat?.remoteVideoUrl || cat?.videoPaths?.petting || VIDEOS.DEFAULT}
           autoPlay
           muted
           playsInline

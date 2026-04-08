@@ -16,12 +16,12 @@ export interface CatInfo {
   color: string;
   avatar: string;
   source: 'created' | 'uploaded';
-  videoPath?: string; // 默认视频路径 (Idle/LongPress)
+  videoPath?: string; // 默认视频路径 (Idle/Petting)
   videoPaths?: {
-    click?: string;
-    longPress?: string;
-    doubleClick?: string;
-    swipe?: string;
+    rubbing?: string;
+    petting?: string;
+    feeding?: string;
+    teasing?: string;
   };
   remoteVideoUrl?: string; // 视频远程路径 (Fallback)
 }

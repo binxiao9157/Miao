@@ -19,13 +19,13 @@ export const VolcanoConfig = {
 };
 
 /**
- * 互动动作对应的 Prompt 模版
+ * 互动动作对应的 Prompt 模版 (Seedance 高精度指令)
  */
 export const ACTION_PROMPTS = {
-  click: "A human hand gently stroking the cat's head, the cat narrows its eyes in enjoyment, purring softly, cozy indoor nest background, realistic fur texture.",
-  longPress: "The cat curled up in the nest, rhythmic breathing, peaceful sleeping, occasional ear twitching, extreme close-up, warm cinematic lighting.",
-  doubleClick: "The cat pouncing on a feather toy, agile movements, playful expression, wide-angle shot of the cat nest, joyful atmosphere.",
-  swipe: "The cat happily eating cat food from a bowl, licking lips, looking up at the camera with big bright eyes, tail wagging, satisfied expression."
+  rubbing: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，缓慢站起走向镜头轻蹭后退回蹲坐，尾帧回归初始蹲坐姿态，与首帧画面一致；保留原始毛色与真实质感，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；超写实风格，固定摄像头。",
+  petting: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，镜头拉近聚焦面部，虚拟手轻摸头顶，猫咪眯眼、耳朵后贴呈现享受状态，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后镜头拉远，尾帧回归初始蹲坐姿态，与首帧画面一致；超写实风格。",
+  feeding: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，镜头拉近，主人手从上方伸入递零食，猫咪低头嗅闻轻咬，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后主人手离开、镜头拉远，尾帧回归初始蹲坐姿态，与首帧画面一致；超写实风格。",
+  teasing: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，镜头拉近，主人手从右侧伸入持羽毛逗猫棒晃动，猫咪兴奋抬头、挥爪、原地小跳 2 次，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后逗猫棒移开、镜头拉远，尾帧回归初始蹲坐姿态，与首帧画面一致；超写实风格。"
 };
 
 /**
@@ -58,8 +58,14 @@ export class VolcanoService {
       const response = await axios.post("/api/generate-video", {
         prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
         image_base64: imageBase64,
+        parameters: {
+          seed: 12345, // 固定种子值，确保连贯性
+          resolution: "480p",
+          duration: 5,
+          audio: false
+        }
       }, {
-        timeout: 310000, // Increased to 310 seconds
+        timeout: 310000, 
         headers: {
           'Content-Type': 'application/json',
           'X-Volc-API-Key': apiKey,

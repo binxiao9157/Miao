@@ -35,9 +35,9 @@ export class FileManager {
       color: metadata?.furColor || '未知',
       avatar: avatarUrl,
       source: metadata?.source === 'created' ? 'created' : 'uploaded',
-      videoPath: finalPaths.longPress || Object.values(finalPaths)[0], // 默认使用长按(休息)作为待机视频
+      videoPath: finalPaths.petting || Object.values(finalPaths)[0], // 默认使用摸头(休息)作为待机视频
       videoPaths: finalPaths,
-      remoteVideoUrl: finalPaths.longPress || Object.values(finalPaths)[0],
+      remoteVideoUrl: finalPaths.petting || Object.values(finalPaths)[0],
     };
 
     storage.saveCatInfo(newCat);
