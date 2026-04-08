@@ -468,7 +468,7 @@ export default function Home() {
             setLoadError(false);
           }}
           onError={handleVideoError}
-          className={`absolute inset-0 w-full h-full z-10 transition-opacity duration-500 ${isVideoReady ? 'opacity-100' : 'opacity-100'} object-cover`}
+          className={`absolute inset-0 w-full h-full z-10 transition-opacity duration-500 opacity-100 object-cover`}
         />
 
         {/* 2. 互动视频层 (Actions) - 预加载并覆盖在待机层之上 */}

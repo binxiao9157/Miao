@@ -1,9 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
-import { ChevronLeft, Zap, Image as ImageIcon, QrCode, CheckCircle, AlertCircle, UserPlus } from "lucide-react";
+import { ChevronLeft, Zap, Image as ImageIcon, QrCode, CheckCircle, AlertCircle, UserPlus, X, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { storage, FriendInfo } from "../services/storage";
+import QRCode from "react-qr-code";
 
 export default function ScanFriend() {
   const navigate = useNavigate();
@@ -12,7 +13,9 @@ export default function ScanFriend() {
   const [error, setError] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [isFlashOn, setIsFlashOn] = useState(false);
+  const [showMyQR, setShowMyQR] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const stopTracks = () => {
     try {
@@ -55,15 +58,14 @@ export default function ScanFriend() {
         },
         aspectRatio: window.innerWidth / window.innerHeight,
         videoConstraints: {
-          facingMode: { exact: "environment" },
-          width: { ideal: 4096 },
-          height: { ideal: 2160 },
-          focusMode: "continuous"
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         }
       };
 
       await html5QrCode.start(
-        { facingMode: { exact: "environment" } },
+        { facingMode: "environment" },
         config,
         async (decodedText) => {
           if (isUnmounted) return;
@@ -72,36 +74,17 @@ export default function ScanFriend() {
         () => {}
       );
     } catch (err) {
-      try {
-        if (scannerRef.current) {
-          await scannerRef.current.start(
-            { facingMode: "environment" },
-            { 
-              fps: 30, 
-              qrbox: (w: number, h: number) => ({ width: Math.floor(Math.min(w, h) * 0.7), height: Math.floor(Math.min(w, h) * 0.7) }),
-              aspectRatio: window.innerWidth / window.innerHeight
-            },
-            async (decodedText) => {
-              handleScanResult(decodedText);
-            },
-            () => {}
-          );
-        }
-      } catch (secondErr) {
-        console.error("Camera start error:", secondErr);
-        if (!isUnmounted) {
-          setError("无法启动相机，请检查权限设置");
-        }
+      console.error("Camera start error:", err);
+      if (!isUnmounted) {
+        setError("无法启动相机，请检查权限设置");
       }
     }
   };
 
   const handleScanResult = async (decodedText: string) => {
     try {
-      // 尝试解析 JSON
       const data = JSON.parse(decodedText);
       if (data.type === 'miao_friend_invite' && data.uid) {
-        // 模拟获取用户信息
         const mockFriend: FriendInfo = {
           id: data.uid,
           nickname: data.nickname || `喵友_${data.uid.slice(-4)}`,
@@ -113,7 +96,6 @@ export default function ScanFriend() {
         
         setPendingFriend(mockFriend);
         
-        // 扫码成功第一时间释放资源
         if (scannerRef.current?.isScanning) {
           await scannerRef.current.stop();
           scannerRef.current.clear();
@@ -128,13 +110,30 @@ export default function ScanFriend() {
         }, 3000);
       }
     } catch (e) {
-      // 非 JSON 格式，当作普通文本处理
       setScannedUID(decodedText);
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
         setScannedUID(null);
       }, 3000);
+    }
+  };
+
+  const handleAlbumClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const html5QrCode = new Html5Qrcode("reader");
+      const decodedText = await html5QrCode.scanFile(file, true);
+      handleScanResult(decodedText);
+    } catch (err) {
+      setError("未在图片中识别到二维码");
+      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -207,26 +206,42 @@ export default function ScanFriend() {
     if (scannerRef.current && scannerRef.current.isScanning) {
       try {
         const track = scannerRef.current.getRunningTrack();
-        if (track && 'applyConstraints' in track) {
-          const constraints: any = { advanced: [{ torch: !isFlashOn }] };
-          await track.applyConstraints(constraints);
-          setIsFlashOn(!isFlashOn);
+        if (track && track.getCapabilities && (track.getCapabilities() as any).torch) {
+          const newFlashState = !isFlashOn;
+          await track.applyConstraints({
+            advanced: [{ torch: newFlashState }]
+          } as any);
+          setIsFlashOn(newFlashState);
+        } else {
+          setError("当前设备不支持手电筒");
+          setTimeout(() => setError(null), 3000);
         }
       } catch (e) {
-        console.warn("Flashlight not supported");
+        console.warn("Flashlight control error:", e);
+        setError("手电筒切换失败");
+        setTimeout(() => setError(null), 3000);
       }
     }
   };
 
+  const activeCat = storage.getActiveCat();
+  const currentUser = storage.getUserInfo();
+  const inviteData = JSON.stringify({
+    type: 'miao_friend_invite',
+    uid: currentUser?.username || 'unknown',
+    nickname: currentUser?.nickname || '喵星人',
+    avatar: currentUser?.avatar || '',
+    catName: activeCat?.name || '小猫',
+    catAvatar: activeCat?.avatar || ''
+  });
+
   return (
     <div className="fixed inset-0 bg-transparent overflow-hidden z-[100]">
-      {/* 1. 极简底层架构 (Pure Camera Backdrop)：100% 全屏铺满 */}
       <div 
         id="reader" 
         className="absolute inset-0 w-full h-full [&>video]:object-cover [&>video]:w-full [&>video]:h-full [&>div]:!hidden [&>span]:!hidden [&>canvas]:!hidden [&>video]:!block"
       ></div>
       
-      {/* 2. 支付宝式橙色激光束 (Alipay Style Laser Beam) */}
       <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
         <motion.div 
           initial={{ top: "25%", opacity: 0 }}
@@ -235,20 +250,30 @@ export default function ScanFriend() {
             opacity: [0, 1, 1, 0]
           }}
           transition={{ 
-            duration: 2, 
+            duration: 2.2, 
             repeat: Infinity, 
             times: [0, 0.1, 0.9, 1],
-            ease: "easeInOut" 
+            ease: "linear" 
           }}
           className="absolute left-[12.5%] right-[12.5%] h-[60px] pointer-events-none"
         >
-          {/* 渐变光晕尾迹 (Glow Tail) - 位于主线上方，模拟激光划过空气的质感 */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#FF9D76]/60 to-transparent" />
-          {/* 激光束主线 (2px) - 位于容器底部，居中 3/4 长度 */}
+          {/* 支付宝式网格光晕 (Advanced Grid Glow Effect) */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div 
+              className="absolute inset-0 bg-gradient-to-t from-[#FF9D76]/60 to-transparent"
+              style={{
+                backgroundImage: `
+                  linear-gradient(to top, rgba(255,157,118,0.6), transparent),
+                  linear-gradient(to right, rgba(255,157,118,0.2) 1px, transparent 1px),
+                  linear-gradient(to bottom, rgba(255,157,118,0.2) 1px, transparent 1px)
+                `,
+                backgroundSize: '100% 100%, 8px 8px, 8px 8px'
+              }}
+            />
+          </div>
           <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#FF9D76] shadow-[0_0_15px_#FF9D76] rounded-full" />
         </motion.div>
 
-        {/* 配套文字提示 */}
         <div className="absolute w-full text-center bottom-[20%]">
           <p className="text-white/60 text-[13px] font-medium tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
             将二维码/条码放入区域内，即可自动扫描
@@ -256,9 +281,7 @@ export default function ScanFriend() {
         </div>
       </div>
 
-      {/* 3. 玻璃拟态悬浮控件 (Glassmorphism Controls) */}
       <div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
-        {/* 顶部返回区 */}
         <div 
           className="w-full px-6 flex items-center pointer-events-auto"
           style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(env(safe-area-inset-top) + 4rem)' }}
@@ -273,29 +296,35 @@ export default function ScanFriend() {
 
         <div className="flex-grow" />
 
-        {/* 底部功能组 */}
         <div 
           className="w-full flex justify-center gap-10 items-center pb-16 px-6 pointer-events-auto"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 3rem)' }}
         >
-          <button className="flex flex-col items-center gap-2 group">
-            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-all shadow-lg">
+          <button 
+            onClick={handleAlbumClick}
+            className="flex flex-col items-center gap-2 group"
+          >
+            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white group-active:scale-90 transition-all shadow-lg">
               <ImageIcon size={24} strokeWidth={1.5} />
             </div>
             <span className="text-[10px] font-bold text-white tracking-widest drop-shadow-md">相册</span>
           </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            hidden 
+            accept="image/*" 
+            onChange={handleFileChange} 
+          />
 
           <button 
-            onClick={() => {
-              const activeCat = storage.getActiveCat();
-              navigate("/add-friend-qr", { state: { cat: activeCat } });
-            }}
+            onClick={() => setShowMyQR(true)}
             className="flex flex-col items-center gap-2 group"
           >
-            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-all shadow-lg">
+            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white group-active:scale-90 transition-all shadow-lg">
               <QrCode size={24} strokeWidth={1.5} />
             </div>
-            <span className="text-[10px] font-bold text-white tracking-widest drop-shadow-md">二维码</span>
+            <span className="text-[10px] font-bold text-white tracking-widest drop-shadow-md">我的二维码</span>
           </button>
 
           <button 
@@ -310,7 +339,42 @@ export default function ScanFriend() {
         </div>
       </div>
 
-      {/* 好友添加确认弹窗 - 玻璃拟态 */}
+      <AnimatePresence>
+        {showMyQR && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm" onClick={() => setShowMyQR(false)}>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-sm bg-white rounded-[40px] shadow-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-8 flex flex-col items-center text-center">
+                <div className="w-full flex justify-end mb-2">
+                  <button onClick={() => setShowMyQR(false)} className="w-8 h-8 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant">
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="w-20 h-20 bg-primary/10 rounded-full overflow-hidden mb-4 border-4 border-white shadow-md">
+                  <img src={currentUser?.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                </div>
+                <h3 className="text-xl font-black text-on-surface mb-1">{currentUser?.nickname}</h3>
+                <p className="text-xs text-on-surface-variant mb-6">扫一扫上面的二维码，加我为好友</p>
+                
+                <div className="p-6 bg-white rounded-3xl shadow-inner border border-outline-variant/30 mb-6">
+                  <QRCode value={inviteData} size={200} />
+                </div>
+                
+                <div className="flex items-center gap-2 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
+                  <Sparkles size={12} className="text-primary" />
+                  <span>Miao - 萌宠社交</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {pendingFriend && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
@@ -361,7 +425,6 @@ export default function ScanFriend() {
         )}
       </AnimatePresence>
 
-      {/* 成功提示 - 玻璃拟态 */}
       <AnimatePresence>
         {showToast && (
           <motion.div 
@@ -381,7 +444,6 @@ export default function ScanFriend() {
         )}
       </AnimatePresence>
 
-      {/* 错误提示 */}
       <AnimatePresence>
         {error && (
           <motion.div 
