@@ -24,9 +24,19 @@ export default function MainLayout() {
     { icon: User, label: "Miao", path: "/profile" },
   ];
 
+  const [visitedTabs, setVisitedTabs] = React.useState<Set<string>>(new Set([location.pathname]));
+  
+  React.useEffect(() => {
+    setVisitedTabs(prev => new Set(prev).add(location.pathname));
+  }, [location.pathname]);
+
   // 模拟 IndexedStack，保持页面状态并消除切换跳动
   const renderPersistentTab = (path: string, Component: React.ComponentType) => {
     const isActive = location.pathname === path;
+    const hasBeenVisited = visitedTabs.has(path);
+    
+    if (!hasBeenVisited) return null;
+
     return (
       <div 
         key={path}

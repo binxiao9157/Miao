@@ -21,6 +21,7 @@ export default function Home() {
   const [showPointToast, setShowPointToast] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false); 
+  const [canLoadActions, setCanLoadActions] = useState(false); // 延迟加载互动视频
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false); 
   
   const [loadError, setLoadError] = useState(false); 
@@ -185,22 +186,20 @@ export default function Home() {
         setActiveAction(null);
       }
 
-      // Force play all videos to ensure they are ready
-      const playVideos = async () => {
+      // Force play idle video
+      const playIdleVideo = async () => {
         try {
-          if (idleVideoRef.current) await idleVideoRef.current.play();
-          // Pre-play and pause action videos to warm them up
-          Object.values(actionRefs).forEach(ref => {
-            if (ref.current) {
-              ref.current.play().then(() => ref.current?.pause()).catch(() => {});
-            }
-          });
+          if (idleVideoRef.current) {
+            await idleVideoRef.current.play();
+            // 待机视频开始播放后，允许加载其他动作视频
+            setCanLoadActions(true);
+          }
         } catch (err) {
-          console.error("Video play failed:", err);
+          console.error("Idle video play failed:", err);
         }
       };
       
-      playVideos();
+      playIdleVideo();
 
       // 刷新问候语逻辑
       startGreetingTimer();
@@ -471,8 +470,8 @@ export default function Home() {
           className={`absolute inset-0 w-full h-full z-10 transition-opacity duration-500 opacity-100 object-cover`}
         />
 
-        {/* 2. 互动视频层 (Actions) - 预加载并覆盖在待机层之上 */}
-        {cat?.videoPaths && Object.entries(cat.videoPaths).map(([key, url]) => {
+        {/* 2. 互动视频层 (Actions) - 延迟加载并覆盖在待机层之上 */}
+        {canLoadActions && cat?.videoPaths && Object.entries(cat.videoPaths).map(([key, url]) => {
           // 确保 key 在 actionRefs 中存在
           if (!actionRefs[key]) return null;
           

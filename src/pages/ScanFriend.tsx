@@ -19,7 +19,9 @@ export default function ScanFriend() {
 
   const stopTracks = () => {
     try {
-      const videoElements = document.querySelectorAll('video');
+      const reader = document.getElementById('reader');
+      const videoElements = reader ? reader.querySelectorAll('video') : [];
+      
       videoElements.forEach(video => {
         if (video.srcObject instanceof MediaStream) {
           video.srcObject.getTracks().forEach(track => {

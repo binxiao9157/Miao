@@ -111,12 +111,29 @@ const USER_DATA_KEYS = {
   FRIEND_DIARIES: 'miao_friend_diaries',
 };
 
+// 内部缓存，减少频繁的 JSON.parse
+let cachedCurrentUser: UserInfo | null = null;
+let cachedCurrentUserRaw: string | null = null;
+
 // 动态生成用户相关的 Key
 const getUserKey = (key: string) => {
-  const currentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-  if (!currentUser) return `guest_${key}`;
+  const currentUserRaw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+  
+  if (!currentUserRaw) {
+    cachedCurrentUser = null;
+    cachedCurrentUserRaw = null;
+    return `guest_${key}`;
+  }
+
+  // 如果原始字符串没变，直接使用缓存
+  if (currentUserRaw === cachedCurrentUserRaw && cachedCurrentUser) {
+    return `u_${cachedCurrentUser.username}_${key}`;
+  }
+
   try {
-    const user = JSON.parse(currentUser) as UserInfo;
+    const user = JSON.parse(currentUserRaw) as UserInfo;
+    cachedCurrentUser = user;
+    cachedCurrentUserRaw = currentUserRaw;
     return `u_${user.username}_${key}`;
   } catch (e) {
     console.error("Error parsing current user in getUserKey:", e);
