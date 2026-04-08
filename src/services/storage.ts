@@ -328,8 +328,20 @@ export const storage = {
     return storage.safeParse<CatInfo[]>(getUserKey(USER_DATA_KEYS.CAT_LIST), []);
   },
 
-  saveCatList: (cats: CatInfo[]) => {
-    storage.setItem(getUserKey(USER_DATA_KEYS.CAT_LIST), JSON.stringify(cats));
+  getCatById: (id: string): CatInfo | null => {
+    const list = storage.getCatList();
+    return list.find(c => c.id === id) || null;
+  },
+
+  saveCatInfo: (cat: CatInfo) => {
+    const list = storage.getCatList();
+    const index = list.findIndex(c => c.id === cat.id);
+    if (index >= 0) {
+      list[index] = cat;
+    } else {
+      list.push(cat);
+    }
+    storage.saveCatList(list);
   },
 
   getActiveCatId: (): string | null => {

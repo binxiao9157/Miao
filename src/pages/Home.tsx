@@ -15,7 +15,8 @@ export default function Home() {
   const { user, refreshCatStatus } = useAuthContext();
   const [cat, setCat] = useState<CatInfo | null>(null);
   const [activeAction, setActiveAction] = useState<string | null>(null); // 当前正在播放的动作类型
-  const [greeting, setGreeting] = useState<string | null>(null);
+  const [bubbleText, setBubbleText] = useState<string | null>(null);
+  const [bubbleId, setBubbleId] = useState<number>(0);
   const [points, setPoints] = useState<number>(0);
   const [showPointToast, setShowPointToast] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -29,9 +30,8 @@ export default function Home() {
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
   const [secretTapCount, setSecretTapCount] = useState(0);
   const secretTapTimer = useRef<NodeJS.Timeout | null>(null);
-  const greetingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const isDev = import.meta.env.DEV;
+  const bubbleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const onlineTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const idleVideoRef = useRef<HTMLVideoElement>(null);
   const clickVideoRef = useRef<HTMLVideoElement>(null);
@@ -47,18 +47,27 @@ export default function Home() {
   };
   
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const onlineTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   const lastTapTime = useRef<number>(0);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggered = useRef(false);
 
-  const startGreetingTimer = () => {
+  const showFloatingBubble = (text: string, duration: number = 10000) => {
     // 清除旧的定时器
-    if (greetingTimerRef.current) {
-      clearTimeout(greetingTimerRef.current);
+    if (bubbleTimerRef.current) {
+      clearTimeout(bubbleTimerRef.current);
     }
 
+    setBubbleText(text);
+    setBubbleId(Date.now());
+
+    // 设置定时消失
+    bubbleTimerRef.current = setTimeout(() => {
+      setBubbleText(null);
+    }, duration);
+  };
+
+  const startGreetingTimer = () => {
     const settings = storage.getSettings();
     if (settings.greetingsEnabled) {
       const hour = new Date().getHours();
@@ -69,17 +78,9 @@ export default function Home() {
         text = "该休息啦～";
       }
 
-      if (text) {
-        setGreeting(text);
-        // 10秒后自动消失
-        greetingTimerRef.current = setTimeout(() => {
-          setGreeting(null);
-        }, 10000);
-      } else {
-        setGreeting(null);
+      if (text && !bubbleText) { // 只有在没有互动气泡时才显示问候
+        showFloatingBubble(text);
       }
-    } else {
-      setGreeting(null);
     }
   };
 
@@ -156,7 +157,7 @@ export default function Home() {
 
     return () => {
       if (onlineTimerRef.current) clearInterval(onlineTimerRef.current);
-      if (greetingTimerRef.current) clearTimeout(greetingTimerRef.current);
+      if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
       
       // We no longer explicitly destroy the video here because Home is kept alive by MainLayout.
       // The component will only unmount if the user logs out or leaves the main app area.
@@ -201,16 +202,16 @@ export default function Home() {
       
       playVideos();
 
-      // 刷新问候语逻辑，并启动10秒定时器
+      // 刷新问候语逻辑
       startGreetingTimer();
     } else {
       // Pause all videos when leaving the tab to save resources
       idleVideoRef.current?.pause();
       Object.values(actionRefs).forEach(ref => ref.current?.pause());
       // 离开页面时清除定时器
-      if (greetingTimerRef.current) {
-        clearTimeout(greetingTimerRef.current);
-        setGreeting(null);
+      if (bubbleTimerRef.current) {
+        clearTimeout(bubbleTimerRef.current);
+        setBubbleText(null);
       }
     }
   }, [location.pathname, cat?.id]);
@@ -249,7 +250,7 @@ export default function Home() {
   };
 
   const triggerInteraction = (actionName: string, bubbleText: string, actionKey?: string) => {
-    setInteractionBubble({ text: bubbleText, id: Date.now() });
+    showFloatingBubble(bubbleText);
     handleInteraction(actionName);
     
     // 检查是否有多视频支持
@@ -330,7 +331,7 @@ export default function Home() {
     isLongPressTriggered.current = false;
     longPressTimer.current = setTimeout(() => {
       isLongPressTriggered.current = true;
-      triggerInteraction('摸头享受', '呼噜呼噜... 🐾', 'petting');
+      triggerInteraction('摸头享受', '好舒服喵~ ❤️', 'petting');
     }, 600);
   };
 
@@ -379,13 +380,13 @@ export default function Home() {
     if (absDx > 50 || absDy > 50) {
       // Swipe detected
       e.preventDefault(); // 阻止默认行为
-      triggerInteraction('逗猫棒玩耍', '好开心！ 🧶', 'teasing');
+      triggerInteraction('逗猫棒玩耍', '抓到了！', 'teasing');
       wakeupUI();
     } else if (absDx < 10 && absDy < 10) {
       if (now - lastTapTime.current < 300) {
         // Double tap
         if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-        triggerInteraction('喂食互动', '吧唧吧唧... 🐟', 'feeding');
+        triggerInteraction('露肚皮抚摸', '咯咯咯咯...', 'feeding');
         wakeupUI();
         lastTapTime.current = 0;
       } else {
@@ -393,7 +394,7 @@ export default function Home() {
         lastTapTime.current = now;
         setTimeout(() => {
           if (lastTapTime.current === now) {
-            triggerInteraction('蹭镜头互动', '喵呜～ ❤️', 'rubbing');
+            triggerInteraction('蹭镜头互动', '轻轻抚摸！', 'rubbing');
             wakeupUI();
           }
         }, 300);
@@ -554,17 +555,17 @@ export default function Home() {
       </AnimatePresence> 
       */}
 
-      {/* 问候气泡 - 仿对话框样式与左侧滑入动画 */}
-      <AnimatePresence>
-        {greeting && (
+      {/* 统一对话气泡 - 仿对话框样式与左侧滑入动画 */}
+      <AnimatePresence mode="wait">
+        {bubbleText && (
           <motion.div 
-            key="greeting-bubble"
+            key={bubbleId}
             initial={{ opacity: 0, x: -100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50, transition: { duration: 0.3 } }}
             transition={{ 
               type: "spring", 
-              damping: 12, 
+              damping: 15, 
               stiffness: 100,
               restDelta: 0.001
             }}
@@ -575,28 +576,10 @@ export default function Home() {
               <div className="absolute -top-4 -left-2 w-8 h-4 border-t-2 border-white/30 rounded-[50%] -rotate-[25deg]" />
               <div className="absolute -bottom-2 -right-3 w-8 h-4 border-b-2 border-white/30 rounded-[50%] -rotate-[15deg]" />
               
-              <div className="relative bg-white/10 backdrop-blur-xl px-10 py-5 rounded-[2.5rem_2rem_3rem_2.5rem] border-2 border-white/40 shadow-2xl">
-                <p className="text-sm font-black text-white tracking-wide text-center">{greeting}</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 互动气泡 */}
-      <AnimatePresence>
-        {interactionBubble && (
-          <motion.div 
-            key={interactionBubble.id}
-            initial={{ opacity: 0, scale: 0.5, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: -20 }}
-            transition={{ type: "spring", damping: 15 }}
-            className="absolute top-1/3 left-1/2 -translate-x-1/2 z-40 pointer-events-none"
-          >
-            <div className="relative">
-              <div className="relative bg-white/10 backdrop-blur-xl px-8 py-4 rounded-[2rem_2.5rem_2rem_3rem] border-2 border-white/40 shadow-xl">
-                <span className="text-white font-black text-sm">{interactionBubble.text}</span>
+              <div className="relative bg-white/90 backdrop-blur-xl px-10 py-5 rounded-[2.5rem_2rem_3rem_2.5rem] border-2 border-white/40 shadow-2xl min-w-[120px]">
+                <p className="text-sm font-black text-[#5D4037] tracking-wide text-center">{bubbleText}</p>
+                {/* 气泡小尾巴 */}
+                <div className="absolute -bottom-2 left-6 w-4 h-4 bg-white/90 border-r-2 border-b-2 border-white/40 rotate-45" />
               </div>
             </div>
           </motion.div>

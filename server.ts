@@ -116,7 +116,7 @@ async function startServer() {
 
   // API Route for Video Generation (Ark Task API)
   app.post("/api/generate-video", async (req, res) => {
-    const { prompt, image_base64, parameters } = req.body;
+    const { prompt, negative_prompt, image_base64, parameters } = req.body;
 
     try {
       if (!ARK_API_KEY) {
@@ -173,7 +173,9 @@ async function startServer() {
           duration: parameters?.duration || 5,
           audio: parameters?.audio || false,
           // 开启首帧约束标记 (Seedance 专用)
-          first_frame_constraint: true
+          first_frame_constraint: true,
+          // 注入负向提示词
+          negative_prompt: negative_prompt || ""
         }
       };
 

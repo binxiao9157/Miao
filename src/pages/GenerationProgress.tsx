@@ -79,60 +79,67 @@ export default function GenerationProgress() {
         }
       }
 
-      // 2. 提交 I2V 任务 (并行提交 4 个) (25% - 100%)
-      setStatus("正在教小猫学习 4 种互动技能...");
-      setProgress(50);
+      // 2. 提交 I2V 任务 (优先级排序)
+      setStatus("正在教小猫学习第一个技能...");
+      setProgress(40);
       
-      const actions = Object.keys(ACTION_PROMPTS) as Array<keyof typeof ACTION_PROMPTS>;
-      console.log("[DEBUG] Starting I2V tasks for actions:", actions);
-      
-      const submitPromises = actions.map(action => {
-        const prompt = ACTION_PROMPTS[action];
-        console.log(`[DEBUG] Submitting task for action: ${action}, prompt: ${prompt.substring(0, 30)}...`);
-        return VolcanoService.submitTask(optimizedImg, prompt);
-      });
-      
-      const submitResults = await Promise.all(submitPromises);
-      const taskGroup: { [key: string]: string } = {};
-      actions.forEach((action, index) => {
-        taskGroup[action] = submitResults[index].id;
-      });
+      const actions = Object.keys(PROMPT_CONFIG) as Array<keyof typeof PROMPT_CONFIG>;
+      const priorityAction = 'petting'; // 摸头/待机作为优先级最高的视频
+      const otherActions = actions.filter(a => a !== priorityAction);
 
-      console.log("[DEBUG] Task IDs assigned:", taskGroup);
-
-      // 3. 轮询结果 (并行轮询 4 个)
-      setStatus("AI 正在绘制 4 段互动视频...");
-      setProgress(80);
+      // 先提交优先级任务
+      const priorityConfig = PROMPT_CONFIG[priorityAction];
+      const priorityTask = await VolcanoService.submitTask(optimizedImg, priorityConfig.positive, priorityConfig.negative);
       
-      const pollPromises = actions.map(action => 
-        VolcanoService.pollTaskResult(
-          taskGroup[action],
-          (status) => console.log(`[DEBUG] Task ${action} (${taskGroup[action]}) status: ${status}`),
-          abortSignal
-        )
+      // 立即开始轮询优先级任务
+      setStatus("正在生成核心互动视频...");
+      setProgress(60);
+      const priorityVideoUrl = await VolcanoService.pollTaskResult(
+        priorityTask.id,
+        (s) => console.log(`[PRIORITY] ${priorityAction} status: ${s}`),
+        abortSignal
       );
 
-      const videoUrls = await Promise.all(pollPromises);
-      console.log("[DEBUG] All videos generated:", videoUrls);
-      
-      const videoUrlMap: { [key: string]: string } = {};
-      actions.forEach((action, index) => {
-        videoUrlMap[action] = videoUrls[index];
-      });
-
-      // 4. 下载/保存视频
-      setStatus("正在同步互动技能到本地...");
-      setProgress(95);
+      // 3. 优先级视频就绪，先保存基础信息
+      setStatus("核心技能已就绪！");
+      setProgress(90);
       const groupId = 'group_' + Date.now();
-      const finalPaths = await FileManager.downloadVideos(
-        videoUrlMap, 
+      
+      // 先保存包含首个视频的猫咪信息
+      const initialVideoMap: { [key: string]: string } = { [priorityAction]: priorityVideoUrl };
+      await FileManager.downloadVideos(
+        initialVideoMap, 
         groupId, 
         name || breed || "我的 AI 猫咪", 
         img,
         { breed, furColor, source: image ? 'upload' : 'created' }
       );
 
-      // 5. 完成
+      // 4. 触发后台生成任务 (不阻塞 UI)
+      console.log("[DEBUG] Starting background tasks for:", otherActions);
+      const runBackgroundTasks = async () => {
+        for (const action of otherActions) {
+          try {
+            const config = PROMPT_CONFIG[action];
+            const task = await VolcanoService.submitTask(optimizedImg, config.positive, config.negative);
+            const url = await VolcanoService.pollTaskResult(task.id);
+            
+            // 更新本地存储中的视频路径
+            const currentCat = storage.getCatById(groupId);
+            if (currentCat) {
+              const updatedPaths = { ...currentCat.videoPaths, [action]: url };
+              storage.saveCatInfo({ ...currentCat, videoPaths: updatedPaths });
+              console.log(`[BACKGROUND] Action ${action} updated successfully`);
+            }
+          } catch (e) {
+            console.error(`[BACKGROUND] Failed to generate ${action}:`, e);
+          }
+        }
+      };
+      
+      runBackgroundTasks(); // 异步执行，不 await
+
+      // 5. 完成并显示入场
       setStatus("生成成功！");
       setProgress(100);
       setPhase('success');
