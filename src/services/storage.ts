@@ -236,6 +236,29 @@ export const storage = {
     return storage.safeParse<UserInfo[]>(STORAGE_KEYS.USERS, []);
   },
   
+  findUser: (username: string): UserInfo | null => {
+    const users = storage.getAllUsers();
+    return users.find(u => u.username === username) || null;
+  },
+
+  updatePassword: (username: string, newPassword: string): boolean => {
+    const users = storage.getAllUsers();
+    const index = users.findIndex(u => u.username === username);
+    if (index >= 0) {
+      users[index].password = newPassword;
+      storage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      
+      // 如果是当前用户，也更新当前用户缓存
+      const currentUser = storage.getUserInfo();
+      if (currentUser && currentUser.username === username) {
+        currentUser.password = newPassword;
+        storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+      }
+      return true;
+    }
+    return false;
+  },
+  
   saveToken: (token: string) => {
     storage.setItem(STORAGE_KEYS.TOKEN, token);
   },

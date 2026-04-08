@@ -128,6 +128,14 @@ export default function Login() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            <div className="text-right">
+              <button 
+                onClick={() => navigate("/reset-password")}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                忘记密码？
+              </button>
+            </div>
           </div>
 
           {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}

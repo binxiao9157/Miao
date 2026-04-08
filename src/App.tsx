@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import MainLayout from "./components/layout/MainLayout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import Welcome from "./pages/Welcome";
 import Home from "./pages/Home";
 import Diary from "./pages/Diary";
@@ -59,6 +60,11 @@ function AppRoutes() {
         isAuthenticated ? (
           hasCat ? <Navigate to="/" replace /> : <Navigate to="/empty-cat" replace />
         ) : <Register />
+      } />
+      <Route path="/reset-password" element={
+        isAuthenticated ? (
+          hasCat ? <Navigate to="/" replace /> : <Navigate to="/empty-cat" replace />
+        ) : <ResetPassword />
       } />
       
       {/* Onboarding & Special Pages (No Bottom Nav) */}
