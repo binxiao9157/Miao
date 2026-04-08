@@ -205,7 +205,10 @@ export default function ScanFriend() {
   const toggleFlash = async () => {
     if (scannerRef.current && scannerRef.current.isScanning) {
       try {
-        const track = scannerRef.current.getRunningTrack();
+        const videoElement = document.querySelector('#reader video') as HTMLVideoElement;
+        const stream = videoElement?.srcObject as MediaStream;
+        const track = stream?.getVideoTracks()[0];
+        
         if (track && track.getCapabilities && (track.getCapabilities() as any).torch) {
           const newFlashState = !isFlashOn;
           await track.applyConstraints({
@@ -213,14 +216,17 @@ export default function ScanFriend() {
           } as any);
           setIsFlashOn(newFlashState);
         } else {
-          setError("当前设备不支持手电筒");
+          setError("当前设备或浏览器不支持手电筒");
           setTimeout(() => setError(null), 3000);
         }
       } catch (e) {
         console.warn("Flashlight control error:", e);
-        setError("手电筒切换失败");
+        setError("手电筒切换失败，请重试");
         setTimeout(() => setError(null), 3000);
       }
+    } else {
+      setError("请先开启相机再使用手电筒");
+      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -264,10 +270,10 @@ export default function ScanFriend() {
               style={{
                 backgroundImage: `
                   linear-gradient(to top, rgba(255,157,118,0.6), transparent),
-                  linear-gradient(to right, rgba(255,157,118,0.2) 1px, transparent 1px),
-                  linear-gradient(to bottom, rgba(255,157,118,0.2) 1px, transparent 1px)
+                  linear-gradient(to right, rgba(255,157,118,0.25) 1px, transparent 1px),
+                  linear-gradient(to bottom, rgba(255,157,118,0.25) 1px, transparent 1px)
                 `,
-                backgroundSize: '100% 100%, 8px 8px, 8px 8px'
+                backgroundSize: '100% 100%, 2px 2px, 2px 2px'
               }}
             />
           </div>
@@ -361,8 +367,13 @@ export default function ScanFriend() {
                 <h3 className="text-xl font-black text-on-surface mb-1">{currentUser?.nickname}</h3>
                 <p className="text-xs text-on-surface-variant mb-6">扫一扫上面的二维码，加我为好友</p>
                 
-                <div className="p-6 bg-white rounded-3xl shadow-inner border border-outline-variant/30 mb-6">
-                  <QRCode value={inviteData} size={200} />
+                <div className="p-6 bg-white rounded-3xl shadow-inner border border-outline-variant/30 mb-6 flex items-center justify-center">
+                  <QRCode 
+                    value={inviteData} 
+                    size={200} 
+                    viewBox={`0 0 256 256`}
+                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                  />
                 </div>
                 
                 <div className="flex items-center gap-2 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
