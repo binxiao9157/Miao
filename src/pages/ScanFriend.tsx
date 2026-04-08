@@ -19,9 +19,7 @@ export default function ScanFriend() {
 
   const stopTracks = () => {
     try {
-      const reader = document.getElementById('reader');
-      const videoElements = reader ? reader.querySelectorAll('video') : [];
-      
+      const videoElements = document.querySelectorAll('video');
       videoElements.forEach(video => {
         if (video.srcObject instanceof MediaStream) {
           video.srcObject.getTracks().forEach(track => {
@@ -175,6 +173,9 @@ export default function ScanFriend() {
       isUnmounted = true;
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      
+      // 强制重置可能被修改的全局样式，确保返回后页面可交互
+      document.body.style.overflow = 'auto';
       
       if (scannerRef.current) {
         const scanner = scannerRef.current;

@@ -745,8 +745,11 @@ export default function Diary() {
                     <button 
                       onClick={() => {
                         setShowAddFriendMenu(false);
-                        setAddFriendStep(1);
-                        navigate("/add-friend-qr", { state: { cat: selectedCatForQR } });
+                        // 延迟跳转，确保 AnimatePresence 退出动画执行完毕，防止路由切换时的状态机冲突
+                        setTimeout(() => {
+                          setAddFriendStep(1);
+                          navigate("/add-friend-qr", { state: { cat: selectedCatForQR } });
+                        }, 300);
                       }}
                       className="flex flex-col items-center gap-3 group"
                     >
