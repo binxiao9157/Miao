@@ -4,15 +4,22 @@ import { useNavigate } from "react-router-dom";
 import { storage, PointsInfo, PointTransaction } from "../services/storage";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../components/PageHeader";
+import FloatingDebugPanel from "../components/FloatingDebugPanel";
 
 export default function Points() {
   const [points, setPoints] = useState(0);
   const [pointsInfo, setPointsInfo] = useState<PointsInfo | null>(null);
   const [isDebugMode, setIsDebugMode] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const navigate = useNavigate();
   const REDEEM_THRESHOLD = storage.getUnlockThreshold();
   const ownedCatsCount = storage.getCatList().length;
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     const fetchPoints = () => {
@@ -137,40 +144,7 @@ export default function Points() {
           </button>
         </div>
       </section>
-
-      {/* 底部占位，确保不被导航栏遮挡 */}
-      <div className="h-32 flex flex-col items-center justify-center gap-4 opacity-20 hover:opacity-100 transition-opacity">
-        <div className="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-full scale-75">
-          <span className="text-[10px] font-bold text-on-surface-variant">测试: 满额积分</span>
-          <button 
-            onClick={() => setIsDebugMode(!isDebugMode)}
-            className={`w-8 h-4 rounded-full transition-colors relative ${isDebugMode ? 'bg-primary' : 'bg-outline-variant/50'}`}
-          >
-            <div className="w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform" style={{ transform: isDebugMode ? 'translateX(18px)' : 'translateX(2px)' }} />
-          </button>
-        </div>
-        <button 
-          onClick={() => {
-            const p = storage.getPoints();
-            p.total = 0;
-            p.history = [];
-            p.lastLoginDate = null;
-            p.lastInteractionDate = null;
-            p.dailyInteractionPoints = 0;
-            p.onlineMinutes = 0;
-            p.lastOnlineUpdate = Date.now();
-            storage.savePoints(p);
-            const healedP = storage.getPoints();
-            setPoints(healedP.total);
-            setPointsInfo(healedP);
-          }}
-          className="text-[10px] text-on-surface-variant underline scale-75"
-        >
-          重置真实积分
-        </button>
-      </div>
-
-      </div>
+    </div>
 
       <AnimatePresence>
         {showHistory && (
@@ -215,6 +189,14 @@ export default function Points() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <FloatingDebugPanel 
+        isDebugMode={isDebugMode}
+        setIsDebugMode={setIsDebugMode}
+        setPoints={setPoints}
+        setPointsInfo={setPointsInfo}
+        showToast={showToast}
+      />
     </div>
   );
 }
