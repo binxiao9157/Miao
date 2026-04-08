@@ -557,6 +557,8 @@ export const storage = {
           authorAvatar: friend.avatar,
           catName: friend.catName,
           content: `今天和 ${friend.catName} 一起晒了太阳，它睡得好香呀～`,
+          media: `https://picsum.photos/seed/${friend.id}_1/800/600`,
+          mediaType: 'image',
           createdAt: Date.now() - 3600000,
           likes: 5,
           isLiked: false,
@@ -569,10 +571,26 @@ export const storage = {
           authorAvatar: friend.avatar,
           catName: friend.catName,
           content: `${friend.catName} 好像又胖了一点点，是不是该减肥了？`,
+          media: `https://picsum.photos/seed/${friend.id}_2/800/600`,
+          mediaType: 'image',
           createdAt: Date.now() - 86400000,
           likes: 12,
           isLiked: true,
           comments: [{ id: 'c1', content: '好可爱的猫咪！' }]
+        },
+        {
+          id: `fdiary_${friend.id}_3`,
+          authorId: friend.id,
+          authorNickname: friend.nickname,
+          authorAvatar: friend.avatar,
+          catName: friend.catName,
+          content: `新买的逗猫棒，${friend.catName} 玩疯了哈哈。`,
+          media: `https://picsum.photos/seed/${friend.id}_3/800/600`,
+          mediaType: 'image',
+          createdAt: Date.now() - 172800000,
+          likes: 8,
+          isLiked: false,
+          comments: []
         }
       ];
       const existingFriendDiaries = storage.getFriendDiaries();

@@ -318,7 +318,7 @@ export default function Diary() {
 
       <div className="px-6 mb-8">
         <div className="bg-surface-container/50 p-1.5 rounded-[24px] flex relative overflow-hidden">
-          <LayoutGroup>
+          <LayoutGroup id="diary-tabs">
             <button 
               onClick={() => setActiveTab('mine')}
               className={`flex-1 py-3 rounded-[18px] text-sm font-black transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-on-surface-variant'}`}

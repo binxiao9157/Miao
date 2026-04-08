@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, PawPrint, QrCode } from "lucide-react";
+import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, PawPrint, QrCode, ScanQrCode } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { storage } from "../services/storage";
 import { useState, useEffect } from "react";
@@ -60,7 +60,7 @@ export default function Profile() {
               onClick={() => navigate("/scan-friend")}
               className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform border border-outline-variant/30"
             >
-              <QrCode size={24} />
+              <ScanQrCode size={24} />
             </button>
             <button 
               onClick={() => navigate("/notifications")}

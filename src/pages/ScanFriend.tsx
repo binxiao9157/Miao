@@ -1,126 +1,160 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Html5QrcodeScanner, Html5Qrcode } from "html5-qrcode";
-import { X, Camera, Zap, Image as ImageIcon, CheckCircle, AlertCircle } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
+import { ChevronLeft, Zap, Image as ImageIcon, QrCode, CheckCircle, AlertCircle, UserPlus } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { storage, FriendInfo } from "../services/storage";
-import PageHeader from "../components/PageHeader";
 
 export default function ScanFriend() {
   const navigate = useNavigate();
-  const [scanResult, setScanResult] = useState<any>(null);
+  const [scannedUID, setScannedUID] = useState<string | null>(null);
+  const [pendingFriend, setPendingFriend] = useState<FriendInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [isFlashOn, setIsFlashOn] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
-  useEffect(() => {
-    let html5QrCode: Html5Qrcode | null = null;
-    let isUnmounted = false;
-
-    const stopTracks = () => {
-      try {
-        // 查找所有视频轨道并停止
-        const videoElements = document.querySelectorAll('video');
-        videoElements.forEach(video => {
-          if (video.srcObject instanceof MediaStream) {
-            video.srcObject.getTracks().forEach(track => {
-              track.stop();
-              console.log("Track stopped manually:", track.label);
-            });
-            video.srcObject = null;
-          }
-        });
-      } catch (e) {
-        console.error("Manual track stop error:", e);
-      }
-    };
-
-    const startScanner = async () => {
-      if (isUnmounted) return;
-      
-      try {
-        // 彻底清理旧实例
-        if (scannerRef.current) {
-          try {
-            if (scannerRef.current.isScanning) await scannerRef.current.stop();
-            scannerRef.current.clear();
-          } catch (e) {}
+  const stopTracks = () => {
+    try {
+      const videoElements = document.querySelectorAll('video');
+      videoElements.forEach(video => {
+        if (video.srcObject instanceof MediaStream) {
+          video.srcObject.getTracks().forEach(track => {
+            track.stop();
+          });
+          video.srcObject = null;
         }
-        
-        // 再次确保轨道停止
-        stopTracks();
+      });
+    } catch (e) {
+      console.error("Manual track stop error:", e);
+    }
+  };
 
-        html5QrCode = new Html5Qrcode("reader");
-        scannerRef.current = html5QrCode;
-
-        const width = window.innerWidth;
-        const qrBoxSize = Math.floor(width * 0.65);
-
-        const config = { 
-          fps: 25, 
-          qrbox: { width: qrBoxSize, height: qrBoxSize },
-          // 强制设置一个标准比例，帮助库选择正确的摄像头流
-          aspectRatio: 1.7777777778 // 16:9
-        };
-
-        // 简化约束，仅请求环境摄像头，不带任何可能导致多摄拼接的理想分辨率
-        const videoConstraints = {
-          facingMode: { exact: "environment" }
-        };
-
-        await html5QrCode.start(
-          videoConstraints,
-          config,
-          async (decodedText) => {
-            if (isUnmounted) return;
-            try {
-              const data = JSON.parse(decodedText);
-              if (data.type === 'miao_friend_invite') {
-                if (html5QrCode?.isScanning) {
-                  await html5QrCode.stop();
-                  html5QrCode.clear();
-                  stopTracks();
-                }
-                setScanResult(data);
-              }
-            } catch (e) {
-              setError("无法解析二维码数据");
-              setTimeout(() => setError(null), 3000);
-            }
-          },
-          () => {}
-        );
-      } catch (err) {
-        // 如果 exact: "environment" 失败（某些设备不支持），尝试普通 environment
+  const startScanner = async (isUnmounted = false) => {
+    if (isUnmounted) return;
+    
+    try {
+      if (scannerRef.current) {
         try {
-          if (html5QrCode) {
-            await html5QrCode.start(
-              { facingMode: "environment" },
-              { fps: 25, qrbox: { width: Math.floor(window.innerWidth * 0.65), height: Math.floor(window.innerWidth * 0.65) } },
-              async (decodedText) => {
-                // ... 同样的成功处理逻辑
-                const data = JSON.parse(decodedText);
-                if (data.type === 'miao_friend_invite') {
-                  await html5QrCode?.stop();
-                  html5QrCode?.clear();
-                  stopTracks();
-                  setScanResult(data);
-                }
-              },
-              () => {}
-            );
-          }
-        } catch (secondErr) {
-          console.error("Camera start error:", secondErr);
-          if (!isUnmounted) {
-            setError("无法启动相机，请检查权限设置");
-          }
+          if (scannerRef.current.isScanning) await scannerRef.current.stop();
+          scannerRef.current.clear();
+        } catch (e) {}
+      }
+      
+      stopTracks();
+
+      const html5QrCode = new Html5Qrcode("reader");
+      scannerRef.current = html5QrCode;
+
+      const config = { 
+        fps: 30, 
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const qrboxSize = Math.floor(minEdge * 0.7);
+          return { width: qrboxSize, height: qrboxSize };
+        },
+        aspectRatio: window.innerWidth / window.innerHeight,
+        videoConstraints: {
+          facingMode: { exact: "environment" },
+          width: { ideal: 4096 },
+          height: { ideal: 2160 },
+          focusMode: "continuous"
+        }
+      };
+
+      await html5QrCode.start(
+        { facingMode: { exact: "environment" } },
+        config,
+        async (decodedText) => {
+          if (isUnmounted) return;
+          handleScanResult(decodedText);
+        },
+        () => {}
+      );
+    } catch (err) {
+      try {
+        if (scannerRef.current) {
+          await scannerRef.current.start(
+            { facingMode: "environment" },
+            { 
+              fps: 30, 
+              qrbox: (w: number, h: number) => ({ width: Math.floor(Math.min(w, h) * 0.7), height: Math.floor(Math.min(w, h) * 0.7) }),
+              aspectRatio: window.innerWidth / window.innerHeight
+            },
+            async (decodedText) => {
+              handleScanResult(decodedText);
+            },
+            () => {}
+          );
+        }
+      } catch (secondErr) {
+        console.error("Camera start error:", secondErr);
+        if (!isUnmounted) {
+          setError("无法启动相机，请检查权限设置");
         }
       }
-    };
+    }
+  };
 
-    startScanner();
+  const handleScanResult = async (decodedText: string) => {
+    try {
+      // 尝试解析 JSON
+      const data = JSON.parse(decodedText);
+      if (data.type === 'miao_friend_invite' && data.uid) {
+        // 模拟获取用户信息
+        const mockFriend: FriendInfo = {
+          id: data.uid,
+          nickname: data.nickname || `喵友_${data.uid.slice(-4)}`,
+          avatar: data.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.uid}`,
+          catName: data.catName || "小橘",
+          catAvatar: data.catAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${data.uid}`,
+          addedAt: Date.now()
+        };
+        
+        setPendingFriend(mockFriend);
+        
+        // 扫码成功第一时间释放资源
+        if (scannerRef.current?.isScanning) {
+          await scannerRef.current.stop();
+          scannerRef.current.clear();
+          stopTracks();
+        }
+      } else {
+        setScannedUID(decodedText);
+        setShowToast(true);
+        setTimeout(() => {
+          setShowToast(false);
+          setScannedUID(null);
+        }, 3000);
+      }
+    } catch (e) {
+      // 非 JSON 格式，当作普通文本处理
+      setScannedUID(decodedText);
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+        setScannedUID(null);
+      }, 3000);
+    }
+  };
+
+  const confirmAddFriend = () => {
+    if (pendingFriend) {
+      storage.addFriend(pendingFriend);
+      setShowToast(true);
+      setScannedUID(`已添加 ${pendingFriend.nickname}`);
+      setPendingFriend(null);
+      setTimeout(() => {
+        setShowToast(false);
+        setScannedUID(null);
+        startScanner();
+      }, 2000);
+    }
+  };
+
+  useEffect(() => {
+    let isUnmounted = false;
+    const timer = setTimeout(() => startScanner(isUnmounted), 100);
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -128,8 +162,8 @@ export default function ScanFriend() {
           scannerRef.current.stop().then(() => stopTracks()).catch(() => stopTracks());
         }
       } else {
-        if (scannerRef.current && !scannerRef.current.isScanning && !scanResult && !showSuccess) {
-          startScanner();
+        if (scannerRef.current && !scannerRef.current.isScanning && !scannedUID && !pendingFriend) {
+          startScanner(isUnmounted);
         }
       }
     };
@@ -138,6 +172,7 @@ export default function ScanFriend() {
 
     return () => {
       isUnmounted = true;
+      clearTimeout(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       
       if (scannerRef.current) {
@@ -162,169 +197,186 @@ export default function ScanFriend() {
       try {
         await scannerRef.current.stop();
         scannerRef.current.clear();
+        stopTracks();
       } catch (e) {}
     }
     navigate(-1);
   };
 
-  const handleAddFriend = () => {
-    if (!scanResult) return;
-    
-    setIsAdding(true);
-    
-    // 模拟网络延迟
-    setTimeout(() => {
-      const friend: FriendInfo = {
-        id: scanResult.userId,
-        nickname: scanResult.nickname,
-        avatar: scanResult.avatar,
-        catName: scanResult.catName,
-        catAvatar: scanResult.catAvatar,
-        addedAt: Date.now()
-      };
-      
-      const success = storage.addFriend(friend);
-      setIsAdding(false);
-      
-      if (success) {
-        setShowSuccess(true);
-        setTimeout(() => {
-          navigate("/diary");
-        }, 2000);
-      } else {
-        setError("该好友已在你的列表中");
-        setTimeout(() => {
-          setError(null);
-          window.location.reload(); // 简单粗暴的重置方式，确保相机状态干净
-        }, 2000);
+  const toggleFlash = async () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      try {
+        const track = scannerRef.current.getRunningTrack();
+        if (track && 'applyConstraints' in track) {
+          const constraints: any = { advanced: [{ torch: !isFlashOn }] };
+          await track.applyConstraints(constraints);
+          setIsFlashOn(!isFlashOn);
+        }
+      } catch (e) {
+        console.warn("Flashlight not supported");
       }
-    }, 1000);
+    }
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-black overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 z-50">
-        <PageHeader 
-          title="扫一扫" 
-          subtitle="Scan QR Code" 
-          dark
-          action={
-            <button 
-              onClick={handleBack}
-              className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
-            >
-              <X size={24} />
-            </button>
-          }
-        />
+    <div className="fixed inset-0 bg-transparent overflow-hidden z-[100]">
+      {/* 1. 极简底层架构 (Pure Camera Backdrop)：100% 全屏铺满 */}
+      <div 
+        id="reader" 
+        className="absolute inset-0 w-full h-full [&>video]:object-cover [&>video]:w-full [&>video]:h-full [&>div]:!hidden [&>span]:!hidden [&>canvas]:!hidden [&>video]:!block"
+      ></div>
+      
+      {/* 2. 支付宝式橙色激光束 (Alipay Style Laser Beam) */}
+      <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+        <motion.div 
+          initial={{ top: "25%", opacity: 0 }}
+          animate={{ 
+            top: ["25%", "75%"],
+            opacity: [0, 1, 1, 0]
+          }}
+          transition={{ 
+            duration: 2, 
+            repeat: Infinity, 
+            times: [0, 0.1, 0.9, 1],
+            ease: "easeInOut" 
+          }}
+          className="absolute left-[12.5%] right-[12.5%] h-[60px] pointer-events-none"
+        >
+          {/* 渐变光晕尾迹 (Glow Tail) - 位于主线上方，模拟激光划过空气的质感 */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#FF9D76]/60 to-transparent" />
+          {/* 激光束主线 (2px) - 位于容器底部，居中 3/4 长度 */}
+          <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#FF9D76] shadow-[0_0_15px_#FF9D76] rounded-full" />
+        </motion.div>
+
+        {/* 配套文字提示 */}
+        <div className="absolute w-full text-center bottom-[20%]">
+          <p className="text-white/60 text-[13px] font-medium tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+            将二维码/条码放入区域内，即可自动扫描
+          </p>
+        </div>
       </div>
 
-      <div className="flex-grow relative flex items-center justify-center bg-black overflow-hidden">
-        {/* 相机预览容器 - 强制单视频显示，隐藏所有库生成的额外元素 */}
+      {/* 3. 玻璃拟态悬浮控件 (Glassmorphism Controls) */}
+      <div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
+        {/* 顶部返回区 */}
         <div 
-          id="reader" 
-          className="absolute inset-0 w-full h-full [&>video]:object-cover [&>video]:w-full [&>video]:h-full [&>div]:!hidden [&>span]:!hidden [&>canvas]:!hidden [&>video]:!block"
-        ></div>
-        
-        {/* 扫描遮罩层 (Custom Overlay - 增加背景深度以掩盖可能的边缘伪影) */}
-        <div className="absolute inset-0 z-10 pointer-events-none">
-          {/* 上遮罩 */}
-          <div className="absolute top-0 left-0 right-0 bg-black/80" style={{ height: 'calc(50% - 32.5vw)' }}></div>
-          {/* 下遮罩 */}
-          <div className="absolute bottom-0 left-0 right-0 bg-black/80" style={{ height: 'calc(50% - 32.5vw)' }}></div>
-          {/* 左遮罩 */}
-          <div className="absolute left-0 bg-black/80" style={{ top: 'calc(50% - 32.5vw)', bottom: 'calc(50% - 32.5vw)', width: 'calc(50% - 32.5vw)' }}></div>
-          {/* 右遮罩 */}
-          <div className="absolute right-0 bg-black/80" style={{ top: 'calc(50% - 32.5vw)', bottom: 'calc(50% - 32.5vw)', width: 'calc(50% - 32.5vw)' }}></div>
-
-          {/* 中心扫描框 - 严格 65vw 正方形 */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[65vw] h-[65vw] border-2 border-white/10">
-            {/* 扫描框边角装饰 - 品牌橙色 */}
-            <div className="absolute -top-1 -left-1 w-10 h-10 border-t-4 border-l-4 border-[#FF9D76] rounded-tl-sm"></div>
-            <div className="absolute -top-1 -right-1 w-10 h-10 border-t-4 border-r-4 border-[#FF9D76] rounded-tr-sm"></div>
-            <div className="absolute -bottom-1 -left-1 w-10 h-10 border-b-4 border-l-4 border-[#FF9D76] rounded-bl-sm"></div>
-            <div className="absolute -bottom-1 -right-1 w-10 h-10 border-b-4 border-r-4 border-[#FF9D76] rounded-br-sm"></div>
-            
-            {/* 扫描线动画 - 增强发光效果 */}
-            <motion.div 
-              animate={{ top: ["2%", "98%"] }}
-              transition={{ duration: 2, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
-              className="absolute left-2 right-2 h-1 bg-[#FF9D76] shadow-[0_0_20px_#FF9D76] z-20 opacity-80"
-            />
-          </div>
-
-          {/* 提示文字 - 位置固定在框下方 */}
-          <div className="absolute w-full text-center" style={{ top: 'calc(50% + 38vw)' }}>
-            <p className="inline-block text-white/90 text-[13px] font-bold tracking-[0.2em] bg-black/40 px-6 py-2.5 rounded-full backdrop-blur-md border border-white/5">
-              将二维码放入框内即可自动扫描
-            </p>
-          </div>
+          className="w-full px-6 flex items-center pointer-events-auto"
+          style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(env(safe-area-inset-top) + 4rem)' }}
+        >
+          <button 
+            onClick={handleBack}
+            className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white active:scale-90 transition-transform shadow-lg"
+          >
+            <ChevronLeft size={28} strokeWidth={2.5} />
+          </button>
         </div>
 
-        <div className="absolute bottom-20 left-0 right-0 z-20 flex justify-center gap-10 px-10">
-          <button className="flex flex-col items-center gap-2 text-white/60">
-            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center">
-              <Zap size={24} />
+        <div className="flex-grow" />
+
+        {/* 底部功能组 */}
+        <div 
+          className="w-full flex justify-center gap-10 items-center pb-16 px-6 pointer-events-auto"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 3rem)' }}
+        >
+          <button className="flex flex-col items-center gap-2 group">
+            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-all shadow-lg">
+              <ImageIcon size={24} strokeWidth={1.5} />
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest">手电筒</span>
+            <span className="text-[10px] font-bold text-white tracking-widest drop-shadow-md">相册</span>
           </button>
-          <button className="flex flex-col items-center gap-2 text-white/60">
-            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center">
-              <ImageIcon size={24} />
+
+          <button 
+            onClick={() => {
+              const activeCat = storage.getActiveCat();
+              navigate("/add-friend-qr", { state: { cat: activeCat } });
+            }}
+            className="flex flex-col items-center gap-2 group"
+          >
+            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-all shadow-lg">
+              <QrCode size={24} strokeWidth={1.5} />
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest">相册</span>
+            <span className="text-[10px] font-bold text-white tracking-widest drop-shadow-md">二维码</span>
+          </button>
+
+          <button 
+            onClick={toggleFlash}
+            className="flex flex-col items-center gap-2 group"
+          >
+            <div className={`w-14 h-14 rounded-full backdrop-blur-md border border-white/10 flex items-center justify-center transition-all group-active:scale-90 shadow-lg ${isFlashOn ? 'bg-white text-[#FF9D76]' : 'bg-white/10 text-white'}`}>
+              <Zap size={24} strokeWidth={1.5} fill={isFlashOn ? "currentColor" : "none"} />
+            </div>
+            <span className="text-[10px] font-bold text-white tracking-widest drop-shadow-md">手电筒</span>
           </button>
         </div>
       </div>
 
-      {/* 扫码结果确认弹窗 */}
+      {/* 好友添加确认弹窗 - 玻璃拟态 */}
       <AnimatePresence>
-        {scanResult && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
-          >
+        {pendingFriend && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
             <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white w-full max-w-sm rounded-[40px] p-8 text-center shadow-2xl"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-sm bg-white/80 backdrop-blur-2xl rounded-[40px] shadow-2xl border border-white/50 overflow-hidden"
             >
-              <div className="relative mb-6 mx-auto w-24 h-24">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/20 p-1">
-                  <img src={scanResult.avatar} alt={scanResult.nickname} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+              <div className="p-8 flex flex-col items-center text-center">
+                <div className="relative mb-6">
+                  <img 
+                    src={pendingFriend.avatar} 
+                    alt={pendingFriend.nickname}
+                    className="w-24 h-24 rounded-full border-4 border-white shadow-xl"
+                  />
+                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[#FF9D76] rounded-full border-4 border-white flex items-center justify-center text-white">
+                    <UserPlus size={18} />
+                  </div>
                 </div>
-                <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-full p-1 shadow-lg">
-                  <img src={scanResult.catAvatar} alt={scanResult.catName} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                
+                <h3 className="text-xl font-black text-on-surface mb-2">添加好友</h3>
+                <p className="text-sm text-on-surface/60 mb-8 leading-relaxed">
+                  是否添加 <span className="text-[#FF9D76] font-bold">{pendingFriend.nickname}</span> 为好友？<br/>
+                  TA 的小猫是 <span className="font-bold">{pendingFriend.catName}</span>
+                </p>
+                
+                <div className="w-full flex gap-4">
+                  <button 
+                    onClick={() => {
+                      setPendingFriend(null);
+                      startScanner();
+                    }}
+                    className="flex-1 py-4 rounded-2xl bg-black/5 text-on-surface font-bold active:scale-95 transition-all"
+                  >
+                    取消
+                  </button>
+                  <button 
+                    onClick={confirmAddFriend}
+                    className="flex-1 py-4 rounded-2xl bg-[#FF9D76] text-white font-bold shadow-lg shadow-[#FF9D76]/30 active:scale-95 transition-all"
+                  >
+                    确认添加
+                  </button>
                 </div>
-              </div>
-
-              <h3 className="text-xl font-black text-on-surface mb-2">发现新好友</h3>
-              <p className="text-sm text-on-surface-variant mb-8">
-                <span className="font-bold text-primary">{scanResult.nickname}</span> 带着 TA 的伙伴 <span className="font-bold text-secondary">{scanResult.catName}</span> 向你打招呼呢～
-              </p>
-
-              <div className="flex flex-col gap-3">
-                <button 
-                  onClick={handleAddFriend}
-                  disabled={isAdding}
-                  className="w-full py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                  {isAdding ? "添加中..." : "确认添加"}
-                </button>
-                <button 
-                  onClick={() => {
-                    setScanResult(null);
-                    // 重新开始扫码逻辑
-                    window.location.reload();
-                  }}
-                  className="w-full py-4 bg-surface-container text-on-surface-variant rounded-2xl font-black active:scale-95 transition-all"
-                >
-                  取消
-                </button>
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 成功提示 - 玻璃拟态 */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[200] bg-white/20 backdrop-blur-xl px-10 py-8 rounded-[40px] shadow-2xl border border-white/30 flex flex-col items-center gap-4 min-w-[220px]"
+          >
+            <div className="w-16 h-16 bg-[#FF9D76]/20 rounded-full flex items-center justify-center text-[#FF9D76]">
+              <CheckCircle size={40} />
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-xs font-black text-[#FF9D76] uppercase tracking-widest mb-1">操作成功</span>
+              <span className="text-sm font-bold text-white truncate max-w-[240px]">{scannedUID}</span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -336,32 +388,10 @@ export default function ScanFriend() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-24 left-6 right-6 z-[110] bg-red-500 text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3"
+            className="fixed top-24 left-6 right-6 z-[110] bg-red-500/90 backdrop-blur-md text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3"
           >
             <AlertCircle size={20} />
             <span className="text-sm font-bold">{error}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 成功提示 */}
-      <AnimatePresence>
-        {showSuccess && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="fixed inset-0 z-[200] bg-primary flex flex-col items-center justify-center text-white p-6"
-          >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", damping: 12 }}
-              className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-6"
-            >
-              <CheckCircle size={48} />
-            </motion.div>
-            <h3 className="text-2xl font-black mb-2">添加成功！</h3>
-            <p className="opacity-80 font-bold">新的温暖连接已建立</p>
           </motion.div>
         )}
       </AnimatePresence>
