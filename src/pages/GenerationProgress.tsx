@@ -83,13 +83,13 @@ export default function GenerationProgress() {
       setStatus("正在教小猫学习第一个技能...");
       setProgress(40);
       
-      const actions = Object.keys(PROMPT_CONFIG) as Array<keyof typeof PROMPT_CONFIG>;
+      const actions = Object.keys(ACTION_PROMPTS) as Array<keyof typeof ACTION_PROMPTS>;
       const priorityAction = 'petting'; // 摸头/待机作为优先级最高的视频
       const otherActions = actions.filter(a => a !== priorityAction);
 
       // 先提交优先级任务
-      const priorityConfig = PROMPT_CONFIG[priorityAction];
-      const priorityTask = await VolcanoService.submitTask(optimizedImg, priorityConfig.positive, priorityConfig.negative);
+      const priorityPrompt = ACTION_PROMPTS[priorityAction];
+      const priorityTask = await VolcanoService.submitTask(optimizedImg, priorityPrompt);
       
       // 立即开始轮询优先级任务
       setStatus("正在生成核心互动视频...");
@@ -120,8 +120,8 @@ export default function GenerationProgress() {
       const runBackgroundTasks = async () => {
         for (const action of otherActions) {
           try {
-            const config = PROMPT_CONFIG[action];
-            const task = await VolcanoService.submitTask(optimizedImg, config.positive, config.negative);
+            const prompt = ACTION_PROMPTS[action];
+            const task = await VolcanoService.submitTask(optimizedImg, prompt);
             const url = await VolcanoService.pollTaskResult(task.id);
             
             // 更新本地存储中的视频路径

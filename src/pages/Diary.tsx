@@ -245,6 +245,27 @@ export default function Diary() {
     }
   };
 
+  const handleWechatInvite = async () => {
+    if (!selectedCatForQR) return;
+
+    const inviteUrl = `${window.location.origin}/join?uid=${user?.id || 'unknown'}&cat=${selectedCatForQR.id}`;
+    const options = {
+      title: `快来 Miao 看看我的小猫 ${selectedCatForQR.name} 吧！`,
+      text: "我正在 Miao 养猫，邀请你成为我的好友，一起记录萌宠瞬间～",
+      url: inviteUrl,
+    };
+
+    const result = await shareService.share(options);
+    
+    if (result.method === 'wechat') {
+      setShowWeChatGuide(true);
+    } else if (result.method === 'copy') {
+      setShareMessage(result.success ? "链接已复制，请手动去微信发给好友吧～" : "复制失败，请手动复制链接");
+      setShowShareToast(true);
+      setTimeout(() => setShowShareToast(false), 3000);
+    }
+  };
+
   const handleShareAction = async () => {
     if (!sharingEntry) return;
 
@@ -711,7 +732,7 @@ export default function Diary() {
                       onClick={() => {
                         setShowAddFriendMenu(false);
                         setAddFriendStep(1);
-                        setShowWeChatGuide(true);
+                        handleWechatInvite();
                       }}
                       className="flex flex-col items-center gap-3 group"
                     >

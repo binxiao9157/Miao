@@ -333,6 +333,10 @@ export const storage = {
     return list.find(c => c.id === id) || null;
   },
 
+  saveCatList: (list: CatInfo[]) => {
+    storage.setItem(getUserKey(USER_DATA_KEYS.CAT_LIST), JSON.stringify(list));
+  },
+
   saveCatInfo: (cat: CatInfo) => {
     const list = storage.getCatList();
     const index = list.findIndex(c => c.id === cat.id);
@@ -342,6 +346,7 @@ export const storage = {
       list.push(cat);
     }
     storage.saveCatList(list);
+    storage.setActiveCatId(cat.id);
   },
 
   getActiveCatId: (): string | null => {
@@ -366,18 +371,6 @@ export const storage = {
   // Legacy support for single cat info
   getCatInfo: (): CatInfo | null => {
     return storage.getActiveCat();
-  },
-
-  saveCatInfo: (info: CatInfo) => {
-    const list = storage.getCatList();
-    const index = list.findIndex(c => c.id === info.id);
-    if (index >= 0) {
-      list[index] = info;
-    } else {
-      list.push(info);
-    }
-    storage.saveCatList(list);
-    storage.setActiveCatId(info.id);
   },
 
   // 获取全局最后一次使用的猫咪图片
