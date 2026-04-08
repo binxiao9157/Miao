@@ -327,7 +327,18 @@ export default function ScanFriend() {
           />
 
           <button 
-            onClick={() => setShowMyQR(true)}
+            onClick={async () => {
+              // 1. 停止相机扫描，释放硬件资源
+              if (scannerRef.current?.isScanning) {
+                try {
+                  await scannerRef.current.stop();
+                  scannerRef.current.clear();
+                  stopTracks();
+                } catch (e) {}
+              }
+              // 2. 跳转至统一的二维码展示页
+              navigate("/add-friend-qr");
+            }}
             className="flex flex-col items-center gap-2 group"
           >
             <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white group-active:scale-90 transition-all shadow-lg">

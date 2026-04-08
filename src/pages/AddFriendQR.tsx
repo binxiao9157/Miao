@@ -4,16 +4,24 @@ import { Share2, Download, X, AlertCircle, RefreshCw } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { motion } from "motion/react";
 import PageHeader from "../components/PageHeader";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { storage } from "../services/storage";
 
 export default function AddFriendQR() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuthContext();
-  const cat = location.state?.cat;
   const [qrError, setQrError] = useState(false);
 
-  // 页面卸载时清理可能影响全局的样式（虽然 React 路由通常会自动处理，但显式清理更安全）
+  // 1. 统一数据初始化逻辑：处理从不同入口进入的情况
+  const cat = useMemo(() => {
+    // 优先使用路由 state 传入的猫咪（日记页入口）
+    if (location.state?.cat) return location.state.cat;
+    // 兜底：获取当前活跃猫咪或列表第一只（扫一扫入口）
+    return storage.getActiveCat() || storage.getCatList()[0];
+  }, [location.state]);
+
+  // 页面卸载时清理可能影响全局的样式
   useEffect(() => {
     return () => {
       document.body.style.overflow = 'auto';
@@ -27,7 +35,7 @@ export default function AddFriendQR() {
           <AlertCircle size={40} />
         </div>
         <h3 className="text-xl font-black text-on-surface mb-2">缺少必要信息</h3>
-        <p className="text-sm text-on-surface-variant mb-8">请返回日记页重新选择代表猫咪</p>
+        <p className="text-sm text-on-surface-variant mb-8">请先去生成或选择一只猫咪哦</p>
         <button 
           onClick={() => navigate(-1)}
           className="px-10 py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 active:scale-95 transition-all"
@@ -38,14 +46,14 @@ export default function AddFriendQR() {
     );
   }
 
-  // 关键修复：精简 Payload，严禁包含 Base64 图片字符串
-  const qrData = JSON.stringify({
+  // 2. 统一 Payload 结构：严禁包含 Base64 图片字符串，确保扫码端解析一致
+  const qrData = useMemo(() => JSON.stringify({
     type: 'miao_friend_invite',
-    uid: user.username, // 仅传 ID
-    nickname: user.nickname, // 仅传名字
-    catName: cat.name, // 仅传猫名
+    uid: user.username,
+    nickname: user.nickname,
+    catName: cat.name,
     timestamp: Date.now()
-  });
+  }), [user.username, user.nickname, cat.name]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
