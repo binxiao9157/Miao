@@ -308,9 +308,13 @@ export default function Home() {
     const error = videoElement.error;
 
     if (!error) return;
-    if (error.code === 1) return;
+    if (error.code === 1) return; // MEDIA_ERR_ABORTED
 
-    console.error("Fatal Video Error:", error.code, error.message);
+    console.error("Fatal Video Error:", {
+      code: error.code,
+      message: error.message,
+      src: videoElement.src
+    });
 
     setLoadError(true);
     setIsInitialized(true);

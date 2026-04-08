@@ -29,6 +29,8 @@ import CatHistory from "./pages/CatHistory";
 import CreateCompanion from "./pages/CreateCompanion";
 import EmptyCatPage from "./pages/EmptyCatPage";
 import AccompanyMilestonePage from "./pages/AccompanyMilestonePage";
+import AddFriendQR from "./pages/AddFriendQR";
+import ScanFriend from "./pages/ScanFriend";
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 import { storage } from "./services/storage";
@@ -94,6 +96,8 @@ function AppRoutes() {
       <Route path="/notification-settings" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/privacy-policy" element={<ProtectedRoute><PrivacyPolicy /></ProtectedRoute>} />
       <Route path="/switch-companion" element={<ProtectedRoute><SwitchCompanion /></ProtectedRoute>} />
+      <Route path="/add-friend-qr" element={<ProtectedRoute><AddFriendQR /></ProtectedRoute>} />
+      <Route path="/scan-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/login" replace />} />

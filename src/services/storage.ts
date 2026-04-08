@@ -48,6 +48,13 @@ export interface DiaryEntry {
   comments: Comment[];
 }
 
+export interface FriendDiaryEntry extends DiaryEntry {
+  authorId: string;
+  authorNickname: string;
+  authorAvatar: string;
+  catName: string;
+}
+
 export interface TimeLetter {
   id: string;
   title?: string; // 新增标题字段，可选以兼容旧数据
@@ -62,6 +69,15 @@ export interface PointTransaction {
   amount: number;
   reason: string;
   timestamp: number;
+}
+
+export interface FriendInfo {
+  id: string;
+  nickname: string;
+  avatar: string;
+  catName: string;
+  catAvatar: string;
+  addedAt: number;
 }
 
 export interface PointsInfo {
@@ -91,6 +107,8 @@ const USER_DATA_KEYS = {
   DIARIES: 'miao_diaries',
   TIME_LETTERS: 'miao_time_letters',
   POINTS: 'miao_points',
+  FRIENDS: 'miao_friends',
+  FRIEND_DIARIES: 'miao_friend_diaries',
 };
 
 // 动态生成用户相关的 Key
@@ -512,5 +530,59 @@ export const storage = {
   deleteCat: () => {
     storage.removeItem(getUserKey(USER_DATA_KEYS.CAT_LIST));
     storage.removeItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID));
-  }
+  },
+
+  // Friend Management
+  getFriends: (): FriendInfo[] => {
+    return storage.safeParse<FriendInfo[]>(getUserKey(USER_DATA_KEYS.FRIENDS), []);
+  },
+
+  addFriend: (friend: FriendInfo) => {
+    const friends = storage.getFriends();
+    if (!friends.find(f => f.id === friend.id)) {
+      friends.push(friend);
+      storage.setItem(getUserKey(USER_DATA_KEYS.FRIENDS), JSON.stringify(friends));
+      
+      // 当添加好友时，模拟生成几条好友日记以供展示
+      const mockDiaries: FriendDiaryEntry[] = [
+        {
+          id: `fdiary_${friend.id}_1`,
+          authorId: friend.id,
+          authorNickname: friend.nickname,
+          authorAvatar: friend.avatar,
+          catName: friend.catName,
+          content: `今天和 ${friend.catName} 一起晒了太阳，它睡得好香呀～`,
+          createdAt: Date.now() - 3600000,
+          likes: 5,
+          isLiked: false,
+          comments: []
+        },
+        {
+          id: `fdiary_${friend.id}_2`,
+          authorId: friend.id,
+          authorNickname: friend.nickname,
+          authorAvatar: friend.avatar,
+          catName: friend.catName,
+          content: `${friend.catName} 好像又胖了一点点，是不是该减肥了？`,
+          createdAt: Date.now() - 86400000,
+          likes: 12,
+          isLiked: true,
+          comments: [{ id: 'c1', content: '好可爱的猫咪！' }]
+        }
+      ];
+      const existingFriendDiaries = storage.getFriendDiaries();
+      storage.saveFriendDiaries([...mockDiaries, ...existingFriendDiaries]);
+      
+      return true;
+    }
+    return false;
+  },
+
+  getFriendDiaries: (): FriendDiaryEntry[] => {
+    return storage.safeParse<FriendDiaryEntry[]>(getUserKey(USER_DATA_KEYS.FRIEND_DIARIES), []);
+  },
+
+  saveFriendDiaries: (diaries: FriendDiaryEntry[]) => {
+    storage.setItem(getUserKey(USER_DATA_KEYS.FRIEND_DIARIES), JSON.stringify(diaries));
+  },
 };

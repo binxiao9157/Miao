@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, ChangeEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
-import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles, Trash2, CheckCircle, Loader2, ArrowUpRight } from "lucide-react";
-import { storage, DiaryEntry } from "../services/storage";
-import { motion, AnimatePresence } from "motion/react";
+import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles, Trash2, CheckCircle, Loader2, ArrowUpRight, UserPlus, QrCode } from "lucide-react";
+import { storage, DiaryEntry, CatInfo, FriendDiaryEntry } from "../services/storage";
+import { motion, AnimatePresence, LayoutGroup } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";
 import CommentItem from "../components/CommentItem";
 import { shareService } from "../services/shareService";
 import PageHeader from "../components/PageHeader";
+import { mockFriendService } from "../services/mockFriendService";
 
 export default function Diary() {
   const { user } = useAuthContext();
@@ -25,7 +27,15 @@ export default function Diary() {
   const [showShareToast, setShowShareToast] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [showAddFriendMenu, setShowAddFriendMenu] = useState(false);
+  const [addFriendStep, setAddFriendStep] = useState(1);
+  const [selectedCatForQR, setSelectedCatForQR] = useState<CatInfo | null>(null);
+  const [catList, setCatList] = useState<CatInfo[]>([]);
+  const [activeTab, setActiveTab] = useState<'mine' | 'friends'>('mine');
+  const [friendDiaries, setFriendDiaries] = useState<FriendDiaryEntry[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const navigate = useNavigate();
 
   const MAX_COMMENT_LENGTH = 100;
 
@@ -60,7 +70,10 @@ export default function Diary() {
   }, [commentingId]);
 
   useEffect(() => {
+    mockFriendService.initializeMockData();
     setDiaries(storage.getDiaries());
+    setFriendDiaries(storage.getFriendDiaries());
+    setCatList(storage.getCatList());
   }, []);
 
   const handlePost = async () => {
@@ -110,33 +123,64 @@ export default function Diary() {
   };
 
   const handleLike = (id: string) => {
-    const updated = diaries.map(d => {
-      if (d.id === id) {
-        return {
-          ...d,
-          isLiked: !d.isLiked,
-          likes: d.isLiked ? d.likes - 1 : d.likes + 1
-        };
-      }
-      return d;
-    });
-    const saved = storage.saveDiaries(updated) || updated;
-    setDiaries(saved);
+    if (activeTab === 'mine') {
+      const updated = diaries.map(d => {
+        if (d.id === id) {
+          return {
+            ...d,
+            isLiked: !d.isLiked,
+            likes: d.isLiked ? d.likes - 1 : d.likes + 1
+          };
+        }
+        return d;
+      });
+      const saved = storage.saveDiaries(updated) || updated;
+      setDiaries(saved);
+    } else {
+      const updated = friendDiaries.map(d => {
+        if (d.id === id) {
+          return {
+            ...d,
+            isLiked: !d.isLiked,
+            likes: d.isLiked ? d.likes - 1 : d.likes + 1
+          };
+        }
+        return d;
+      });
+      storage.saveFriendDiaries(updated);
+      setFriendDiaries(updated);
+    }
   };
 
   const handleComment = (id: string) => {
     if (!commentText.trim() || commentText.length > MAX_COMMENT_LENGTH) return;
-    const updated = diaries.map(d => {
-      if (d.id === id) {
-        return {
-          ...d,
-          comments: [...d.comments, { id: Date.now().toString(), content: commentText }]
-        };
-      }
-      return d;
-    });
-    const saved = storage.saveDiaries(updated) || updated;
-    setDiaries(saved);
+    
+    if (activeTab === 'mine') {
+      const updated = diaries.map(d => {
+        if (d.id === id) {
+          return {
+            ...d,
+            comments: [...d.comments, { id: Date.now().toString(), content: commentText }]
+          };
+        }
+        return d;
+      });
+      const saved = storage.saveDiaries(updated) || updated;
+      setDiaries(saved);
+    } else {
+      const updated = friendDiaries.map(d => {
+        if (d.id === id) {
+          return {
+            ...d,
+            comments: [...d.comments, { id: Date.now().toString(), content: commentText }]
+          };
+        }
+        return d;
+      });
+      storage.saveFriendDiaries(updated);
+      setFriendDiaries(updated);
+    }
+    
     setCommentText("");
     setCommentingId(null);
   };
@@ -234,118 +278,258 @@ export default function Diary() {
         title="日常记录" 
         subtitle="Daily Moments" 
         action={
-          <button 
-            onClick={() => setIsPosting(true)}
-            className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all"
-          >
-            <Plus size={28} />
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowAddFriendMenu(true)}
+              className="w-12 h-12 bg-white text-on-surface-variant rounded-2xl flex items-center justify-center shadow-sm active:scale-90 transition-all border border-outline-variant/30"
+            >
+              <UserPlus size={24} />
+            </button>
+            <button 
+              onClick={() => setIsPosting(true)}
+              className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all"
+            >
+              <Plus size={28} />
+            </button>
+          </div>
         }
       />
 
-      <div className="px-6 space-y-8">
-        {diaries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
-              <ImageIcon size={40} />
-            </div>
-            <h3 className="text-xl font-black text-on-surface mb-2">还没有记录</h3>
-            <p className="text-sm text-on-surface-variant max-w-[200px]">快去分享你与猫咪的第一个温暖瞬间吧</p>
-          </div>
-        ) : (
-          diaries.map((entry) => (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              key={entry.id} 
-              id={entry.id}
-              className="miao-card !p-0 overflow-hidden"
+      <div className="px-6 mb-8">
+        <div className="bg-surface-container/50 p-1.5 rounded-[24px] flex relative overflow-hidden">
+          <LayoutGroup>
+            <button 
+              onClick={() => setActiveTab('mine')}
+              className={`flex-1 py-3 rounded-[18px] text-sm font-black transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-on-surface-variant'}`}
             >
-              <div className="p-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full overflow-hidden border-2 border-white shadow-sm">
-                    <img 
-                      src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
-                      alt="Avatar" 
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-on-surface">{user?.nickname || "喵星人"}</p>
-                    <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
-                      {new Date(entry.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setDeletingId(entry.id)}
-                  className="w-8 h-8 flex items-center justify-center text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 rounded-full transition-all mr-2"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-
-              {entry.media && (
-                <div className="aspect-square w-full bg-surface-container flex items-center justify-center overflow-hidden">
-                  {entry.mediaType === 'video' ? (
-                    <video src={entry.media} controls className="w-full h-full object-cover" />
-                  ) : (
-                    <img src={entry.media} alt="Diary media" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  )}
-                </div>
+              我的记录
+              {activeTab === 'mine' && (
+                <motion.div 
+                  layoutId="tab-bg"
+                  className="absolute inset-0 bg-primary rounded-[18px] -z-10 shadow-lg shadow-primary/20"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
               )}
+            </button>
+            <button 
+              onClick={() => setActiveTab('friends')}
+              className={`flex-1 py-3 rounded-[18px] text-sm font-black transition-all relative z-10 ${activeTab === 'friends' ? 'text-white' : 'text-on-surface-variant'}`}
+            >
+              好友动态
+              {activeTab === 'friends' && (
+                <motion.div 
+                  layoutId="tab-bg"
+                  className="absolute inset-0 bg-secondary rounded-[18px] -z-10 shadow-lg shadow-secondary/20"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </button>
+          </LayoutGroup>
+        </div>
+      </div>
 
-              <div className="p-6">
-                <p className="text-on-surface text-base font-medium leading-relaxed mb-6 whitespace-pre-wrap">
-                  {entry.content}
-                </p>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-6">
-                    <button 
-                      onClick={() => handleLike(entry.id)}
-                      className={`flex items-center gap-2 transition-all ${entry.isLiked ? "text-red-500 scale-110" : "text-on-surface-variant hover:text-primary"}`}
-                    >
-                      <Heart size={24} fill={entry.isLiked ? "currentColor" : "none"} />
-                      <span className="text-xs font-black">{entry.likes}</span>
-                    </button>
-                    <button 
-                      onClick={() => setCommentingId(entry.id)}
-                      className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-all"
-                    >
-                      <MessageCircle size={24} />
-                      <span className="text-xs font-black">{entry.comments.length}</span>
-                    </button>
+      <div className="px-6 space-y-8">
+        {activeTab === 'mine' ? (
+          diaries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
+                <ImageIcon size={40} />
+              </div>
+              <h3 className="text-xl font-black text-on-surface mb-2">还没有记录</h3>
+              <p className="text-sm text-on-surface-variant max-w-[200px]">快去分享你与猫咪的第一个温暖瞬间吧</p>
+            </div>
+          ) : (
+            diaries.map((entry) => (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                key={entry.id} 
+                id={entry.id}
+                className="miao-card !p-0 overflow-hidden"
+              >
+                <div className="p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full overflow-hidden border-2 border-white shadow-sm">
+                      <img 
+                        src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
+                        alt="Avatar" 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-on-surface">{user?.nickname || "喵星人"}</p>
+                      <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+                        {new Date(entry.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
                   <button 
-                    onClick={() => handleShare(entry)}
-                    className="text-on-surface-variant hover:text-primary transition-all"
+                    onClick={() => setDeletingId(entry.id)}
+                    className="w-8 h-8 flex items-center justify-center text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 rounded-full transition-all mr-2"
                   >
-                    <Share2 size={24} />
+                    <Trash2 size={18} />
                   </button>
                 </div>
 
-                {/* 评论列表 */}
-                {entry.comments.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-outline-variant/30 space-y-3">
-                    {entry.comments.map((comment) => (
-                      <div key={comment.id}>
-                        <CommentItem 
-                          comment={comment} 
-                          diaryId={entry.id} 
-                          onDelete={(dId, cId) => {
-                            const updated = storage.deleteComment(dId, cId);
-                            setDiaries(updated);
-                          }}
-                        />
-                      </div>
-                    ))}
+                {entry.media && (
+                  <div className="aspect-square w-full bg-surface-container flex items-center justify-center overflow-hidden">
+                    {entry.mediaType === 'video' ? (
+                      <video src={entry.media} controls className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={entry.media} alt="Diary media" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    )}
                   </div>
                 )}
+
+                <div className="p-6">
+                  <p className="text-on-surface text-base font-medium leading-relaxed mb-6 whitespace-pre-wrap">
+                    {entry.content}
+                  </p>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <button 
+                        onClick={() => handleLike(entry.id)}
+                        className={`flex items-center gap-2 transition-all ${entry.isLiked ? "text-red-500 scale-110" : "text-on-surface-variant hover:text-primary"}`}
+                      >
+                        <Heart size={24} fill={entry.isLiked ? "currentColor" : "none"} />
+                        <span className="text-xs font-black">{entry.likes}</span>
+                      </button>
+                      <button 
+                        onClick={() => setCommentingId(entry.id)}
+                        className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-all"
+                      >
+                        <MessageCircle size={24} />
+                        <span className="text-xs font-black">{entry.comments.length}</span>
+                      </button>
+                    </div>
+                    <button 
+                      onClick={() => handleShare(entry)}
+                      className="text-on-surface-variant hover:text-primary transition-all"
+                    >
+                      <Share2 size={24} />
+                    </button>
+                  </div>
+
+                  {/* 评论列表 */}
+                  {entry.comments.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-outline-variant/30 space-y-3">
+                      {entry.comments.map((comment) => (
+                        <div key={comment.id}>
+                          <CommentItem 
+                            comment={comment} 
+                            diaryId={entry.id} 
+                            onDelete={(dId, cId) => {
+                              const updated = storage.deleteComment(dId, cId);
+                              setDiaries(updated);
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))
+          )
+        ) : (
+          friendDiaries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
+                <UserPlus size={40} />
               </div>
-            </motion.div>
-          ))
+              <h3 className="text-xl font-black text-on-surface mb-2">还没有好友动态</h3>
+              <p className="text-sm text-on-surface-variant max-w-[200px]">快去添加好友，看看 TA 们的猫咪在做什么吧</p>
+            </div>
+          ) : (
+            friendDiaries.map((entry) => (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                key={entry.id} 
+                id={entry.id}
+                className="miao-card !p-0 overflow-hidden"
+              >
+                <div className="p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-secondary/10 rounded-full overflow-hidden border-2 border-white shadow-sm">
+                      <img 
+                        src={entry.authorAvatar} 
+                        alt={entry.authorNickname} 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-black text-on-surface">{entry.authorNickname}</p>
+                        <span className="px-2 py-0.5 bg-secondary/10 text-secondary text-[8px] font-black rounded-full uppercase tracking-tighter">
+                          {entry.catName}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+                        {new Date(entry.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {entry.media && (
+                  <div className="aspect-square w-full bg-surface-container flex items-center justify-center overflow-hidden">
+                    {entry.mediaType === 'video' ? (
+                      <video src={entry.media} controls className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={entry.media} alt="Diary media" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    )}
+                  </div>
+                )}
+
+                <div className="p-6">
+                  <p className="text-on-surface text-base font-medium leading-relaxed mb-6 whitespace-pre-wrap">
+                    {entry.content}
+                  </p>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <button 
+                        onClick={() => handleLike(entry.id)}
+                        className={`flex items-center gap-2 transition-all ${entry.isLiked ? "text-red-500 scale-110" : "text-on-surface-variant hover:text-primary"}`}
+                      >
+                        <Heart size={24} fill={entry.isLiked ? "currentColor" : "none"} />
+                        <span className="text-xs font-black">{entry.likes}</span>
+                      </button>
+                      <button 
+                        onClick={() => setCommentingId(entry.id)}
+                        className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-all"
+                      >
+                        <MessageCircle size={24} />
+                        <span className="text-xs font-black">{entry.comments.length}</span>
+                      </button>
+                    </div>
+                    <button 
+                      onClick={() => handleShare(entry)}
+                      className="text-on-surface-variant hover:text-primary transition-all"
+                    >
+                      <Share2 size={24} />
+                    </button>
+                  </div>
+
+                  {/* 评论列表 */}
+                  {entry.comments.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-outline-variant/30 space-y-3">
+                      {entry.comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-2">
+                          <span className="text-xs font-black text-secondary shrink-0">好友:</span>
+                          <p className="text-xs text-on-surface-variant font-medium">{comment.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))
+          )
         )}
       </div>
 
@@ -459,6 +643,107 @@ export default function Diary() {
                   )}
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 添加好友菜单 */}
+      <AnimatePresence>
+        {showAddFriendMenu && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md flex items-end justify-center sm:p-6"
+            onClick={() => {
+              setShowAddFriendMenu(false);
+              setAddFriendStep(1);
+            }}
+          >
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="bg-background w-full max-w-lg rounded-t-[32px] sm:rounded-[40px] shadow-2xl p-8 pb-12"
+              onClick={e => e.stopPropagation()}
+            >
+              {addFriendStep === 1 ? (
+                <>
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-black text-on-surface">选择代表猫咪</h3>
+                    <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Select your cat representative</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4 mb-8 max-h-[300px] overflow-y-auto p-2">
+                    {catList.map(cat => (
+                      <button 
+                        key={cat.id}
+                        onClick={() => {
+                          setSelectedCatForQR(cat);
+                          setAddFriendStep(2);
+                        }}
+                        className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all ${selectedCatForQR?.id === cat.id ? 'bg-primary/10 ring-2 ring-primary' : 'bg-surface-container'}`}
+                      >
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-sm">
+                          <img src={cat.avatar} alt={cat.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        </div>
+                        <span className="text-xs font-bold text-on-surface truncate w-full text-center">{cat.name}</span>
+                      </button>
+                    ))}
+                    {catList.length === 0 && (
+                      <div className="col-span-3 py-8 text-center text-on-surface-variant/40 text-sm font-bold">
+                        还没有生成的猫咪哦
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-center mb-10">
+                    <h3 className="text-xl font-black text-on-surface">选择添加方式</h3>
+                    <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Choose addition method</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-8">
+                    <button 
+                      onClick={() => {
+                        setShowAddFriendMenu(false);
+                        setAddFriendStep(1);
+                        setShowWeChatGuide(true);
+                      }}
+                      className="flex flex-col items-center gap-3 group"
+                    >
+                      <div className="w-16 h-16 bg-[#07C160] rounded-3xl flex items-center justify-center text-white shadow-lg shadow-green-500/20 active:scale-90 transition-all">
+                        <MessageCircle size={32} fill="currentColor" />
+                      </div>
+                      <span className="text-sm font-bold text-on-surface">微信邀请</span>
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        setShowAddFriendMenu(false);
+                        setAddFriendStep(1);
+                        navigate("/add-friend-qr", { state: { cat: selectedCatForQR } });
+                      }}
+                      className="flex flex-col items-center gap-3 group"
+                    >
+                      <div className="w-16 h-16 bg-primary rounded-3xl flex items-center justify-center text-white shadow-lg shadow-primary/20 active:scale-90 transition-all">
+                        <QrCode size={32} />
+                      </div>
+                      <span className="text-sm font-bold text-on-surface">面对面添加</span>
+                    </button>
+                  </div>
+
+                  <button 
+                    onClick={() => setAddFriendStep(1)}
+                    className="w-full mt-12 py-4 bg-surface-container text-on-surface-variant rounded-2xl font-black active:scale-95 transition-all"
+                  >
+                    返回上一步
+                  </button>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
