@@ -195,7 +195,7 @@ export class VolcanoService {
   }
 
   /**
-   * 轮询文生图结果
+   * 轮询文生图结果 (指数退避策略)
    */
   public static async pollImageResult(taskId: string, signal?: AbortSignal): Promise<string> {
     if (VolcanoConfig.MOCK_MODE) {
@@ -203,63 +203,54 @@ export class VolcanoService {
       return 'https://picsum.photos/seed/cat/800/800';
     }
 
-    return new Promise((resolve, reject) => {
-      let cleaned = false;
-      const cleanup = () => {
-        if (cleaned) return;
-        cleaned = true;
-        clearInterval(timer);
-      };
+    let delay = 2000; // 初始 2s
+    const maxDelay = 10000; // 最大 10s
+    const startTime = Date.now();
+    const maxWaitTimeMs = 120000; // 2分钟超时
 
-      const timer = setInterval(async () => {
-        if (signal?.aborted) {
-          cleanup();
-          reject(new Error("任务中止"));
-          return;
+    while (true) {
+      if (signal?.aborted) throw new Error("任务中止");
+      if (Date.now() - startTime > maxWaitTimeMs) throw new Error("图片生成超时");
+
+      try {
+        const response = await axios.get(`/api/image-status/${taskId}`, {
+          headers: {
+            'X-Volc-API-Key': localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey
+          },
+          signal
+        });
+        
+        const result = response.data;
+        if (result.status === 'succeeded') {
+          const imageUrl = result.output?.image_url || result.data?.image_url || result.image_url;
+          if (imageUrl) return imageUrl;
+          throw new Error("任务成功但未获取到图片地址");
+        } else if (result.status === 'failed') {
+          const errorInfo = result.error || result.message || "未知错误";
+          throw new Error(`图片生成失败: ${typeof errorInfo === 'string' ? errorInfo : JSON.stringify(errorInfo)}`);
         }
-
-        try {
-          const response = await axios.get(`/api/image-status/${taskId}`, {
-            headers: {
-              'X-Volc-API-Key': localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey
-            }
-          });
-          
-          const result = response.data;
-          if (result.status === 'succeeded') {
-            cleanup();
-            const imageUrl = result.output?.image_url || result.data?.image_url || result.image_url;
-            if (imageUrl) resolve(imageUrl);
-            else reject(new Error("任务成功但未获取到图片地址"));
-          } else if (result.status === 'failed') {
-            cleanup();
-            const errorInfo = result.error || result.message || "未知错误";
-            reject(new Error(`图片生成失败: ${typeof errorInfo === 'string' ? errorInfo : JSON.stringify(errorInfo)}`));
-          }
-        } catch (error: any) {
-          cleanup();
-          let errorMsg = "查询图片状态失败";
-          if (error.response?.data) {
-            const data = error.response.data;
-            const innerError = data.error?.error || data.error || data;
-            errorMsg = typeof innerError === 'string' ? innerError : (innerError.message || JSON.stringify(innerError));
-          } else {
-            errorMsg = error.message;
-          }
-          reject(new Error(errorMsg));
+        
+        // 还在运行中，继续轮询
+      } catch (error: any) {
+        if (axios.isCancel(error) || signal?.aborted) throw new Error("任务中止");
+        
+        // 如果是网络错误或 5xx，可以尝试重试，否则直接抛出
+        const status = error.response?.status;
+        if (!status || status >= 500) {
+          console.warn("Polling encountered network/server error, retrying...", error.message);
+        } else {
+          throw error;
         }
-      }, 3000);
+      }
 
-      signal?.addEventListener('abort', () => {
-        cleanup();
-        reject(new Error("任务中止"));
-      });
-    });
+      // 等待并增加延迟（指数退避）
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay = Math.min(delay * 1.5, maxDelay);
+    }
   }
 
   /**
-   * 轮询逻辑 (Polling Logic)
-   * 每隔 5 秒查询一次，直到成功或失败，增加超时和中止支持
+   * 轮询视频生成结果 (指数退避策略)
    */
   public static async pollTaskResult(
     taskId: string, 
@@ -267,78 +258,58 @@ export class VolcanoService {
     signal?: AbortSignal,
     maxWaitTimeMs: number = 300000 // 默认 5 分钟超时
   ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now();
-      let cleaned = false;
-      const cleanup = () => {
-        if (cleaned) return;
-        cleaned = true;
-        clearInterval(timer);
-      };
-      
-      const timer = setInterval(async () => {
-        // 检查是否已中止
-        if (signal?.aborted) {
-          cleanup();
-          reject(new Error("任务轮询已中止"));
-          return;
-        }
+    if (VolcanoConfig.MOCK_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return 'https://www.w3schools.com/html/mov_bbb.mp4';
+    }
 
-        // 检查是否超时
-        if (Date.now() - startTime > maxWaitTimeMs) {
-          cleanup();
-          reject(new Error("任务轮询超时 (5分钟)"));
-          return;
-        }
+    let delay = 3000; // 初始 3s
+    const maxDelay = 15000; // 最大 15s
+    const startTime = Date.now();
 
-        try {
-          const result = await this.getTaskResult(taskId);
-          console.log(`[DEBUG] Task ${taskId} status: ${result.status}`);
+    while (true) {
+      if (signal?.aborted) throw new Error("任务轮询已中止");
+      if (Date.now() - startTime > maxWaitTimeMs) throw new Error("任务轮询超时 (5分钟)");
 
-          const status = result.status;
-          if (onProgress) onProgress(status);
+      try {
+        const result = await this.getTaskResult(taskId);
+        const status = result.status;
+        if (onProgress) onProgress(status);
 
-          if (status === 'succeeded') {
-            cleanup();
-            console.log("[DEBUG] Task succeeded. Full result:", JSON.stringify(result, null, 2));
-            
-            // 优先从 output 或 content 中获取标准的 video_url
-            let videoUrl = 
-              result.output?.video_url || 
-              result.content?.video_url || 
-              result.data?.video_url ||
-              result.video_url;
+        if (status === 'succeeded') {
+          let videoUrl = 
+            result.output?.video_url || 
+            result.content?.video_url || 
+            result.data?.video_url ||
+            result.video_url;
 
-            // 如果上述都没有，尝试从 response 结构中找
-            if (!videoUrl && result.response?.video?.uri) {
-              console.warn("[DEBUG] Found URI instead of URL:", result.response.video.uri);
-              videoUrl = result.response.video.uri;
-            }
-            
-            console.log("[DEBUG] Extracted video URL:", videoUrl);
-            
-            if (videoUrl && (videoUrl.startsWith('http') || videoUrl.startsWith('/api'))) {
-              resolve(videoUrl);
-            } else {
-              console.error("[DEBUG] Invalid or missing video URL in response");
-              reject(new Error(`任务成功但未获取到有效的视频播放地址。`));
-            }
-          } else if (status === 'failed' || status === 'cancelled') {
-            cleanup();
-            reject(new Error(`任务失败，状态: ${status}, 错误: ${JSON.stringify(result.error || result.message)}`));
+          if (!videoUrl && result.response?.video?.uri) {
+            videoUrl = result.response.video.uri;
           }
-          // 如果是 running, pending 等状态，继续轮询
-        } catch (error) {
-          cleanup();
-          reject(error);
+          
+          if (videoUrl && (videoUrl.startsWith('http') || videoUrl.startsWith('/api'))) {
+            return videoUrl;
+          } else {
+            throw new Error(`任务成功但未获取到有效的视频播放地址。`);
+          }
+        } else if (status === 'failed' || status === 'cancelled') {
+          throw new Error(`任务失败，状态: ${status}, 错误: ${JSON.stringify(result.error || result.message)}`);
         }
-      }, 5000);
+      } catch (error: any) {
+        if (signal?.aborted) throw new Error("任务轮询已中止");
+        
+        // 网络错误重试逻辑
+        const status = error.response?.status;
+        if (!status || status >= 500) {
+          console.warn("Polling encountered error, retrying...", error.message);
+        } else {
+          throw error;
+        }
+      }
 
-      // 监听中止信号
-      signal?.addEventListener('abort', () => {
-        cleanup();
-        reject(new Error("任务轮询已中止"));
-      });
-    });
+      // 等待并增加延迟
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay = Math.min(delay * 1.5, maxDelay);
+    }
   }
 }
