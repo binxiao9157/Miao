@@ -317,30 +317,30 @@ export default function Diary() {
       />
 
       <div className="px-6 mb-8">
-        <div className="bg-surface-container/50 p-1.5 rounded-[24px] flex relative overflow-hidden">
+        <div className="bg-[#FF9D76]/10 p-1.5 rounded-full flex relative overflow-hidden">
           <LayoutGroup id="diary-tabs">
             <button 
               onClick={() => setActiveTab('mine')}
-              className={`flex-1 py-3 rounded-[18px] text-sm font-black transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-on-surface-variant'}`}
+              className={`flex-1 py-3 rounded-full text-sm font-black transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-[#5D4037]/60 hover:bg-black/5'}`}
             >
               我的记录
               {activeTab === 'mine' && (
                 <motion.div 
                   layoutId="tab-bg"
-                  className="absolute inset-0 bg-primary rounded-[18px] -z-10 shadow-lg shadow-primary/20"
+                  className="absolute inset-0 bg-[#FF9D76] rounded-full -z-10 shadow-sm"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
             </button>
             <button 
               onClick={() => setActiveTab('friends')}
-              className={`flex-1 py-3 rounded-[18px] text-sm font-black transition-all relative z-10 ${activeTab === 'friends' ? 'text-white' : 'text-on-surface-variant'}`}
+              className={`flex-1 py-3 rounded-full text-sm font-black transition-all relative z-10 ${activeTab === 'friends' ? 'text-white' : 'text-[#5D4037]/60 hover:bg-black/5'}`}
             >
               好友动态
               {activeTab === 'friends' && (
                 <motion.div 
                   layoutId="tab-bg"
-                  className="absolute inset-0 bg-secondary rounded-[18px] -z-10 shadow-lg shadow-secondary/20"
+                  className="absolute inset-0 bg-[#FF9D76] rounded-full -z-10 shadow-sm"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
