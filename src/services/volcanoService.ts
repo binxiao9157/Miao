@@ -41,10 +41,10 @@ function buildHeaders(options?: { includeT2I?: boolean }) {
  * 互动动作对应的 Prompt 模版 (Seedance 高精度指令)
  */
 export const ACTION_PROMPTS = {
-  rubbing: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，缓慢站起走向镜头轻蹭后退回蹲坐，尾帧回归初始蹲坐姿态，与首帧画面一致；保留原始毛色与真实质感，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；超写实风格，固定摄像头。",
-  petting: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，镜头拉近聚焦面部，虚拟手轻摸头顶，猫咪眯眼、耳朵后贴呈现享受状态，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后镜头拉远，尾帧回归初始蹲坐姿态，与首帧画面一致；超写实风格。",
-  feeding: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，镜头拉近，猫咪缓慢放松躺平、自然露出肚皮，虚拟手轻柔抚摸腹部，猫咪姿态放松舒适，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后猫咪起身恢复蹲坐、镜头拉远，尾帧回归初始蹲坐姿态，与首帧画面一致；超写实风格，固定摄像头，480P，5 秒无音频，种子值 12345。",
-  teasing: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，镜头拉近，主人手从右侧伸入持羽毛逗猫棒晃动，猫咪兴奋抬头、挥爪、原地小跳 2 次，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后逗猫棒移开、镜头拉远，尾帧回归初始蹲坐姿态，与首帧画面一致；超写实风格。"
+  rubbing: "Only retain the cat in the reference image, completely remove original background, extract the cat accurately. Place the cat in the center of soft carpet in a warm cozy living room, facing camera, posture/scene/lighting/composition completely unified. Keep the cat's FULL BODY (head, torso, four limbs) strictly within the vertical 9:16 frame at all times, NO cropping, NO out of frame. Cat slowly stands up, walks towards the camera, gently rubs against it, then steps back and returns to the exact initial sitting posture. First frame and last frame are 100% identical. Retain original coat color and hyper-realistic texture. Cat mouth strictly follows real feline anatomy, absolutely NO anthropomorphism. Fixed camera, vertical 9:16, 480p, 6 seconds video, no audio, high detail.",
+  petting: "Only retain the cat in the reference image, completely remove original background, extract the cat accurately. Place the cat in the center of soft carpet in a warm cozy living room, facing camera, posture/scene/lighting/composition completely unified. Camera slowly and slightly zooms in focusing on the cat's face. Keep the cat's FULL BODY strictly within the vertical 9:16 frame at all times, NO cropping, NO out of frame. A virtual hand gently pets the top of the cat's head. Cat squints eyes, ears fold back showing enjoyment. Cat mouth strictly follows real feline anatomy, absolutely NO anthropomorphism. Then camera slowly zooms out. First frame and last frame are 100% identical. Vertical 9:16, 480p, 6 seconds video, no audio, hyper-realistic, high detail.",
+  feeding: "Only retain the cat in the reference image, completely remove original background, extract the cat accurately. Place the cat in the center of soft carpet in a warm cozy living room, facing camera, posture/scene/lighting/composition completely unified. Camera slowly and slightly zooms in focusing on the cat's front paws and upper body. Keep the cat's FULL BODY strictly within the vertical 9:16 frame at all times, NO cropping, NO out of frame. Cat's front paws slowly alternate making kneading (making biscuits) motions on the soft carpet, body slightly rises and falls, showing a relaxed and comfortable state. Cat mouth strictly follows real feline anatomy, absolutely NO anthropomorphism. Stops kneading, then camera slowly zooms out. First frame and last frame are 100% identical. Fixed camera, vertical 9:16, 480p, 6 seconds video, no audio, hyper-realistic.",
+  teasing: "Only retain the cat in the reference image, completely remove original background, extract the cat accurately. Place the cat in the center of soft carpet in a warm cozy living room, facing camera, posture/scene/lighting/composition completely unified. Camera slowly and slightly zooms in focusing on the cat's upper body. Keep the cat's FULL BODY strictly within the vertical 9:16 frame at all times, NO cropping, NO out of frame. Owner's hand reaches in from the right holding a feather cat wand and shakes it. Cat excitedly looks up, waves paws, and does two small jumps in place. Cat mouth strictly follows real feline anatomy, absolutely NO anthropomorphism. Wand moves away, then camera slowly zooms out. First frame and last frame are 100% identical. Vertical 9:16, 480p, 6 seconds video, no audio, hyper-realistic."
 };
 
 /**
@@ -71,11 +71,13 @@ export class VolcanoService {
     try {
       const response = await axios.post("/api/generate-video", {
         prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
+        negative_prompt: "original background, messy background, extra objects, blurred subject, distorted cat, background retention, out of frame, cropped body, anthropomorphism, human-like face, text, watermark, jitter, deformation, extra limbs, low resolution, ugly, noise",
         image_base64: imageBase64,
         parameters: {
           seed: 12345, // 固定种子值，确保连贯性
           resolution: "480p",
-          duration: 5,
+          aspect_ratio: "9:16",
+          duration: 6,
           audio: false
         }
       }, {
