@@ -242,9 +242,7 @@ export default function Home() {
       if (p.history.length > 50) p.history.pop();
       storage.savePoints(p);
       setPoints(p.total);
-      triggerPointToast(`${actionName}！+5 互动奖励`);
-    } else {
-      triggerPointToast(`${actionName}！`);
+      triggerPointToast(`互动任务达成！积分 +5 🌟`);
     }
   };
 
