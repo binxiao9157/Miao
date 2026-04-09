@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuthContext } from "../context/AuthContext";
 import { ArrowLeft, User, Lock, ShieldCheck, PawPrint, Eye, EyeOff } from "lucide-react";
 import { storage } from "../services/storage";
+import { motion } from "motion/react";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -13,8 +14,16 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
+  const [isAgreed, setIsAgreed] = useState(false);
+  const [shake, setShake] = useState(false);
 
   const handleRegister = () => {
+    if (!isAgreed) {
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      alert("请先阅读并勾选同意服务条款与隐私政策");
+      return;
+    }
     if (!username || !password || !confirmPassword) {
       setError("请填写完整信息");
       return;
@@ -127,6 +136,25 @@ export default function Register() {
             {error}
           </div>
         )}
+
+        <motion.div
+          animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}}
+          transition={{ duration: 0.3 }}
+          className="flex items-start gap-2 mb-4"
+        >
+          <input
+            type="checkbox"
+            checked={isAgreed}
+            onChange={(e) => setIsAgreed(e.target.checked)}
+            className="w-4 h-4 mt-1 text-orange-500 rounded focus:ring-orange-500 border-gray-300"
+          />
+          <span className="text-sm text-gray-500">
+            我已阅读并同意
+            <Link to="/terms" className="text-orange-500 hover:underline mx-1">《Miao 服务条款》</Link>
+            和
+            <Link to="/privacy-policy" className="text-orange-500 hover:underline ml-1">《隐私政策》</Link>
+          </span>
+        </motion.div>
 
         <button 
           onClick={handleRegister}

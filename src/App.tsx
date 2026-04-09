@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 
 // 使用 React.lazy 延迟加载非核心页面
 const Register = lazy(() => import("./pages/Register"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Points = lazy(() => import("./pages/Points"));
@@ -63,6 +64,7 @@ function AppRoutes() {
             hasCat ? <Navigate to="/" replace /> : <Navigate to="/empty-cat" replace />
           ) : <Register />
         } />
+        <Route path="/terms" element={<TermsOfService />} />
         <Route path="/reset-password" element={
           isAuthenticated ? (
             hasCat ? <Navigate to="/" replace /> : <Navigate to="/empty-cat" replace />
@@ -94,7 +96,7 @@ function AppRoutes() {
         <Route path="/privacy-settings" element={<ProtectedRoute><PrivacySettings /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationList /></ProtectedRoute>} />
         <Route path="/notification-settings" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-        <Route path="/privacy-policy" element={<ProtectedRoute><PrivacyPolicy /></ProtectedRoute>} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/switch-companion" element={<ProtectedRoute><SwitchCompanion /></ProtectedRoute>} />
         <Route path="/add-friend-qr" element={<ProtectedRoute><AddFriendQR /></ProtectedRoute>} />
         <Route path="/scan-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />
