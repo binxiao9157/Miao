@@ -209,11 +209,12 @@ export default function Diary() {
       reader.onloadend = () => {
         if (!isMountedRef.current) return;
         if (type === 'image') {
+          // 图片压缩逻辑：限制最大尺寸并降低质量以节省存储空间
           const img = new Image();
           img.onload = () => {
             if (!isMountedRef.current) return;
             const canvas = document.createElement('canvas');
-            const MAX_SIZE = 800; // 日记图片可以稍微大一点，但也要限制
+            const MAX_SIZE = 800; // 限制最大宽度/高度为 800px
             let width = img.width;
             let height = img.height;
 
@@ -234,14 +235,14 @@ export default function Diary() {
             const ctx = canvas.getContext('2d');
             ctx?.drawImage(img, 0, 0, width, height);
             
-            // 导出压缩后的 Base64 (JPEG 格式体积更小)
+            // 导出压缩后的 Base64 (JPEG 格式，质量 0.6)
             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
             setSelectedMedia({ url: compressedBase64, type: 'image' });
           };
           img.src = reader.result as string;
         } else {
-          // 视频暂时不压缩（Web 端压缩较复杂），但提醒用户限制大小
-          if (file.size > 2 * 1024 * 1024) {
+          // 视频处理：Web 端实时压缩成本较高，此处采取限制文件大小的策略
+          if (file.size > 2 * 1024 * 1024) { // 严格限制在 2MB 以内
             alert("视频文件太大啦，请选择 2MB 以内的视频哦");
             return;
           }

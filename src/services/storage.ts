@@ -118,8 +118,9 @@ let cachedCurrentUserRaw: string | null = null;
 // 刷新用户前缀缓存
 const refreshUserPrefix = () => {
   const currentUserRaw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+  if (currentUserRaw === cachedCurrentUserRaw) return; // 无变化，跳过 JSON.parse
   cachedCurrentUserRaw = currentUserRaw;
-  
+
   if (!currentUserRaw) {
     cachedUserPrefix = 'guest';
     return;

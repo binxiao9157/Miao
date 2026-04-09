@@ -212,6 +212,8 @@ export class VolcanoService {
       if (signal?.aborted) throw new Error("任务中止");
       if (Date.now() - startTime > maxWaitTimeMs) throw new Error("图片生成超时");
 
+      // 1. 网络请求（可重试）
+      let result: any;
       try {
         const response = await axios.get(`/api/image-status/${taskId}`, {
           headers: {
@@ -219,28 +221,26 @@ export class VolcanoService {
           },
           signal
         });
-        
-        const result = response.data;
-        if (result.status === 'succeeded') {
-          const imageUrl = result.output?.image_url || result.data?.image_url || result.image_url;
-          if (imageUrl) return imageUrl;
-          throw new Error("任务成功但未获取到图片地址");
-        } else if (result.status === 'failed') {
-          const errorInfo = result.error || result.message || "未知错误";
-          throw new Error(`图片生成失败: ${typeof errorInfo === 'string' ? errorInfo : JSON.stringify(errorInfo)}`);
-        }
-        
-        // 还在运行中，继续轮询
+        result = response.data;
       } catch (error: any) {
         if (axios.isCancel(error) || signal?.aborted) throw new Error("任务中止");
-        
-        // 如果是网络错误或 5xx，可以尝试重试，否则直接抛出
+        // 网络错误或 5xx → 重试；4xx → 直接抛出
         const status = error.response?.status;
-        if (!status || status >= 500) {
-          console.warn("Polling encountered network/server error, retrying...", error.message);
-        } else {
-          throw error;
-        }
+        if (status && status < 500) throw error;
+        console.warn("Polling encountered network/server error, retrying...", error.message);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay = Math.min(delay * 1.5, maxDelay);
+        continue;
+      }
+
+      // 2. 结果解析（业务逻辑错误，直接抛出不重试）
+      if (result.status === 'succeeded') {
+        const imageUrl = result.output?.image_url || result.data?.image_url || result.image_url;
+        if (imageUrl) return imageUrl;
+        throw new Error("任务成功但未获取到图片地址");
+      } else if (result.status === 'failed') {
+        const errorInfo = result.error || result.message || "未知错误";
+        throw new Error(`图片生成失败: ${typeof errorInfo === 'string' ? errorInfo : JSON.stringify(errorInfo)}`);
       }
 
       // 等待并增加延迟（指数退避）
@@ -271,40 +271,44 @@ export class VolcanoService {
       if (signal?.aborted) throw new Error("任务轮询已中止");
       if (Date.now() - startTime > maxWaitTimeMs) throw new Error("任务轮询超时 (5分钟)");
 
+      // 1. 网络请求（可重试）
+      let result: any;
       try {
-        const result = await this.getTaskResult(taskId);
-        const status = result.status;
-        if (onProgress) onProgress(status);
-
-        if (status === 'succeeded') {
-          let videoUrl = 
-            result.output?.video_url || 
-            result.content?.video_url || 
-            result.data?.video_url ||
-            result.video_url;
-
-          if (!videoUrl && result.response?.video?.uri) {
-            videoUrl = result.response.video.uri;
-          }
-          
-          if (videoUrl && (videoUrl.startsWith('http') || videoUrl.startsWith('/api'))) {
-            return videoUrl;
-          } else {
-            throw new Error(`任务成功但未获取到有效的视频播放地址。`);
-          }
-        } else if (status === 'failed' || status === 'cancelled') {
-          throw new Error(`任务失败，状态: ${status}, 错误: ${JSON.stringify(result.error || result.message)}`);
-        }
+        result = await this.getTaskResult(taskId);
       } catch (error: any) {
         if (signal?.aborted) throw new Error("任务轮询已中止");
-        
-        // 网络错误重试逻辑
-        const status = error.response?.status;
-        if (!status || status >= 500) {
-          console.warn("Polling encountered error, retrying...", error.message);
-        } else {
-          throw error;
+        // getTaskResult 内部已处理网络/超时错误并抛出友好消息
+        // 检查是否为可重试的网络错误
+        const httpStatus = error.response?.status;
+        if (httpStatus && httpStatus < 500) throw error;
+        console.warn("Polling encountered error, retrying...", error.message);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay = Math.min(delay * 1.5, maxDelay);
+        continue;
+      }
+
+      // 2. 结果解析（业务逻辑错误，直接抛出不重试）
+      const status = result.status;
+      if (onProgress) onProgress(status);
+
+      if (status === 'succeeded') {
+        let videoUrl = 
+          result.output?.video_url || 
+          result.content?.video_url || 
+          result.data?.video_url ||
+          result.video_url;
+
+        if (!videoUrl && result.response?.video?.uri) {
+          videoUrl = result.response.video.uri;
         }
+        
+        if (videoUrl && (videoUrl.startsWith('http') || videoUrl.startsWith('/api'))) {
+          return videoUrl;
+        } else {
+          throw new Error(`任务成功但未获取到有效的视频播放地址。`);
+        }
+      } else if (status === 'failed' || status === 'cancelled') {
+        throw new Error(`任务失败，状态: ${status}, 错误: ${JSON.stringify(result.error || result.message)}`);
       }
 
       // 等待并增加延迟

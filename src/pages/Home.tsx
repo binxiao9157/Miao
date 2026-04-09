@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, TouchEvent, RefObject } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, TouchEvent, RefObject } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Coins, RefreshCw, Loader2, AlertCircle, Settings } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
@@ -253,25 +253,25 @@ export default function Home() {
     }
   };
 
-      const triggerInteraction = (actionName: string, bubbleText: string, actionKey?: string) => {
-        showFloatingBubble(bubbleText);
-        handleInteraction(actionName);
-        
-        const hasMultiVideo = cat?.videoPaths && actionKey && cat.videoPaths[actionKey as keyof typeof cat.videoPaths];
+  const triggerInteraction = (actionName: string, bubbleText: string, actionKey?: string) => {
+    showFloatingBubble(bubbleText);
+    handleInteraction(actionName);
+    
+    const hasMultiVideo = cat?.videoPaths && actionKey && cat.videoPaths[actionKey as keyof typeof cat.videoPaths];
 
-        if (hasMultiVideo && actionKey && actionRefs[actionKey]?.current) {
-          const video = actionRefs[actionKey].current;
-          if (video) {
-            video.currentTime = 0;
-            video.play().catch(() => {});
-          }
-        } else {
-          if (idleVideoRef.current) {
-            idleVideoRef.current.currentTime = 0;
-            idleVideoRef.current.play().catch(() => {});
-          }
-        }
-      };
+    if (hasMultiVideo && actionKey && actionRefs[actionKey]?.current) {
+      const video = actionRefs[actionKey].current;
+      if (video) {
+        video.currentTime = 0;
+        video.play().catch(() => {});
+      }
+    } else {
+      if (idleVideoRef.current) {
+        idleVideoRef.current.currentTime = 0;
+        idleVideoRef.current.play().catch(() => {});
+      }
+    }
+  };
 
   const handleRegenerate = () => {
     // 暂停所有视频
@@ -316,7 +316,7 @@ export default function Home() {
     setIsInitialized(true);
   };
 
-  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>, key: string) => {
+  const handleTimeUpdate = useCallback((e: React.SyntheticEvent<HTMLVideoElement>, key: string) => {
     const v = e.target as HTMLVideoElement;
     if (v.currentTime > 0) {
       if (!isVideoReady) setIsVideoReady(true);
@@ -328,7 +328,7 @@ export default function Home() {
         });
       }
     }
-  };
+  }, [isVideoReady, visibleLayer]);
 
   const handleLongPressStart = () => {
     isLongPressTriggered.current = false;
@@ -458,7 +458,7 @@ export default function Home() {
         />
       );
     });
-  }, [canLoadActions, cat?.videoPaths, visibleLayer]);
+  }, [canLoadActions, cat?.videoPaths, visibleLayer, handleTimeUpdate]);
 
   if (!cat || !cat.name) {
     return (

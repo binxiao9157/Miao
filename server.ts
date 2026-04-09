@@ -80,6 +80,12 @@ async function startServer() {
   // API Route for Image Generation (Ark T2I)
   app.post("/api/generate-image", async (req, res) => {
     const { prompt } = req.body;
+
+    // 恢复前置校验，防止空指针
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ error: "缺少必要参数: prompt", code: "INVALID_PARAMETER" });
+    }
+
     const finalApiKey = req.headers['x-volc-api-key'] as string || ARK_API_KEY;
     const finalModelId = req.headers['x-volc-t2i-model-id'] as string || ARK_T2I_MODEL_ID;
 
@@ -124,7 +130,8 @@ async function startServer() {
   // SSRF Protection: Validate taskId format
   const isValidTaskId = (id: string) => {
     if (id.startsWith('url:')) return true;
-    return /^[a-zA-Z0-9-]+$/.test(id);
+    // 修复正则漏洞：支持下划线并严格限制 128 位长度
+    return /^[a-zA-Z0-9_-]{1,128}$/.test(id);
   };
 
   // Image status polling
@@ -157,6 +164,11 @@ async function startServer() {
   // API Route for Video Generation (Ark Task API)
   app.post("/api/generate-video", async (req, res) => {
     const { prompt, negative_prompt, image_base64, parameters } = req.body;
+
+    // 恢复 image_base64 非空校验
+    if (!image_base64) {
+      return res.status(400).json({ error: "缺少必要参数: image_base64", code: "INVALID_PARAMETER" });
+    }
 
     try {
       if (!ARK_API_KEY) {
