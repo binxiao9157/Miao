@@ -112,33 +112,35 @@ const USER_DATA_KEYS = {
 };
 
 // 内部缓存，减少频繁的 JSON.parse
-let cachedCurrentUser: UserInfo | null = null;
+let cachedUserPrefix: string = 'guest';
 let cachedCurrentUserRaw: string | null = null;
 
-// 动态生成用户相关的 Key
-const getUserKey = (key: string) => {
+// 刷新用户前缀缓存
+const refreshUserPrefix = () => {
   const currentUserRaw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+  cachedCurrentUserRaw = currentUserRaw;
   
   if (!currentUserRaw) {
-    cachedCurrentUser = null;
-    cachedCurrentUserRaw = null;
-    return `guest_${key}`;
-  }
-
-  // 如果原始字符串没变，直接使用缓存
-  if (currentUserRaw === cachedCurrentUserRaw && cachedCurrentUser) {
-    return `u_${cachedCurrentUser.username}_${key}`;
+    cachedUserPrefix = 'guest';
+    return;
   }
 
   try {
     const user = JSON.parse(currentUserRaw) as UserInfo;
-    cachedCurrentUser = user;
-    cachedCurrentUserRaw = currentUserRaw;
-    return `u_${user.username}_${key}`;
+    cachedUserPrefix = `u_${user.username}`;
   } catch (e) {
-    console.error("Error parsing current user in getUserKey:", e);
-    return `guest_${key}`;
+    console.error("Error parsing current user in refreshUserPrefix:", e);
+    cachedUserPrefix = 'guest';
   }
+};
+
+// 动态生成用户相关的 Key
+const getUserKey = (key: string) => {
+  // 如果缓存为空，则初始化
+  if (cachedCurrentUserRaw === null) {
+    refreshUserPrefix();
+  }
+  return `${cachedUserPrefix}_${key}`;
 };
 
 export const storage = {
@@ -238,6 +240,9 @@ export const storage = {
     // 1. 保存到当前登录用户
     storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(info));
     storage.setItem(STORAGE_KEYS.LAST_USERNAME, info.username);
+    
+    // 刷新前缀缓存
+    refreshUserPrefix();
 
     
     // 2. 保存到用户列表（模拟数据库）
@@ -313,6 +318,7 @@ export const storage = {
   clearCurrentUser: () => {
     storage.removeItem(STORAGE_KEYS.CURRENT_USER);
     storage.removeItem(STORAGE_KEYS.TOKEN);
+    refreshUserPrefix();
   },
   
   clearAll: () => {

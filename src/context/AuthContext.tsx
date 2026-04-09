@@ -1,10 +1,11 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { storage, UserInfo } from '../services/storage';
 
 interface AuthContextType {
   user: UserInfo | null;
   isAuthenticated: boolean;
   hasCat: boolean;
+  catCount: number;
   login: (username: string, password: string) => boolean;
   register: (info: UserInfo) => void;
   logout: () => void;
@@ -17,11 +18,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hasCat, setHasCat] = useState(false);
+  const [catCount, setCatCount] = useState(0);
 
-  const refreshCatStatus = () => {
-    setHasCat(storage.getCatList().length > 0);
-  };
+  const hasCat = useMemo(() => catCount > 0, [catCount]);
+
+  const refreshCatStatus = useCallback(() => {
+    setCatCount(storage.getCatList().length);
+  }, []);
 
   useEffect(() => {
     // 强制每次冷启动都显示登录页，清除之前的会话状态
@@ -74,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 3. 重置所有内存状态，防止数据污染
     setUser(null);
     setIsAuthenticated(false);
-    setHasCat(false);
+    setCatCount(0);
   };
 
   const updateProfile = (updates: Partial<UserInfo>) => {
@@ -86,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, hasCat, login, register, logout, updateProfile, refreshCatStatus }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, hasCat, catCount, login, register, logout, updateProfile, refreshCatStatus }}>
       {children}
     </AuthContext.Provider>
   );

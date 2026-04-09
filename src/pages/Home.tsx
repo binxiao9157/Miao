@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, TouchEvent, RefObject } from "react";
+import React, { useState, useEffect, useRef, useMemo, TouchEvent, RefObject } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Coins, RefreshCw, Loader2, AlertCircle, Settings } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
@@ -434,6 +434,32 @@ export default function Home() {
     secretTapTimer.current = setTimeout(() => setSecretTapCount(0), 2000);
   };
 
+  const actionVideoEntries = useMemo(() => {
+    if (!canLoadActions || !cat?.videoPaths) return null;
+    
+    return Object.entries(cat.videoPaths).map(([key, url]) => {
+      // 确保 key 在 actionRefs 中存在
+      if (!actionRefs[key]) return null;
+      
+      return (
+        <video
+          key={key}
+          ref={actionRefs[key]}
+          src={url}
+          muted
+          playsInline
+          preload="auto"
+          onTimeUpdate={(e) => handleTimeUpdate(e, key)}
+          onEnded={(e) => {
+            const video = e.target as HTMLVideoElement;
+            video.pause();
+          }}
+          className={`absolute inset-0 w-full h-full z-20 object-cover pointer-events-none ${visibleLayer === key ? 'opacity-100' : 'opacity-0'}`}
+        />
+      );
+    });
+  }, [canLoadActions, cat?.videoPaths, visibleLayer]);
+
   if (!cat || !cat.name) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-black">
@@ -478,27 +504,7 @@ export default function Home() {
         />
 
         {/* 2. 互动视频层 (Actions) - 延迟加载并覆盖在待机层之上 */}
-        {canLoadActions && cat?.videoPaths && Object.entries(cat.videoPaths).map(([key, url]) => {
-          // 确保 key 在 actionRefs 中存在
-          if (!actionRefs[key]) return null;
-          
-          return (
-            <video
-              key={key}
-              ref={actionRefs[key]}
-              src={url}
-              muted
-              playsInline
-              preload="auto"
-              onTimeUpdate={(e) => handleTimeUpdate(e, key)}
-              onEnded={(e) => {
-                const video = e.target as HTMLVideoElement;
-                video.pause();
-              }}
-              className={`absolute inset-0 w-full h-full z-20 object-cover pointer-events-none ${visibleLayer === key ? 'opacity-100' : 'opacity-0'}`}
-            />
-          );
-        })}
+        {actionVideoEntries}
         
         {/* 初始加载状态 */}
         {!isInitialized && !loadError && (
