@@ -64,7 +64,7 @@ export default function GenerationProgress() {
             const image = new Image();
             image.onload = () => {
               const canvas = document.createElement('canvas');
-              const maxSide = 512;
+              const maxSide = 1280;
               let width = image.width;
               let height = image.height;
               if (width > maxSide || height > maxSide) {
@@ -80,7 +80,7 @@ export default function GenerationProgress() {
               canvas.height = height;
               const ctx = canvas.getContext('2d');
               ctx?.drawImage(image, 0, 0, width, height);
-              resolve(canvas.toDataURL('image/jpeg', 0.8));
+              resolve(canvas.toDataURL('image/jpeg', 0.95));
             };
             image.onerror = reject;
             image.src = img;
@@ -124,7 +124,7 @@ export default function GenerationProgress() {
         groupId, 
         name || breed || "我的 AI 猫咪", 
         img,
-        { breed, furColor, source: image ? 'upload' : 'created' }
+        { breed, furColor, source: image ? 'upload' : 'created', placeholderImage: image }
       );
 
       // 4. 触发后台生成任务 (不阻塞 UI)

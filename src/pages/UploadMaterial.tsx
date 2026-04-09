@@ -1,7 +1,8 @@
-import { useState, useRef, ChangeEvent, useEffect } from "react";
+import { useState, useRef, ChangeEvent, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Upload, Sparkles, X, Pencil } from "lucide-react";
+import { ArrowLeft, Upload, Sparkles, X, Pencil, Check, Maximize2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import Cropper from 'react-easy-crop';
 
 export default function UploadMaterial() {
   const navigate = useNavigate();
@@ -10,6 +11,13 @@ export default function UploadMaterial() {
   const [selectedImage, setSelectedImage] = useState<string | null>(location.state?.image || null);
   const [nickname, setNickname] = useState(location.state?.name || "");
   const [showToast, setShowToast] = useState<string | null>(null);
+
+  // Cropping State
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const isRedemption = location.state?.isRedemption || false;
   const isDebugRedemption = location.state?.isDebugRedemption || false;
@@ -35,45 +43,97 @@ export default function UploadMaterial() {
       const reader = new FileReader();
       reader.onloadend = () => {
         const dataUrl = reader.result as string;
-        
-        const img = new Image();
-        img.onload = () => {
-          if (img.width < 300) {
-            triggerToast("图片宽度至少需 300 像素哦～");
-            if (fileInputRef.current) fileInputRef.current.value = "";
-            return;
-          }
-          
-          // 压缩并调整大小，减小 payload
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const maxSide = 512;
-          
-          if (width > maxSide || height > maxSide) {
-            if (width > height) {
-              height = (height / width) * maxSide;
-              width = maxSide;
-            } else {
-              width = (width / height) * maxSide;
-              height = maxSide;
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            setSelectedImage(compressedDataUrl);
-          } else {
-            setSelectedImage(dataUrl);
-          }
-        };
-        img.src = dataUrl;
+        setImageToCrop(dataUrl);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const createImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const image = new Image();
+      image.addEventListener('load', () => resolve(image));
+      image.addEventListener('error', (error) => reject(error));
+      image.setAttribute('crossOrigin', 'anonymous');
+      image.src = url;
+    });
+
+  const getCroppedImg = async (imageSrc: string, pixelCrop: any): Promise<string | null> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) return null;
+
+    // 1. Smart Resizing Logic
+    // Seedance prefers 1280px as max side for high quality
+    let targetWidth = pixelCrop.width;
+    let targetHeight = pixelCrop.height;
+    const maxSide = 1280;
+
+    if (targetWidth > maxSide || targetHeight > maxSide) {
+      if (targetWidth > targetHeight) {
+        targetHeight = (targetHeight / targetWidth) * maxSide;
+        targetWidth = maxSide;
+      } else {
+        targetWidth = (targetWidth / targetHeight) * maxSide;
+        targetHeight = maxSide;
+      }
+    }
+
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    ctx.drawImage(
+      image,
+      pixelCrop.x,
+      pixelCrop.y,
+      pixelCrop.width,
+      pixelCrop.height,
+      0,
+      0,
+      targetWidth,
+      targetHeight
+    );
+
+    // 2. High Quality Strategy
+    // Try 95% quality first
+    let quality = 0.95;
+    let dataUrl = canvas.toDataURL('image/jpeg', quality);
+    
+    // 3. Size Threshold Protection
+    // If > 4MB, drop quality slightly
+    const base64Length = dataUrl.length - (dataUrl.indexOf(',') + 1);
+    const sizeInBytes = (base64Length * 3) / 4;
+    const sizeInMB = sizeInBytes / (1024 * 1024);
+
+    if (sizeInMB > 4) {
+      quality = 0.90;
+      dataUrl = canvas.toDataURL('image/jpeg', quality);
+    }
+
+    return dataUrl;
+  };
+
+  const handleCropSave = async () => {
+    if (!imageToCrop || !croppedAreaPixels) return;
+    
+    try {
+      setIsProcessing(true);
+      const croppedImage = await getCroppedImg(imageToCrop, croppedAreaPixels);
+      if (croppedImage) {
+        setSelectedImage(croppedImage);
+        setImageToCrop(null);
+      }
+    } catch (e) {
+      console.error(e);
+      triggerToast("图片处理失败，请重试");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -184,6 +244,65 @@ export default function UploadMaterial() {
         </div>
       </div>
 
+      {/* 图片裁剪弹窗 */}
+      <AnimatePresence>
+        {imageToCrop && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black flex flex-col"
+          >
+            <div className="flex items-center justify-between p-6 pt-[calc(env(safe-area-inset-top)+1rem)]">
+              <button onClick={() => setImageToCrop(null)} className="text-white p-2">
+                <X size={24} />
+              </button>
+              <h3 className="text-white font-black">调整猫咪位置</h3>
+              <button 
+                onClick={handleCropSave} 
+                disabled={isProcessing}
+                className="bg-[#FF9D76] text-white px-6 py-2 rounded-full font-black text-sm flex items-center gap-2"
+              >
+                {isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
+                完成
+              </button>
+            </div>
+
+            <div className="flex-grow relative bg-black/50">
+              <Cropper
+                image={imageToCrop}
+                crop={crop}
+                zoom={zoom}
+                aspect={9 / 16}
+                onCropChange={setCrop}
+                onCropComplete={onCropComplete}
+                onZoomChange={setZoom}
+              />
+            </div>
+
+            <div className="p-8 space-y-6 bg-black/80 backdrop-blur-md">
+              <div className="flex items-center gap-4">
+                <span className="text-white/40 text-xs font-bold uppercase tracking-widest">缩放</span>
+                <input
+                  type="range"
+                  value={zoom}
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  aria-labelledby="Zoom"
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                  className="flex-grow h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF9D76]"
+                />
+              </div>
+              <p className="text-white/60 text-[11px] text-center leading-relaxed">
+                请将猫咪置于画面中心，以获得最佳的生成效果。<br/>
+                建议保留完整的头部和身体细节。
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 轻提示 Toast */}
       <AnimatePresence>
         {showToast && (
@@ -198,5 +317,17 @@ export default function UploadMaterial() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function Loader2({ className, size }: { className?: string, size?: number }) {
+  return (
+    <motion.div
+      animate={{ rotate: 360 }}
+      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+      className={className}
+    >
+      <X size={size || 24} className="opacity-20" />
+    </motion.div>
   );
 }

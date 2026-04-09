@@ -470,8 +470,18 @@ export default function Home() {
 
   return (
     <div className="w-full h-full flex flex-col relative overflow-hidden bg-black touch-none z-0">
+      {/* 0. 高画质静态占位图层 - 确保视频加载前的无缝衔接 */}
+      {cat?.placeholderImage && (
+        <img 
+          src={cat.placeholderImage} 
+          alt="Cat Placeholder" 
+          className="absolute inset-0 w-full h-full object-cover z-0"
+          referrerPolicy="no-referrer"
+        />
+      )}
+
       {/* 视频播放器区域 - 采用 Stack 堆叠布局实现无缝切换 */}
-      <div className="absolute inset-0 flex items-center justify-center bg-[#F8F9FA] overflow-hidden z-10">
+      <div className="absolute inset-0 flex items-center justify-center bg-transparent overflow-hidden z-10">
         {/* 1. 待机视频层 (Idle) */}
         <video
           ref={idleVideoRef}

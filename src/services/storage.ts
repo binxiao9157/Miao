@@ -24,6 +24,7 @@ export interface CatInfo {
     teasing?: string;
   };
   remoteVideoUrl?: string; // 视频远程路径 (Fallback)
+  placeholderImage?: string; // 高画质静态占位图 (Base64)
 }
 
 export interface AppSettings {

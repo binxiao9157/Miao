@@ -18,7 +18,7 @@ export class FileManager {
     groupId: string, 
     catName: string, 
     avatarUrl: string,
-    metadata?: { breed?: string; furColor?: string; source?: 'upload' | 'created' }
+    metadata?: { breed?: string; furColor?: string; source?: 'upload' | 'created'; placeholderImage?: string }
   ): Promise<{ [key: string]: string }> {
     const finalPaths: { [key: string]: string } = {};
     
@@ -37,6 +37,7 @@ export class FileManager {
       videoPath: finalPaths.petting || Object.values(finalPaths)[0], // 默认使用摸头(休息)作为待机视频
       videoPaths: finalPaths,
       remoteVideoUrl: finalPaths.petting || Object.values(finalPaths)[0],
+      placeholderImage: metadata?.placeholderImage,
     };
 
     storage.saveCatInfo(newCat);
