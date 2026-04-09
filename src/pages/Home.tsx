@@ -186,27 +186,46 @@ export default function Home() {
         setActiveAction(null);
       }
 
-      // Force play idle video
-      const playIdleVideo = async () => {
+      setCanLoadActions(true);
+
+      // Force play entry video
+      const playEntryVideo = async () => {
         try {
-          if (idleVideoRef.current) {
-            await idleVideoRef.current.play();
-            // 待机视频开始播放后，允许加载其他动作视频
-            setCanLoadActions(true);
-          }
+          setTimeout(() => {
+            const hasRubbing = cat?.videoPaths?.rubbing && actionRefs['rubbing']?.current;
+            if (hasRubbing) {
+              setActiveAction('rubbing');
+              const video = actionRefs['rubbing'].current!;
+              video.currentTime = 0;
+              video.play().catch(e => console.log("Entry video play failed:", e));
+            } else if (idleVideoRef.current) {
+              idleVideoRef.current.currentTime = 0;
+              idleVideoRef.current.play().catch(e => console.log("Idle video play failed:", e));
+            }
+          }, 100);
         } catch (err) {
-          console.error("Idle video play failed:", err);
+          console.error("Entry video play failed:", err);
         }
       };
       
-      playIdleVideo();
+      playEntryVideo();
 
       // 刷新问候语逻辑
       startGreetingTimer();
     } else {
       // Pause all videos when leaving the tab to save resources
-      idleVideoRef.current?.pause();
-      Object.values(actionRefs).forEach(ref => ref.current?.pause());
+      if (idleVideoRef.current) {
+        idleVideoRef.current.pause();
+        idleVideoRef.current.currentTime = 0;
+      }
+      Object.values(actionRefs).forEach(ref => {
+        if (ref.current) {
+          ref.current.pause();
+          ref.current.currentTime = 0;
+        }
+      });
+      setActiveAction(null);
+      
       // 离开页面时清除定时器
       if (bubbleTimerRef.current) {
         clearTimeout(bubbleTimerRef.current);
@@ -269,6 +288,7 @@ export default function Home() {
     } else {
       // 降级方案：如果没有多视频支持，或者是长按（通常是待机），则重置当前待机视频的进度
       if (idleVideoRef.current) {
+        idleVideoRef.current.pause();
         idleVideoRef.current.currentTime = 0;
         idleVideoRef.current.play().catch(() => {});
       }
@@ -444,10 +464,8 @@ export default function Home() {
         <video
           ref={idleVideoRef}
           src={cat?.videoPath || cat?.remoteVideoUrl || cat?.videoPaths?.petting || VIDEOS.DEFAULT}
-          autoPlay
           muted
           playsInline
-          loop
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={(e) => {
             const video = e.target as HTMLVideoElement;
@@ -457,12 +475,17 @@ export default function Home() {
           }}
           onLoadedData={() => {
             setIsInitialized(true);
-            idleVideoRef.current?.play().catch(() => {});
-          }}
-          onPlaying={() => {
-            setIsInitialized(true);
             setIsVideoReady(true);
             setLoadError(false);
+            setCanLoadActions(true);
+            if (idleVideoRef.current) {
+              idleVideoRef.current.currentTime = 0;
+            }
+          }}
+          onEnded={(e) => {
+            const video = e.target as HTMLVideoElement;
+            video.pause();
+            video.currentTime = 0;
           }}
           onError={handleVideoError}
           className={`absolute inset-0 w-full h-full z-10 transition-opacity duration-500 opacity-100 object-cover`}
@@ -481,7 +504,12 @@ export default function Home() {
               muted
               playsInline
               preload="auto"
-              onEnded={() => setActiveAction(null)}
+              onEnded={(e) => {
+                const video = e.target as HTMLVideoElement;
+                video.pause();
+                video.currentTime = 0;
+                setActiveAction(null);
+              }}
               className={`absolute inset-0 w-full h-full z-20 transition-opacity duration-300 ${activeAction === key ? 'opacity-100' : 'opacity-0' } object-cover pointer-events-none`}
             />
           );
