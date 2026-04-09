@@ -1,4 +1,3 @@
-import CryptoJS from 'crypto-js';
 import axios from 'axios';
 
 /**
@@ -17,6 +16,30 @@ export const VolcanoConfig = {
   T2IModelId: import.meta.env.VITE_VOLC_T2I_MODEL_ID || 'doubao-t2i-v2',
   BaseUrl: 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
 };
+
+/**
+ * 统一请求头构建辅助函数
+ */
+function buildHeaders(options?: { includeT2I?: boolean }) {
+  const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
+  const accessKey = localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey;
+  const secretKey = localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey;
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Volc-API-Key': apiKey || '',
+    'X-Volc-Access-Key': accessKey || '',
+    'X-Volc-Secret-Key': secretKey || '',
+  };
+
+  if (options?.includeT2I) {
+    headers['X-Volc-T2I-Model-Id'] = localStorage.getItem('VOLC_T2I_MODEL_ID') || VolcanoConfig.T2IModelId;
+  } else {
+    headers['X-Volc-Model-Id'] = localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId;
+  }
+
+  return headers;
+}
 
 /**
  * 互动动作对应的 Prompt 模版 (Seedance 高精度指令)
@@ -49,11 +72,6 @@ export class VolcanoService {
       return { id: 'mock_task_' + Date.now() };
     }
 
-    const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
-    const modelId = localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId;
-    const accessKey = localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey;
-    const secretKey = localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey;
-
     try {
       const response = await axios.post("/api/generate-video", {
         prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
@@ -66,13 +84,7 @@ export class VolcanoService {
         }
       }, {
         timeout: 310000, 
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Volc-API-Key': apiKey,
-          'X-Volc-Model-Id': modelId,
-          'X-Volc-Access-Key': accessKey,
-          'X-Volc-Secret-Key': secretKey
-        }
+        headers: buildHeaders()
       });
       
       console.log("[DEBUG] Submit task response:", response.data);
@@ -122,20 +134,10 @@ export class VolcanoService {
       return { status: 'running' };
     }
 
-    const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
-    const modelId = localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId;
-    const accessKey = localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey;
-    const secretKey = localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey;
-
     try {
       const response = await axios.get(`/api/video-status/${taskId}`, {
         timeout: 60000, // Added 60 seconds timeout
-        headers: {
-          'X-Volc-API-Key': apiKey,
-          'X-Volc-Model-Id': modelId,
-          'X-Volc-Access-Key': accessKey,
-          'X-Volc-Secret-Key': secretKey
-        }
+        headers: buildHeaders()
       });
       return response.data;
     } catch (error: any) {
@@ -163,23 +165,12 @@ export class VolcanoService {
       return { id: 'mock_img_task_' + Date.now() };
     }
 
-    const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
-    const accessKey = localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey;
-    const secretKey = localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey;
-    const t2iModelId = localStorage.getItem('VOLC_T2I_MODEL_ID') || VolcanoConfig.T2IModelId;
-
     try {
       const response = await axios.post("/api/generate-image", {
         prompt,
       }, {
         timeout: 60000,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Volc-API-Key': apiKey,
-          'X-Volc-Access-Key': accessKey,
-          'X-Volc-Secret-Key': secretKey,
-          'X-Volc-T2I-Model-Id': t2iModelId
-        }
+        headers: buildHeaders({ includeT2I: true })
       });
       
       const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;

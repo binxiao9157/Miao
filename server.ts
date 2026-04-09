@@ -27,10 +27,6 @@ async function startServer() {
     nodeEnv: process.env.NODE_ENV
   });
 
-  // Volcengine AccessKey and SecretKey should be provided via environment variables
-  const VOLC_ACCESS_KEY = process.env.VOLC_ACCESS_KEY;
-  const VOLC_SECRET_KEY = process.env.VOLC_SECRET_KEY;
-
   const ARK_T2I_URL = "https://ark.cn-beijing.volces.com/api/v3/images/generations";
 
   // API Route for Image Generation (Ark T2I)
@@ -303,7 +299,6 @@ async function startServer() {
     }
 
     const frontendApiKey = req.headers['x-volc-api-key'] as string;
-    const frontendModelId = req.headers['x-volc-model-id'] as string;
     const finalApiKey = frontendApiKey || ARK_API_KEY;
 
     try {

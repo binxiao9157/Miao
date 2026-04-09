@@ -5,8 +5,6 @@ import { catService } from "../services/catService";
 import { storage } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import { VolcanoService } from "../services/volcanoService";
-import { GoogleGenAI } from "@google/genai";
-
 import { useAuthContext } from "../context/AuthContext";
 
 export default function CreateCompanion() {

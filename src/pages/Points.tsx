@@ -2,7 +2,7 @@ import { Star, CheckCircle2, ArrowRight, Lock, ChevronRight, X } from "lucide-re
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { storage, PointsInfo, PointTransaction } from "../services/storage";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
 import FloatingDebugPanel from "../components/FloatingDebugPanel";
 
