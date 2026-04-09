@@ -316,9 +316,29 @@ export const storage = {
     storage.removeItem(STORAGE_KEYS.TOKEN);
   },
 
+  saveLoginTime: (time: number) => {
+    localStorage.setItem('miao_login_time', time.toString());
+  },
+
+  getLoginTime: () => {
+    const time = localStorage.getItem('miao_login_time');
+    return time ? parseInt(time, 10) : null;
+  },
+
+  saveLastActiveTime: (time: number) => {
+    localStorage.setItem('miao_last_active_time', time.toString());
+  },
+
+  getLastActiveTime: () => {
+    const time = localStorage.getItem('miao_last_active_time');
+    return time ? parseInt(time, 10) : null;
+  },
+
   clearCurrentUser: () => {
     storage.removeItem(STORAGE_KEYS.CURRENT_USER);
     storage.removeItem(STORAGE_KEYS.TOKEN);
+    localStorage.removeItem('miao_login_time');
+    localStorage.removeItem('miao_last_active_time');
     refreshUserPrefix();
   },
   
@@ -443,7 +463,7 @@ export const storage = {
     if (!p.history) p.history = [];
 
     // Self-healing
-    const today = new Date().toLocaleDateString();
+    const today = new Date().toISOString().slice(0, 10);
     let expectedMinimum = 0;
     if (p.lastLoginDate === today) expectedMinimum += 10;
     if (p.lastInteractionDate === today) expectedMinimum += p.dailyInteractionPoints;

@@ -1,11 +1,11 @@
 {
-  "name": "react-example",
+  "name": "miao",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "node server.ts",
+    "start": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
@@ -25,7 +25,6 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-qr-code": "^2.0.18",
     "react-router-dom": "^7.13.2",
     "vite": "^6.2.0"
   },

@@ -22,14 +22,10 @@ export const VolcanoConfig = {
  */
 function buildHeaders(options?: { includeT2I?: boolean }) {
   const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
-  const accessKey = localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey;
-  const secretKey = localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey;
-  
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Volc-API-Key': apiKey || '',
-    'X-Volc-Access-Key': accessKey || '',
-    'X-Volc-Secret-Key': secretKey || '',
   };
 
   if (options?.includeT2I) {

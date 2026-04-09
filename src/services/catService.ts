@@ -1,5 +1,8 @@
 import { storage, CatInfo } from './storage';
 
+// 模块级 AudioContext 单例，避免每次 playMeow 创建新实例导致泄漏
+let sharedAudioCtx: AudioContext | null = null;
+
 export const catService = {
   breeds: [
     { 
@@ -55,7 +58,14 @@ export const catService = {
     // 在实际环境中，我们会加载一个 mp3 文件
     // 尝试使用 Web Audio API 播放一个简单的合成音
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+        sharedAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      // 如果被浏览器挂起，尝试恢复
+      if (sharedAudioCtx.state === 'suspended') {
+        sharedAudioCtx.resume();
+      }
+      const audioCtx = sharedAudioCtx;
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
 

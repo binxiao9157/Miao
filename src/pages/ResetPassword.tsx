@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [phone, setPhone] = useState("");
+  const [generatedCode, setGeneratedCode] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -35,6 +36,7 @@ export default function ResetPassword() {
     // Mock SMS
     const mockCode = Math.floor(1000 + Math.random() * 9000).toString();
     console.log("[DEBUG] Verification Code:", mockCode);
+    setGeneratedCode(mockCode);
     alert(`验证码已发送至您的手机: ${mockCode}`);
     
     setCountdown(60);
@@ -42,6 +44,14 @@ export default function ResetPassword() {
   };
 
   const handleReset = () => {
+    if (!generatedCode) {
+      setError("请先获取验证码");
+      return;
+    }
+    if (code !== generatedCode) {
+      setError("验证码错误，请重新输入");
+      return;
+    }
     if (newPassword.length < 6) {
       setError("密码长度至少为6位");
       return;

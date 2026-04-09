@@ -32,6 +32,7 @@ async function startServer() {
   // Helper to send standardized error responses
   const sendError = (res: express.Response, error: any, defaultMessage: string) => {
     const status = error.response?.status || 500;
+    const isProduction = process.env.NODE_ENV === 'production';
     const errorData = error.response?.data;
     
     // Check for specific Volcengine error codes
@@ -41,39 +42,35 @@ async function startServer() {
     if (errorCode === "AccountBalanceInsufficient" || errorMessage?.toLowerCase().includes("balance")) {
       return res.status(403).json({ 
         error: "账户余额不足，请联系管理员充值",
-        code: "BALANCE_INSUFFICIENT",
-        detail: errorData
+        code: "BALANCE_INSUFFICIENT"
       });
     }
 
     if (errorCode === "QuotaExceeded" || errorMessage?.toLowerCase().includes("quota")) {
       return res.status(403).json({ 
         error: "API 额度已耗尽，请检查资源包状态",
-        code: "QUOTA_EXCEEDED",
-        detail: errorData
+        code: "QUOTA_EXCEEDED"
       });
     }
 
     if (errorCode === "InvalidParameter") {
       return res.status(400).json({
         error: `参数错误: ${errorMessage}`,
-        code: "INVALID_PARAMETER",
-        detail: errorData
+        code: "INVALID_PARAMETER"
       });
     }
 
     if (status === 404) {
       return res.status(404).json({
         error: "API 端点未找到 (404)。请检查推理接入点 ID 是否正确。",
-        code: "NOT_FOUND",
-        detail: errorData || errorMessage
+        code: "NOT_FOUND"
       });
     }
 
     res.status(status).json({ 
       error: defaultMessage,
-      message: errorMessage,
-      detail: errorData
+      message: errorMessage
+      // detail 字段已移除：生产环境不返回上游错误原始数据
     });
   };
 
@@ -129,7 +126,12 @@ async function startServer() {
 
   // SSRF Protection: Validate taskId format
   const isValidTaskId = (id: string) => {
-    if (id.startsWith('url:')) return true;
+    if (id.startsWith('url:')) {
+      const url = id.substring(4);
+      // 仅允许 HTTPS URL，且必须以 https:// 开头
+      if (!/^https:\/\/[a-zA-Z0-9]/.test(url)) return false;
+      return true;
+    }
     // 修复正则漏洞：支持下划线并严格限制 128 位长度
     return /^[a-zA-Z0-9_-]{1,128}$/.test(id);
   };
@@ -309,6 +311,7 @@ async function startServer() {
 
   process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
+    process.exit(1);
   });
 }
 

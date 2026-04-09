@@ -7,9 +7,7 @@ export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ""),
-    },
+    // Gemini API Key 已移至服务端，不再注入客户端包
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

@@ -16,15 +16,16 @@ const handleRangeRequest = async (request, cache) => {
       const start = parseInt(bytes[0], 10);
       const end = bytes[1] ? parseInt(bytes[1], 10) : blob.size - 1;
       const chunk = blob.slice(start, end + 1);
-      
+
+      // 使用 Headers 构造函数正确复制原始 headers（展开操作符对 Headers 对象无效）
+      const newHeaders = new Headers(cachedResponse.headers);
+      newHeaders.set('Content-Range', `bytes ${start}-${end}/${blob.size}`);
+      newHeaders.set('Content-Length', String(chunk.size));
+
       return new Response(chunk, {
         status: 206,
         statusText: 'Partial Content',
-        headers: {
-          ...cachedResponse.headers,
-          'Content-Range': `bytes ${start}-${end}/${blob.size}`,
-          'Content-Length': chunk.size,
-        }
+        headers: newHeaders
       });
     }
     return cachedResponse;
@@ -47,7 +48,12 @@ const cacheFirst = async (request) => {
   try {
     const networkResponse = await fetch(request);
     if (networkResponse.ok) {
-      cache.put(request, networkResponse.clone());
+      // 限制缓存大小：跳过超过 50MB 的响应，避免耗尽用户存储配额
+      const contentLength = networkResponse.headers.get('Content-Length');
+      const MAX_CACHE_SIZE = 50 * 1024 * 1024; // 50MB
+      if (!contentLength || parseInt(contentLength, 10) <= MAX_CACHE_SIZE) {
+        cache.put(request, networkResponse.clone()).catch(() => {});
+      }
     }
     return networkResponse;
   } catch (error) {
@@ -66,7 +72,12 @@ const networkFirst = async (request) => {
   try {
     const networkResponse = await fetch(request);
     if (networkResponse.ok) {
-      cache.put(request, networkResponse.clone());
+      // 限制缓存大小：跳过超过 50MB 的响应，避免耗尽用户存储配额
+      const contentLength = networkResponse.headers.get('Content-Length');
+      const MAX_CACHE_SIZE = 50 * 1024 * 1024; // 50MB
+      if (!contentLength || parseInt(contentLength, 10) <= MAX_CACHE_SIZE) {
+        cache.put(request, networkResponse.clone()).catch(() => {});
+      }
     }
     return networkResponse;
   } catch (error) {

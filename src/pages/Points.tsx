@@ -35,7 +35,7 @@ export default function Points() {
     return () => clearInterval(interval);
   }, []);
 
-  const today = new Date().toLocaleDateString();
+  const today = new Date().toISOString().slice(0, 10);
   const loginCompleted = pointsInfo?.lastLoginDate === today;
   const interactionCompleted = pointsInfo?.lastInteractionDate === today && (pointsInfo?.dailyInteractionPoints || 0) > 0;
   const onlineCompleted = (pointsInfo?.onlineMinutes || 0) >= 10;

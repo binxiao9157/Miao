@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, Loader2, CheckCircle2, AlertCircle, PartyPopper, Coins, ArrowRight } from "lucide-react";
@@ -12,6 +12,9 @@ import { GoogleGenAI } from "@google/genai";
 export default function GenerationProgress() {
   const location = useLocation();
   const navigate = useNavigate();
+  // 管理 I2V 阶段的 AbortController 生命周期
+  const i2vAbortRef = useRef<AbortController | null>(null);
+
   const { refreshCatStatus } = useAuthContext();
   const { image, name, breed, furColor, isRedemption, isDebugRedemption, redemptionAmount } = location.state || {};
 
@@ -41,6 +44,15 @@ export default function GenerationProgress() {
   const startI2VPhase = async (img: string, abortSignal: AbortSignal) => {
     try {
       setPhase('i2v');
+
+      // 积分前置检查：在生成视频之前验证积分是否足够
+      if (isRedemption && !isDebugRedemption) {
+        const currentPoints = storage.getPoints();
+        const required = redemptionAmount || 200;
+        if (currentPoints.total < required) {
+          throw new Error(`积分不足，需要 ${required} 积分，当前仅有 ${currentPoints.total} 积分`);
+        }
+      }
       
       // 优化：在提交 I2V 之前，如果图片是 base64 且尺寸过大，进行压缩
       // 这可以有效防止 "timeout of 150000ms exceeded" 错误
@@ -144,12 +156,9 @@ export default function GenerationProgress() {
       setProgress(100);
       setPhase('success');
       
-      // 扣除积分 (如果是兑换)
+      // 扣除积分 (已在前面预检查过)
       if (isRedemption && !isDebugRedemption) {
-        const success = storage.deductPoints(redemptionAmount || 200, "解锁新伙伴");
-        if (!success) {
-          throw new Error("积分不足，兑换失败");
-        }
+        storage.deductPoints(redemptionAmount || 200, "解锁新伙伴");
       }
 
       // 确保活跃 ID 已设置
@@ -204,7 +213,7 @@ export default function GenerationProgress() {
             setStatus("正在使用 Gemini 引擎构思形象...");
             
             try {
-              const apiKey = process.env.GEMINI_API_KEY;
+              const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
               if (!apiKey) {
                 throw new Error("未配置 Gemini API Key，无法使用备用引擎");
               }
@@ -258,6 +267,10 @@ export default function GenerationProgress() {
 
     return () => {
       abortController.abort();
+      // 同时中止 I2V 阶段的任务
+      if (i2vAbortRef.current) {
+        i2vAbortRef.current.abort();
+      }
     };
   }, [image, breed, furColor, navigate]);
 
@@ -342,8 +355,9 @@ export default function GenerationProgress() {
 
             <button 
               onClick={() => {
-                const abortController = new AbortController();
-                if (anchorImage) startI2VPhase(anchorImage, abortController.signal);
+                const controller = new AbortController();
+                i2vAbortRef.current = controller;
+                if (anchorImage) startI2VPhase(anchorImage, controller.signal);
               }}
               className="w-full py-4 bg-[#FF9D76] text-white rounded-full font-black text-lg shadow-xl shadow-[#FF9D76]/20 flex items-center justify-center gap-3 active:scale-95 transition-all"
             >
