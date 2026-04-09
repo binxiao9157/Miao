@@ -3,10 +3,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Camera, ArrowRight, Upload, PawPrint, ArrowLeft, Eye, EyeOff, Save, RotateCcw, X, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { VolcanoConfig } from "../services/volcanoService";
+import { useAuthContext } from "../context/AuthContext";
 
 export default function Welcome() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuthContext();
   const isRedemption = location.state?.isRedemption || false;
   const isDebugRedemption = location.state?.isDebugRedemption || false;
   const redemptionAmount = location.state?.redemptionAmount || 200;
@@ -44,17 +46,15 @@ export default function Welcome() {
       className="min-h-screen flex flex-col px-8 pb-8 bg-background relative"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
     >
-      {isRedemption && (
-        <button 
-          onClick={() => navigate(-1)} 
-          className="absolute left-6 w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform z-10 shadow-sm"
-          style={{ top: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
-        >
-          <ArrowLeft size={20} />
-        </button>
-      )}
+      <button 
+        onClick={isRedemption ? () => navigate(-1) : () => { logout(); navigate('/login', { replace: true }); }} 
+        className="absolute left-6 w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-[#5D4037] active:scale-90 transition-transform z-10 shadow-sm"
+        style={{ top: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+      >
+        <ArrowLeft size={20} />
+      </button>
 
-      <div className={`flex items-center gap-2 mb-12 group ${isRedemption ? 'mt-12' : ''}`}>
+      <div className={`flex items-center gap-2 mb-12 group mt-12`}>
         <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={32} />
         <span className="text-2xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">Miao</span>
       </div>

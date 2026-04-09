@@ -1,12 +1,28 @@
 import { useNavigate } from "react-router-dom";
-import { PawPrint, Sparkles } from "lucide-react";
+import { PawPrint, Sparkles, ArrowLeft } from "lucide-react";
 import { motion } from "motion/react";
+import { useAuthContext } from "../context/AuthContext";
 
 export default function EmptyCatPage() {
   const navigate = useNavigate();
+  const { logout } = useAuthContext();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 relative overflow-hidden">
+      {/* Logout Button */}
+      <button 
+        onClick={handleLogout}
+        className="absolute left-6 w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-[#5D4037] active:scale-90 transition-transform z-50 shadow-sm"
+        style={{ top: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+      >
+        <ArrowLeft size={20} />
+      </button>
+
       {/* Background Decorative Elements */}
       <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-[-10%] left-[-10%] w-64 h-64 bg-secondary/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>

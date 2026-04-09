@@ -4,7 +4,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { ChevronLeft, Zap, Image as ImageIcon, QrCode, CheckCircle, AlertCircle, UserPlus, X, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { storage, FriendInfo } from "../services/storage";
-import QRCode from "react-qr-code";
+import { QRCodeCanvas } from "qrcode.react";
 
 export default function ScanFriend() {
   const navigate = useNavigate();
@@ -382,10 +382,9 @@ export default function ScanFriend() {
                 <p className="text-xs text-on-surface-variant mb-6">扫一扫上面的二维码，加我为好友</p>
                 
                 <div className="p-6 bg-white rounded-3xl shadow-inner border border-outline-variant/30 mb-6 flex items-center justify-center">
-                  <QRCode 
+                  <QRCodeCanvas 
                     value={inviteData} 
                     size={200} 
-                    viewBox={`0 0 256 256`}
                     style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                   />
                 </div>
