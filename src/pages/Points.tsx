@@ -55,7 +55,10 @@ export default function Points() {
         subtitle="Points Center" 
       />
 
-      <div className="px-6">
+      <div 
+        className="px-6 pb-32"
+        style={{ paddingBottom: 'calc(120px + env(safe-area-inset-bottom))' }}
+      >
         <div 
           onClick={() => setShowHistory(true)}
           className="miao-card bg-primary text-white p-8 mb-8 flex flex-col items-center justify-center relative overflow-hidden cursor-pointer active:scale-95 transition-transform"
