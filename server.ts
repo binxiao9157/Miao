@@ -90,9 +90,21 @@ async function startServer() {
     }
   });
 
+  // SSRF Protection: Validate taskId format
+  const isValidTaskId = (id: string) => {
+    // Allow "url:" prefix for sync results
+    if (id.startsWith('url:')) return true;
+    // Standard Ark task IDs are alphanumeric with hyphens
+    return /^[a-zA-Z0-9-]+$/.test(id);
+  };
+
   // Image status polling
   app.get("/api/image-status/:taskId", async (req, res) => {
     const { taskId } = req.params;
+
+    if (!isValidTaskId(taskId)) {
+      return res.status(400).json({ error: "无效的任务 ID 格式" });
+    }
     
     // Handle the "url:" prefix for synchronous results
     if (taskId.startsWith('url:')) {
@@ -285,6 +297,11 @@ async function startServer() {
   // Polling endpoint
   app.get("/api/video-status/:taskId", async (req, res) => {
     const { taskId } = req.params;
+
+    if (!isValidTaskId(taskId)) {
+      return res.status(400).json({ error: "无效的任务 ID 格式" });
+    }
+
     const frontendApiKey = req.headers['x-volc-api-key'] as string;
     const frontendModelId = req.headers['x-volc-model-id'] as string;
     const finalApiKey = frontendApiKey || ARK_API_KEY;

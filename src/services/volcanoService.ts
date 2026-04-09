@@ -213,9 +213,16 @@ export class VolcanoService {
     }
 
     return new Promise((resolve, reject) => {
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        clearInterval(timer);
+      };
+
       const timer = setInterval(async () => {
         if (signal?.aborted) {
-          clearInterval(timer);
+          cleanup();
           reject(new Error("任务中止"));
           return;
         }
@@ -229,17 +236,17 @@ export class VolcanoService {
           
           const result = response.data;
           if (result.status === 'succeeded') {
-            clearInterval(timer);
+            cleanup();
             const imageUrl = result.output?.image_url || result.data?.image_url || result.image_url;
             if (imageUrl) resolve(imageUrl);
             else reject(new Error("任务成功但未获取到图片地址"));
           } else if (result.status === 'failed') {
-            clearInterval(timer);
+            cleanup();
             const errorInfo = result.error || result.message || "未知错误";
             reject(new Error(`图片生成失败: ${typeof errorInfo === 'string' ? errorInfo : JSON.stringify(errorInfo)}`));
           }
         } catch (error: any) {
-          clearInterval(timer);
+          cleanup();
           let errorMsg = "查询图片状态失败";
           if (error.response?.data) {
             const data = error.response.data;
@@ -251,6 +258,11 @@ export class VolcanoService {
           reject(new Error(errorMsg));
         }
       }, 3000);
+
+      signal?.addEventListener('abort', () => {
+        cleanup();
+        reject(new Error("任务中止"));
+      });
     });
   }
 
@@ -266,18 +278,24 @@ export class VolcanoService {
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        clearInterval(timer);
+      };
       
       const timer = setInterval(async () => {
         // 检查是否已中止
         if (signal?.aborted) {
-          clearInterval(timer);
+          cleanup();
           reject(new Error("任务轮询已中止"));
           return;
         }
 
         // 检查是否超时
         if (Date.now() - startTime > maxWaitTimeMs) {
-          clearInterval(timer);
+          cleanup();
           reject(new Error("任务轮询超时 (5分钟)"));
           return;
         }
@@ -290,7 +308,7 @@ export class VolcanoService {
           if (onProgress) onProgress(status);
 
           if (status === 'succeeded') {
-            clearInterval(timer);
+            cleanup();
             console.log("[DEBUG] Task succeeded. Full result:", JSON.stringify(result, null, 2));
             
             // 优先从 output 或 content 中获取标准的 video_url
@@ -315,19 +333,19 @@ export class VolcanoService {
               reject(new Error(`任务成功但未获取到有效的视频播放地址。`));
             }
           } else if (status === 'failed' || status === 'cancelled') {
-            clearInterval(timer);
+            cleanup();
             reject(new Error(`任务失败，状态: ${status}, 错误: ${JSON.stringify(result.error || result.message)}`));
           }
           // 如果是 running, pending 等状态，继续轮询
         } catch (error) {
-          clearInterval(timer);
+          cleanup();
           reject(error);
         }
       }, 5000);
 
       // 监听中止信号
       signal?.addEventListener('abort', () => {
-        clearInterval(timer);
+        cleanup();
         reject(new Error("任务轮询已中止"));
       });
     });

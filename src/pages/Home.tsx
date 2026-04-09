@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, TouchEvent, RefObject } from "react";
+import React, { useState, useEffect, useRef, TouchEvent, RefObject } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Coins, RefreshCw, Loader2, AlertCircle, Settings } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
@@ -160,9 +160,9 @@ export default function Home() {
     return () => {
       if (onlineTimerRef.current) clearInterval(onlineTimerRef.current);
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
-      
-      // We no longer explicitly destroy the video here because Home is kept alive by MainLayout.
-      // The component will only unmount if the user logs out or leaves the main app area.
+      if (secretTapTimer.current) clearTimeout(secretTapTimer.current);
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
     };
   }, []);
 
@@ -299,7 +299,7 @@ export default function Home() {
     longPressVideoRef.current?.load();
   };
 
-  const handleVideoError = (e: any) => {
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const videoElement = e.target as HTMLVideoElement;
     const error = videoElement.error;
 

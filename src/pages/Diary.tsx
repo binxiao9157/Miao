@@ -196,15 +196,22 @@ export default function Diary() {
     setDeletingId(null);
   };
 
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => { isMountedRef.current = false; };
+  }, []);
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const type = file.type.startsWith('video') ? 'video' : 'image';
       const reader = new FileReader();
       reader.onloadend = () => {
+        if (!isMountedRef.current) return;
         if (type === 'image') {
           const img = new Image();
           img.onload = () => {
+            if (!isMountedRef.current) return;
             const canvas = document.createElement('canvas');
             const MAX_SIZE = 800; // 日记图片可以稍微大一点，但也要限制
             let width = img.width;

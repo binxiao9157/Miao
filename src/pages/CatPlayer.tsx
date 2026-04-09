@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Play, Pause, Download, Trash2, Heart, Share2, AlertCircle } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
@@ -81,7 +81,7 @@ export default function CatPlayer() {
     navigate("/cat-history");
   };
 
-  const handleVideoError = (e: any) => {
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const videoElement = videoRef.current;
     let errorMsg = "视频加载失败";
     

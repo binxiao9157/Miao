@@ -11,13 +11,12 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const itemRef = useRef<HTMLDivElement>(null);
-  const longPressTimer = useRef<any>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (!isMenuOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
-      if (isMenuOpen) {
-        setIsMenuOpen(false);
-      }
+      setIsMenuOpen(false);
     };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);

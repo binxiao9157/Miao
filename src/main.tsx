@@ -15,9 +15,15 @@ if ('serviceWorker' in navigator) {
           installingWorker.onstatechange = () => {
             if (installingWorker.state === 'installed') {
               if (navigator.serviceWorker.controller) {
-                console.log('New content is available; please refresh.');
-                // 自动刷新以应用更新
-                window.location.reload();
+                const reloadKey = 'sw_reloaded';
+                if (!sessionStorage.getItem(reloadKey)) {
+                  sessionStorage.setItem(reloadKey, '1');
+                  console.log('New content is available; refreshing.');
+                  window.location.reload();
+                } else {
+                  sessionStorage.removeItem(reloadKey);
+                  console.log('New content available, skipping auto-reload to prevent loop.');
+                }
               }
             }
           };
