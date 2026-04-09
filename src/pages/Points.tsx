@@ -152,15 +152,15 @@ export default function Points() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm pt-[env(safe-area-inset-top)]"
           >
             <div className="flex items-center justify-between p-6 pb-4 border-b border-outline-variant/30 bg-surface">
               <h2 className="text-xl font-bold text-on-surface">积分明细</h2>
               <button 
                 onClick={() => setShowHistory(false)}
-                className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
+                className="w-11 h-11 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform"
               >
-                <X size={20} />
+                <X size={24} />
               </button>
             </div>
             
