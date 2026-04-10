@@ -8,15 +8,15 @@
   "description": "遇见你的数字猫咪",
   "icons": [
     {
-      "src": "https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=192&h=192&auto=format&fit=crop",
-      "sizes": "192x192",
+      "src": "/icon-180.png",
+      "sizes": "180x180",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://images.unsplash.com/photo-1548546738-8509cb246ed3?q=80&w=512&h=512&auto=format&fit=crop",
+      "src": "/og-image.jpg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     }
   ]

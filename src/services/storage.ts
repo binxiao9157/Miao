@@ -117,6 +117,31 @@ const USER_DATA_KEYS = {
 let cachedUserPrefix: string = 'guest';
 let cachedCurrentUserRaw: string | null = null;
 
+// 高频读取的内存缓存（按 storageKey 索引）
+const memCache = new Map<string, { raw: string | null; parsed: unknown }>();
+
+function cachedRead<T>(storageKey: string, defaultValue: T): T {
+  const raw = localStorage.getItem(storageKey);
+  const entry = memCache.get(storageKey);
+  if (entry && entry.raw === raw) return entry.parsed as T;
+  if (raw === null) {
+    memCache.set(storageKey, { raw: null, parsed: defaultValue });
+    return defaultValue;
+  }
+  try {
+    const parsed = JSON.parse(raw) as T;
+    memCache.set(storageKey, { raw, parsed });
+    return parsed ?? defaultValue;
+  } catch {
+    memCache.set(storageKey, { raw, parsed: defaultValue });
+    return defaultValue;
+  }
+}
+
+function invalidateCache(storageKey: string) {
+  memCache.delete(storageKey);
+}
+
 // 刷新用户前缀缓存
 const refreshUserPrefix = () => {
   const currentUserRaw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
@@ -246,8 +271,9 @@ export const storage = {
   saveUserInfo: (info: UserInfo) => {
     // 1. 保存到当前登录用户
     storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(info));
+    invalidateCache(STORAGE_KEYS.CURRENT_USER);
     storage.setItem(STORAGE_KEYS.LAST_USERNAME, info.username);
-    
+
     // 刷新前缀缓存
     refreshUserPrefix();
 
@@ -269,7 +295,7 @@ export const storage = {
   },
   
   getUserInfo: (): UserInfo | null => {
-    const info = storage.safeParse<UserInfo | null>(STORAGE_KEYS.CURRENT_USER, null);
+    const info = cachedRead<UserInfo | null>(STORAGE_KEYS.CURRENT_USER, null);
     if (info) {
       const savedAvatar = localStorage.getItem(getUserKey(STORAGE_KEYS.USER_AVATAR));
       if (savedAvatar) {
@@ -342,6 +368,7 @@ export const storage = {
 
   clearCurrentUser: () => {
     storage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    invalidateCache(STORAGE_KEYS.CURRENT_USER);
     storage.removeItem(STORAGE_KEYS.TOKEN);
     localStorage.removeItem('miao_login_time');
     localStorage.removeItem('miao_last_active_time');
@@ -375,7 +402,7 @@ export const storage = {
 
   // Cat Management
   getCatList: (): CatInfo[] => {
-    return storage.safeParse<CatInfo[]>(getUserKey(USER_DATA_KEYS.CAT_LIST), []);
+    return cachedRead<CatInfo[]>(getUserKey(USER_DATA_KEYS.CAT_LIST), []);
   },
 
   getCatById: (id: string): CatInfo | null => {
@@ -384,7 +411,9 @@ export const storage = {
   },
 
   saveCatList: (list: CatInfo[]) => {
-    storage.setItem(getUserKey(USER_DATA_KEYS.CAT_LIST), JSON.stringify(list));
+    const key = getUserKey(USER_DATA_KEYS.CAT_LIST);
+    storage.setItem(key, JSON.stringify(list));
+    invalidateCache(key);
   },
 
   saveCatInfo: (cat: CatInfo) => {
@@ -456,7 +485,7 @@ export const storage = {
 
   // Points Management
   getPoints: (): PointsInfo => {
-    const p = storage.safeParse<PointsInfo>(getUserKey(USER_DATA_KEYS.POINTS), {
+    const p = cachedRead<PointsInfo>(getUserKey(USER_DATA_KEYS.POINTS), {
       total: 0,
       lastLoginDate: null,
       dailyInteractionPoints: 0,
@@ -484,7 +513,9 @@ export const storage = {
   },
 
   savePoints: (points: PointsInfo) => {
-    storage.setItem(getUserKey(USER_DATA_KEYS.POINTS), JSON.stringify(points));
+    const key = getUserKey(USER_DATA_KEYS.POINTS);
+    storage.setItem(key, JSON.stringify(points));
+    invalidateCache(key);
   },
 
   addPoints: (amount: number, reason: string = '系统奖励') => {
