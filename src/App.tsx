@@ -34,9 +34,33 @@ const ScanFriend = lazy(() => import("./pages/ScanFriend"));
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 import { storage } from "./services/storage";
 
+function SplashScreen() {
+  return (
+    <div className="fixed inset-0 bg-[#FFF5F0] flex flex-col items-center justify-center z-[9999]">
+      <div className="relative">
+        {/* 简单的猫爪加载动画或 Logo */}
+        <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center mb-4">
+          <span className="text-2xl font-black text-[#FF9D76]">Miao</span>
+        </div>
+        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+          <div className="flex gap-1">
+            <div className="w-2 h-2 bg-[#FF9D76] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+            <div className="w-2 h-2 bg-[#FF9D76] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+            <div className="w-2 h-2 bg-[#FF9D76] rounded-full animate-bounce"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthContext();
+  const { isAuthenticated, isInitializing } = useAuthContext();
   const location = useLocation();
+
+  if (isInitializing) {
+    return <SplashScreen />;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
@@ -46,8 +70,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated, hasCat } = useAuthContext();
+  const { isAuthenticated, isInitializing, hasCat } = useAuthContext();
   const location = useLocation(); // Force re-render on route change
+
+  if (isInitializing) {
+    return <SplashScreen />;
+  }
 
   return (
     <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>

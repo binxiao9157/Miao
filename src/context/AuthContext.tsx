@@ -4,6 +4,7 @@ import { storage, UserInfo } from '../services/storage';
 interface AuthContextType {
   user: UserInfo | null;
   isAuthenticated: boolean;
+  isInitializing: boolean;
   hasCat: boolean;
   catCount: number;
   login: (username: string, password: string) => boolean;
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [catCount, setCatCount] = useState(0);
 
   const hasCat = useMemo(() => catCount > 0, [catCount]);
@@ -45,6 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       storage.clearCurrentUser();
       refreshCatStatus();
     }
+    
+    // 校验逻辑完成，关闭初始化状态
+    setIsInitializing(false);
   }, [refreshCatStatus]);
 
   const login = (username: string, password: string): boolean => {
@@ -103,9 +108,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const contextValue = useMemo(() => ({
-    user, isAuthenticated, hasCat, catCount, login, register, logout, updateProfile, refreshCatStatus
+    user, isAuthenticated, isInitializing, hasCat, catCount, login, register, logout, updateProfile, refreshCatStatus
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [user, isAuthenticated, hasCat, catCount]);
+  }), [user, isAuthenticated, isInitializing, hasCat, catCount]);
 
   return (
     <AuthContext.Provider value={contextValue}>
