@@ -181,7 +181,7 @@ export default function TimeLetters() {
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
       className="fixed inset-0 z-50 bg-background flex flex-col overflow-y-auto"
     >
-      <div className="p-8" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="p-8 pb-32" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <header className="flex items-center justify-between mb-12 pt-4">
           <button onClick={() => setView('list')} className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant">
             <ArrowLeft size={24} />
@@ -270,7 +270,7 @@ export default function TimeLetters() {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-50 bg-on-primary-container p-8 flex flex-col overflow-y-auto"
+      className="fixed inset-0 z-50 bg-on-primary-container p-8 pb-32 flex flex-col overflow-y-auto"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <header className="flex items-center justify-between mb-12 pt-4">
