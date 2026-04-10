@@ -90,18 +90,14 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // 延迟执行重度逻辑，确保 UI 先渲染
+    // 同步初始化猫咪数据，避免首屏空白
+    const info = storage.getActiveCat();
+    setCat(info);
+    if (info) setVideoAspectRatio(null);
+
+    // 延迟执行积分等重度逻辑，确保 UI 先渲染
+    let intervalId: ReturnType<typeof setInterval> | null = null;
     const timer = setTimeout(() => {
-      const refreshCat = () => {
-        const info = storage.getActiveCat();
-        setCat(info);
-        if (info) {
-          setVideoAspectRatio(null);
-        }
-      };
-
-      refreshCat();
-
       const pointsInfo = storage.getPoints();
       const today = new Date().toISOString().slice(0, 10);
       
@@ -127,7 +123,7 @@ export default function Home() {
 
       showGreetingOnce();
 
-      onlineTimerRef.current = setInterval(() => {
+      intervalId = setInterval(() => {
         const p = storage.getPoints();
         const now = Date.now();
         
@@ -161,10 +157,12 @@ export default function Home() {
           storage.savePoints(p);
         }
       }, 60000);
+      onlineTimerRef.current = intervalId;
     }, 300);
 
     return () => {
       clearTimeout(timer);
+      if (intervalId) clearInterval(intervalId);
       if (onlineTimerRef.current) clearInterval(onlineTimerRef.current);
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
       if (secretTapTimer.current) clearTimeout(secretTapTimer.current);

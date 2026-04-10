@@ -13,8 +13,7 @@ const Register = lazy(() => import("./pages/Register"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Welcome = lazy(() => import("./pages/Welcome"));
-const Points = lazy(() => import("./pages/Points"));
-const Profile = lazy(() => import("./pages/Profile"));
+// Points 和 Profile 由 MainLayout 持久化渲染，无需在路由层 lazy 加载
 const EditProfile = lazy(() => import("./pages/EditProfile"));
 const ChangePassword = lazy(() => import("./pages/ChangePassword"));
 const PrivacySettings = lazy(() => import("./pages/PrivacySettings"));
@@ -114,8 +113,8 @@ function AppRoutes() {
           <Route path="/diary" element={hasCat ? <></> : <Navigate to="/empty-cat" replace />} />
           <Route path="/time-letters" element={hasCat ? <></> : <Navigate to="/empty-cat" replace />} />
           <Route path="/notifications" element={hasCat ? <></> : <Navigate to="/empty-cat" replace />} />
-          <Route path="/points" element={hasCat ? <Points /> : <Navigate to="/empty-cat" replace />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/points" element={hasCat ? <></> : <Navigate to="/empty-cat" replace />} />
+          <Route path="/profile" element={hasCat ? <></> : <Navigate to="/empty-cat" replace />} />
         </Route>
   
         {/* Settings & Detail Routes (No Bottom Nav) */}

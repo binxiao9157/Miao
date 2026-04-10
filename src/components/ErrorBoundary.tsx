@@ -28,12 +28,13 @@ class ErrorBoundary extends React.Component<Props, State> {
   }
 
   private handleReset = () => {
+    // 先尝试就地恢复，不刷新页面
     this.setState({ hasError: false, error: null });
-    window.location.href = "/";
   };
 
-  private handleReload = () => {
-    window.location.reload();
+  private handleGoHome = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.href = "/";
   };
 
   public render() {
@@ -61,7 +62,7 @@ class ErrorBoundary extends React.Component<Props, State> {
 
             <div className="flex flex-col gap-3">
               <button
-                onClick={this.handleReload}
+                onClick={this.handleReset}
                 className="w-full py-4 bg-[#FF9D76] text-white rounded-2xl font-bold shadow-lg shadow-orange-200 flex items-center justify-center gap-2 active:scale-95 transition-transform"
               >
                 <RefreshCw size={20} />
@@ -69,7 +70,7 @@ class ErrorBoundary extends React.Component<Props, State> {
               </button>
               
               <button
-                onClick={this.handleReset}
+                onClick={this.handleGoHome}
                 className="w-full py-4 bg-gray-50 text-gray-600 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
               >
                 <Home size={20} />

@@ -16,36 +16,26 @@ export default function Welcome() {
 
   const [showDebugDialog, setShowDebugDialog] = useState(false);
   const [debugClickCount, setDebugClickCount] = useState(0);
-  const debugTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debugTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // 资源预加载逻辑
+  // 预加载猫咪头像资源
   useEffect(() => {
-    const preloadImages = () => {
-      const catList = storage.getCatList();
-      const imagesToPreload = [
-        ...catList.map(cat => cat.avatar),
-        "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4" // 预加载视频（浏览器会处理缓存）
-      ];
-
-      imagesToPreload.forEach(src => {
-        if (!src) return;
-        if (src.endsWith('.mp4')) {
-          const video = document.createElement('video');
-          video.src = src;
-          video.preload = 'auto';
-        } else {
+    const preloadAvatars = () => {
+      storage.getCatList().forEach(cat => {
+        if (cat.avatar) {
           const img = new Image();
-          img.src = src;
+          img.src = cat.avatar;
         }
       });
     };
 
-    // 在页面空闲时预加载
     if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(preloadImages);
+      const id = (window as unknown as { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(preloadAvatars);
+      return () => (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(id);
     } else {
-      setTimeout(preloadImages, 1000);
+      const timer = setTimeout(preloadAvatars, 1000);
+      return () => clearTimeout(timer);
     }
   }, []);
 

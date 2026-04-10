@@ -20,6 +20,7 @@ export interface CatInfo {
   videoPaths?: {
     rubbing?: string;
     petting?: string;
+    longPress?: string; // 兼容旧数据
     feeding?: string;
     teasing?: string;
   };
