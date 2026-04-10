@@ -170,7 +170,7 @@ export default function Home() {
     if (interactionBubble) {
       const timer = setTimeout(() => {
         setInteractionBubble(null);
-      }, 3000);
+      }, 2000);
       return () => clearTimeout(timer);
     }
   }, [interactionBubble]);
@@ -237,23 +237,19 @@ export default function Home() {
     }
 
     if (p.dailyInteractionPoints < 20) {
-      // 延迟发放积分，适应 6 秒视频时长
-      setTimeout(() => {
-        const currentP = storage.getPoints();
-        currentP.dailyInteractionPoints += 5;
-        currentP.total += 5;
-        currentP.history.unshift({
-          id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
-          type: 'earn',
-          amount: 5,
-          reason: '互动奖励',
-          timestamp: Date.now()
-        });
-        if (currentP.history.length > 50) currentP.history.pop();
-        storage.savePoints(currentP);
-        setPoints(currentP.total);
-        triggerPointToast(`互动任务达成！积分 +5 🌟`);
-      }, 5500);
+      p.dailyInteractionPoints += 5;
+      p.total += 5;
+      p.history.unshift({
+        id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+        type: 'earn',
+        amount: 5,
+        reason: '互动奖励',
+        timestamp: Date.now()
+      });
+      if (p.history.length > 50) p.history.pop();
+      storage.savePoints(p);
+      setPoints(p.total);
+      triggerPointToast(`互动任务达成！积分 +5 🌟`);
     }
   };
 
@@ -393,7 +389,7 @@ export default function Home() {
       if (now - lastTapTime.current < 300) {
         // Double tap
         if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-        triggerInteraction('踩奶互动', '呼噜噜~ 踩奶好解压喵 🐾', 'feeding');
+        triggerInteraction('露肚皮抚摸', '咯咯咯咯...', 'feeding');
         wakeupUI();
         lastTapTime.current = 0;
       } else {
