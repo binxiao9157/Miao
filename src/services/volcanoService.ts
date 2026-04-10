@@ -8,9 +8,6 @@ export const VolcanoConfig = {
   MOCK_MODE: false, 
   
   // 凭证信息 (从环境变量读取)
-  AccessKey: import.meta.env.VITE_VOLC_ACCESS_KEY,
-  SecretKey: import.meta.env.VITE_VOLC_SECRET_KEY,
-  
   ApiKey: import.meta.env.VITE_VOLC_API_KEY,
   ModelId: import.meta.env.VITE_VOLC_MODEL_ID || 'doubao-seedance-1-5-pro-251215',
   T2IModelId: import.meta.env.VITE_VOLC_T2I_MODEL_ID || 'doubao-t2i-v2',
@@ -83,13 +80,10 @@ export class VolcanoService {
         headers: buildHeaders()
       });
       
-      console.log("[DEBUG] Submit task response:", response.data);
-      
       // 兼容不同的返回结构 (id 或 task_id)
       const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;
       
       if (!taskId) {
-        console.error("[DEBUG] Invalid response structure:", response.data);
         throw new Error("服务器返回数据格式错误，未获取到任务 ID");
       }
 

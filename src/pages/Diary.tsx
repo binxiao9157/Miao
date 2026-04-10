@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
-import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, MoreHorizontal, Sparkles, Trash2, CheckCircle, Loader2, ArrowUpRight, UserPlus, QrCode } from "lucide-react";
+import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, Sparkles, Trash2, CheckCircle, Loader2, ArrowUpRight, UserPlus, QrCode } from "lucide-react";
 import { storage, DiaryEntry, CatInfo, FriendDiaryEntry } from "../services/storage";
 import { motion, AnimatePresence, LayoutGroup } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";

@@ -125,10 +125,10 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
                     <p className="text-xs text-on-surface-variant font-medium">{comment.content}</p>
                   </div>
                 ) : (
-                  <CommentItem 
-                    comment={comment} 
-                    diaryId={entry.id} 
-                    onDelete={onDeleteComment}
+                  <CommentItem
+                    comment={comment}
+                    diaryId={entry.id}
+                    onDelete={onDeleteComment || (() => {})}
                   />
                 )}
               </div>

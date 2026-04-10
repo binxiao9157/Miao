@@ -62,9 +62,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(true);
       setUser(savedUser);
       
-      // 3. 立即同步猫咪形象到全局缓存
-      storage.getActiveCat();
-      
       refreshCatStatus();
       return true;
     }
@@ -75,7 +72,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 1. 保存用户信息并设为当前用户
     storage.saveUserInfo(info);
     storage.saveToken('mock_token_' + Date.now());
-    
+    storage.saveLoginTime(Date.now());
+    storage.saveLastActiveTime(Date.now());
+
     // 2. 更新内存状态
     setUser(info);
     setIsAuthenticated(true);
@@ -103,8 +102,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const contextValue = useMemo(() => ({
+    user, isAuthenticated, hasCat, catCount, login, register, logout, updateProfile, refreshCatStatus
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [user, isAuthenticated, hasCat, catCount]);
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, hasCat, catCount, login, register, logout, updateProfile, refreshCatStatus }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

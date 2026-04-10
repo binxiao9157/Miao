@@ -35,7 +35,6 @@ export default function ResetPassword() {
     
     // Mock SMS
     const mockCode = Math.floor(1000 + Math.random() * 9000).toString();
-    console.log("[DEBUG] Verification Code:", mockCode);
     setGeneratedCode(mockCode);
     alert(`验证码已发送至您的手机: ${mockCode}`);
     

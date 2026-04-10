@@ -23,11 +23,9 @@ export default function CatPlayer() {
     const list = storage.getCatList();
     const found = list.find(c => c.id === id);
     if (found) {
-      console.log("[DEBUG] Found cat info:", found);
       setCat(found);
       setVideoAspectRatio(null);
     } else {
-      console.error("[DEBUG] Cat not found for ID:", id);
       setErrorDetails("找不到该猫咪的数据记录");
       navigate("/");
     }
@@ -85,12 +83,9 @@ export default function CatPlayer() {
     const videoElement = videoRef.current;
     let errorMsg = "视频加载失败";
     
-    console.error("[DEBUG] Video playback error event:", e);
     if (videoElement && videoElement.error) {
       const code = videoElement.error.code;
       const message = videoElement.error.message;
-      console.error("[DEBUG] Video element error details:", { code, message });
-      
       switch (code) {
         case 1: errorMsg = "视频加载被中止 (Aborted)"; break;
         case 2: errorMsg = "网络错误，无法下载视频 (Network Error)"; break;
@@ -104,7 +99,6 @@ export default function CatPlayer() {
   };
 
   const handleLoadedData = () => {
-    console.log("[DEBUG] Video can play");
     setIsLoading(false);
     setErrorDetails(null);
   };
@@ -257,13 +251,11 @@ export default function CatPlayer() {
               : 'object-cover'
           }`}
           onPlay={() => {
-            console.log("[DEBUG] Video play event triggered");
             setIsPlaying(true);
             setIsLoading(false);
           }}
           onPause={() => setIsPlaying(false)}
           onCanPlay={() => {
-            console.log("[DEBUG] Video can play");
             setIsLoading(false);
             setErrorDetails(null);
           }}

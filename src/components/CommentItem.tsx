@@ -12,6 +12,7 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const itemRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTouchDevice = useRef(false);
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -23,6 +24,11 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
   }, [isMenuOpen]);
 
   const handleLongPress = (e: React.MouseEvent | React.TouchEvent) => {
+    if ('touches' in e) {
+      isTouchDevice.current = true;
+    } else if (isTouchDevice.current) {
+      return; // 触屏设备忽略 mouse 事件，防止双重触发
+    }
     longPressTimer.current = setTimeout(() => {
       const rect = itemRef.current?.getBoundingClientRect();
       if (rect) {
@@ -39,9 +45,9 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     try {
-      navigator.clipboard.writeText(comment.content);
+      await navigator.clipboard.writeText(comment.content);
     } catch (e) {
       console.error("Failed to copy to clipboard:", e);
     }
@@ -49,7 +55,6 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
   };
 
   const handleDelete = () => {
-    console.log("CommentItem: handleDelete called", { diaryId, commentId: comment.id });
     onDelete(diaryId, comment.id);
     setIsMenuOpen(false);
   };

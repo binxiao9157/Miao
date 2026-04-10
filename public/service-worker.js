@@ -1,4 +1,7 @@
 const CACHE_NAME = 'miao-v4';
+// 预缓存列表：仅包含应用 shell 资源。
+// Vite 构建产物（JS/CSS bundles）的哈希文件名由浏览器缓存策略处理，
+// 如需完整离线支持，建议集成 vite-plugin-pwa 自动注入 manifest。
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -105,8 +108,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // 1. 视频和图片：缓存优先
-  if (url.pathname.match(/\.(mp4|png|jpg|jpeg|gif|webp)$/) || url.search.includes('video')) {
+  // 1. 视频和图片：缓存优先（限定为 CDN/外部资源，避免缓存内部同扩展名请求）
+  const isMediaExt = url.pathname.match(/\.(mp4|png|jpg|jpeg|gif|webp)$/);
+  const isVideoQuery = url.search.includes('video');
+  const isExternalOrCDN = url.hostname !== self.location.hostname;
+  if ((isMediaExt || isVideoQuery) && isExternalOrCDN) {
     event.respondWith(cacheFirst(event.request));
     return;
   }
@@ -117,8 +123,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. 其他资源：网络优先，失败回退缓存
+  // 3. 其他 GET 资源：网络优先，失败回退缓存；非 GET 请求直接走网络
+  if (event.request.method !== 'GET') {
+    return;
+  }
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request).catch(() => caches.match(event.request).then(r => r || new Response('Offline', { status: 503 })))
   );
 });

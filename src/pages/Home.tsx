@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, TouchEvent, RefObject } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Coins, RefreshCw, Loader2, AlertCircle, Settings } from "lucide-react";
+import { Coins, RefreshCw, Loader2, AlertCircle } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";
@@ -27,7 +27,6 @@ export default function Home() {
   
   const [loadError, setLoadError] = useState(false); 
   const [showControls, setShowControls] = useState(false); 
-  const [interactionBubble, setInteractionBubble] = useState<{text: string, id: number} | null>(null);
   
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
   const [secretTapCount, setSecretTapCount] = useState(0);
@@ -41,12 +40,13 @@ export default function Home() {
   const swipeVideoRef = useRef<HTMLVideoElement>(null);
   const longPressVideoRef = useRef<HTMLVideoElement>(null);
 
-  const actionRefs: { [key: string]: RefObject<HTMLVideoElement | null> } = {
+  const actionRefs = useMemo<{ [key: string]: RefObject<HTMLVideoElement | null> }>(() => ({
     rubbing: clickVideoRef,
     feeding: doubleClickVideoRef,
     teasing: swipeVideoRef,
     petting: longPressVideoRef
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
   
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
@@ -69,7 +69,10 @@ export default function Home() {
     }, duration);
   };
 
-  const startGreetingTimer = useCallback(() => {
+  // 问候逻辑：仅挂载时检查一次，不依赖 bubbleText 避免 Effect 循环
+  const greetingShownRef = useRef(false);
+  const showGreetingOnce = () => {
+    if (greetingShownRef.current) return;
     const settings = storage.getSettings();
     if (settings.greetingsEnabled) {
       const hour = new Date().getHours();
@@ -79,12 +82,12 @@ export default function Home() {
       } else if (hour >= 22 && hour < 24) {
         text = "该休息啦～";
       }
-
-      if (text && !bubbleText) { // 只有在没有互动气泡时才显示问候
+      if (text) {
+        greetingShownRef.current = true;
         showFloatingBubble(text);
       }
     }
-  }, [bubbleText]);
+  };
 
   useEffect(() => {
     const refreshCat = () => {
@@ -103,7 +106,7 @@ export default function Home() {
     if (pointsInfo.lastLoginDate !== today) {
       pointsInfo.total += 10;
       pointsInfo.history.unshift({
-        id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+        id: 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7),
         type: 'earn',
         amount: 10,
         reason: '每日登录奖励',
@@ -120,7 +123,7 @@ export default function Home() {
       setPoints(pointsInfo.total);
     }
 
-    startGreetingTimer();
+    showGreetingOnce();
 
     onlineTimerRef.current = setInterval(() => {
       const p = storage.getPoints();
@@ -143,7 +146,7 @@ export default function Home() {
         if (p.onlineMinutes >= 10 && p.onlineMinutes - diffMinutes < 10) {
           p.total += 10;
           p.history.unshift({
-            id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+            id: 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7),
             type: 'earn',
             amount: 10,
             reason: '在线时长奖励',
@@ -163,17 +166,10 @@ export default function Home() {
       if (secretTapTimer.current) clearTimeout(secretTapTimer.current);
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
+      if (pointToastTimerRef.current) clearTimeout(pointToastTimerRef.current);
     };
-  }, [startGreetingTimer]);
-
-  useEffect(() => {
-    if (interactionBubble) {
-      const timer = setTimeout(() => {
-        setInteractionBubble(null);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [interactionBubble]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle visibility changes (KeepAlive resume) and cat changes
   useEffect(() => {
@@ -211,7 +207,7 @@ export default function Home() {
         playEntryVideo();
       }
 
-      startGreetingTimer();
+      showGreetingOnce();
     } else {
       if (idleVideoRef.current) idleVideoRef.current.pause();
       Object.values(actionRefs).forEach(ref => ref.current?.pause());
@@ -222,9 +218,11 @@ export default function Home() {
     }
   }, [location.pathname, cat?.id]);
 
+  const pointToastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const triggerPointToast = (msg: string) => {
+    if (pointToastTimerRef.current) clearTimeout(pointToastTimerRef.current);
     setShowPointToast(msg);
-    setTimeout(() => setShowPointToast(null), 3000);
+    pointToastTimerRef.current = setTimeout(() => setShowPointToast(null), 3000);
   };
 
   const handleInteraction = (actionName: string) => {
@@ -240,7 +238,7 @@ export default function Home() {
       p.dailyInteractionPoints += 5;
       p.total += 5;
       p.history.unshift({
-        id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+        id: 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7),
         type: 'earn',
         amount: 5,
         reason: '互动奖励',

@@ -23,7 +23,6 @@ export default function Login() {
     // 1. 实现数据读取逻辑 (Data Fetching)
     // 在登录页面初始化时，检查本地持久化存储
     const lastImage = storage.getLastCatImage();
-    console.log("[DEBUG] Login Page - Last Cat Image:", lastImage ? "Found" : "Not Found");
     if (lastImage) {
       setCatImage(lastImage);
     }

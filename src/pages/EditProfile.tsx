@@ -1,6 +1,6 @@
 import { useState, useRef, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Check, Image as ImageIcon, Camera as CameraIcon, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, Image as ImageIcon, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "motion/react";
 

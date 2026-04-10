@@ -170,10 +170,14 @@ export const storage = {
   // Prune storage to free up space
   pruneStorage: () => {
     try {
-      // Iterate over all keys in localStorage to find diaries across all users
+      // 先收集所有 key，避免遍历时修改 localStorage 导致跳过元素
+      const allKeys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.endsWith(USER_DATA_KEYS.DIARIES)) {
+        if (key) allKeys.push(key);
+      }
+      for (const key of allKeys) {
+        if (key.endsWith(USER_DATA_KEYS.DIARIES)) {
           try {
             const data = localStorage.getItem(key);
             if (data) {
@@ -318,7 +322,7 @@ export const storage = {
   },
 
   saveLoginTime: (time: number) => {
-    localStorage.setItem('miao_login_time', time.toString());
+    storage.setItem('miao_login_time', time.toString());
   },
 
   getLoginTime: () => {
@@ -327,7 +331,7 @@ export const storage = {
   },
 
   saveLastActiveTime: (time: number) => {
-    localStorage.setItem('miao_last_active_time', time.toString());
+    storage.setItem('miao_last_active_time', time.toString());
   },
 
   getLastActiveTime: () => {
@@ -486,7 +490,7 @@ export const storage = {
     const points = storage.getPoints();
     points.total += amount;
     points.history.unshift({
-      id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+      id: 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7),
       type: 'earn',
       amount,
       reason,
@@ -510,7 +514,7 @@ export const storage = {
     if (points.total >= amount) {
       points.total -= amount;
       points.history.unshift({
-        id: 'tx_' + Date.now() + Math.random().toString(36).substr(2, 5),
+        id: 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7),
         type: 'spend',
         amount,
         reason,

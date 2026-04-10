@@ -85,9 +85,7 @@ export default function GenerationProgress() {
             image.onerror = reject;
             image.src = img;
           });
-          console.log("[DEBUG] Image optimized for I2V submission");
         } catch (e) {
-          console.warn("[DEBUG] Image optimization failed, using original:", e);
         }
       }
 
@@ -108,7 +106,7 @@ export default function GenerationProgress() {
       setProgress(60);
       const priorityVideoUrl = await VolcanoService.pollTaskResult(
         priorityTask.id,
-        (s) => console.log(`[PRIORITY] ${priorityAction} status: ${s}`),
+        undefined,
         abortSignal
       );
 
@@ -128,38 +126,36 @@ export default function GenerationProgress() {
       );
 
       // 4. 触发后台生成任务 (不阻塞 UI)
-      console.log("[DEBUG] Starting background tasks for:", otherActions);
-      const runBackgroundTasks = async () => {
+      const runBackgroundTasks = async (signal: AbortSignal) => {
         for (const action of otherActions) {
+          if (signal.aborted) return;
           try {
             const prompt = ACTION_PROMPTS[action];
             const task = await VolcanoService.submitTask(optimizedImg, prompt);
-            const url = await VolcanoService.pollTaskResult(task.id);
+            const url = await VolcanoService.pollTaskResult(task.id, undefined, signal);
             
             // 更新本地存储中的视频路径
             const currentCat = storage.getCatById(groupId);
             if (currentCat) {
               const updatedPaths = { ...currentCat.videoPaths, [action]: url };
               storage.saveCatInfo({ ...currentCat, videoPaths: updatedPaths });
-              console.log(`[BACKGROUND] Action ${action} updated successfully`);
             }
           } catch (e) {
-            console.error(`[BACKGROUND] Failed to generate ${action}:`, e);
           }
         }
       };
       
-      runBackgroundTasks(); // 异步执行，不 await
+      runBackgroundTasks(abortSignal); // 异步执行，不 await
 
-      // 5. 完成并显示入场
-      setStatus("生成成功！");
-      setProgress(100);
-      setPhase('success');
-      
-      // 扣除积分 (已在前面预检查过)
+      // 5. 扣除积分 (已在前面预检查过，在 UI 更新之前执行)
       if (isRedemption && !isDebugRedemption) {
         storage.deductPoints(redemptionAmount || 200, "解锁新伙伴");
       }
+
+      // 6. 完成并显示入场
+      setStatus("生成成功！");
+      setProgress(100);
+      setPhase('success');
 
       // 确保活跃 ID 已设置
       storage.setActiveCatId(groupId);
@@ -197,19 +193,15 @@ export default function GenerationProgress() {
           setProgress(5);
           
           const imgPrompt = IMAGE_PROMPTS.anchor(breed, furColor);
-          console.log("[DEBUG] Starting T2I task with prompt:", imgPrompt);
           
           // 策略：由于火山引擎 T2I 模型配置复杂（容易 404），我们优先尝试火山，失败后立即切换 Gemini
           // 如果用户没有配置火山 T2I，也可以直接在这里调整优先级
           try {
             const submitRes = await VolcanoService.submitImageTask(imgPrompt);
-            console.log("[DEBUG] Volcano T2I task submitted, ID:", submitRes.id);
             setProgress(10);
             
             currentAnchor = await VolcanoService.pollImageResult(submitRes.id, abortController.signal);
-            console.log("[DEBUG] Volcano T2I task succeeded, anchor image URL:", currentAnchor);
           } catch (vError: any) {
-            console.warn("[DEBUG] Volcano T2I failed or not configured, falling back to Gemini:", vError);
             setStatus("正在使用 Gemini 引擎构思形象...");
             
             try {
@@ -236,9 +228,7 @@ export default function GenerationProgress() {
               }
               
               currentAnchor = geminiImage;
-              console.log("[DEBUG] Gemini T2I succeeded");
             } catch (gError: any) {
-              console.error("[DEBUG] Gemini T2I also failed:", gError);
               throw new Error(`形象生成失败: 火山(${vError.message}) & Gemini(${gError.message})`);
             }
           }
@@ -248,7 +238,6 @@ export default function GenerationProgress() {
           setPhase('preview');
           setStatus("形象已就绪，准备生成视频");
         } else {
-          console.log("[DEBUG] Image already provided (upload mode), skipping T2I.");
           setStatus("正在分析图片...");
           setProgress(25);
           setAnchorImage(image);
@@ -272,7 +261,8 @@ export default function GenerationProgress() {
         i2vAbortRef.current.abort();
       }
     };
-  }, [image, breed, furColor, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [image, name, breed, furColor, navigate]);
 
   return (
     <div 

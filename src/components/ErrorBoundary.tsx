@@ -10,7 +10,7 @@ interface State {
   error: Error | null;
 }
 
-class ErrorBoundary extends (React.Component as any) {
+class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = {
@@ -37,7 +37,7 @@ class ErrorBoundary extends (React.Component as any) {
   };
 
   public render() {
-    const { hasError, error } = this.state as State;
+    const { hasError, error } = this.state;
     if (hasError) {
       return (
         <div className="min-h-screen bg-[#FDF8F6] flex items-center justify-center p-6">
@@ -81,7 +81,7 @@ class ErrorBoundary extends (React.Component as any) {
       );
     }
 
-    return (this.props as Props).children;
+    return this.props.children;
   }
 }
 
