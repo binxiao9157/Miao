@@ -220,7 +220,7 @@ export default function EditProfile() {
                   className="flex flex-col items-center gap-3 p-6 bg-white rounded-[32px] border border-outline-variant/30 active:scale-95 transition-transform"
                 >
                   <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center">
-                    <CameraIcon size={28} />
+                    <Camera size={28} />
                   </div>
                   <span className="font-bold text-sm text-on-surface">拍照</span>
                 </button>

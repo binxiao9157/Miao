@@ -143,8 +143,8 @@ export default function Welcome() {
 function DebugDialog({ onClose, onSave }: { onClose: () => void, onSave: () => void }) {
   const [config, setConfig] = useState({
     VOLC_API_KEY: localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey || '',
-    VOLC_ACCESS_KEY: localStorage.getItem('VOLC_ACCESS_KEY') || VolcanoConfig.AccessKey || '',
-    VOLC_SECRET_KEY: localStorage.getItem('VOLC_SECRET_KEY') || VolcanoConfig.SecretKey || '',
+    VOLC_ACCESS_KEY: localStorage.getItem('VOLC_ACCESS_KEY') || '',
+    VOLC_SECRET_KEY: localStorage.getItem('VOLC_SECRET_KEY') || '',
     VOLC_MODEL_ID: localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId || '',
     VOLC_T2I_MODEL_ID: localStorage.getItem('VOLC_T2I_MODEL_ID') || VolcanoConfig.T2IModelId || '',
   });
@@ -175,8 +175,8 @@ function DebugDialog({ onClose, onSave }: { onClose: () => void, onSave: () => v
       Object.keys(config).forEach(key => localStorage.removeItem(key));
       setConfig({
         VOLC_API_KEY: VolcanoConfig.ApiKey || '',
-        VOLC_ACCESS_KEY: VolcanoConfig.AccessKey || '',
-        VOLC_SECRET_KEY: VolcanoConfig.SecretKey || '',
+        VOLC_ACCESS_KEY: '',
+        VOLC_SECRET_KEY: '',
         VOLC_MODEL_ID: VolcanoConfig.ModelId || '',
         VOLC_T2I_MODEL_ID: VolcanoConfig.T2IModelId || '',
       });

@@ -86,6 +86,7 @@ function AppRoutes() {
           <Route path="/" element={hasCat ? <></> : <Navigate to="/empty-cat" replace />} />
           <Route path="/diary" element={hasCat ? <></> : <Navigate to="/empty-cat" replace />} />
           <Route path="/time-letters" element={hasCat ? <></> : <Navigate to="/empty-cat" replace />} />
+          <Route path="/notifications" element={hasCat ? <></> : <Navigate to="/empty-cat" replace />} />
           <Route path="/points" element={hasCat ? <Points /> : <Navigate to="/empty-cat" replace />} />
           <Route path="/profile" element={<Profile />} />
         </Route>
@@ -94,7 +95,6 @@ function AppRoutes() {
         <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
         <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
         <Route path="/privacy-settings" element={<ProtectedRoute><PrivacySettings /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><NotificationList /></ProtectedRoute>} />
         <Route path="/notification-settings" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/switch-companion" element={<ProtectedRoute><SwitchCompanion /></ProtectedRoute>} />

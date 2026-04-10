@@ -7,7 +7,8 @@ import PageHeader from "../components/PageHeader";
 type ViewState = 'list' | 'write' | 'detail';
 
 export default function TimeLetters() {
-  const [letters, setLetters] = useState<TimeLetter[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [letters, setLetters] = useState<TimeLetter[]>(() => storage.getTimeLetters());
   const [view, setView] = useState<ViewState>('list');
   const [selectedLetter, setSelectedLetter] = useState<TimeLetter | null>(null);
   const [showToast, setShowToast] = useState<string | null>(null);
@@ -25,6 +26,22 @@ export default function TimeLetters() {
     setShowToast(msg);
     setTimeout(() => setShowToast(null), 3000);
   };
+
+  const LetterSkeleton = () => (
+    <div className="miao-card flex items-center gap-6 animate-pulse">
+      <div className="w-16 h-16 bg-surface-container-high rounded-3xl shrink-0" />
+      <div className="flex-grow space-y-3">
+        <div className="flex justify-between items-center">
+          <div className="h-5 bg-surface-container-high rounded-full w-1/2" />
+          <div className="h-2 bg-surface-container-high rounded-full w-12" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-3 bg-surface-container-high rounded-full w-full" />
+          <div className="h-2 bg-surface-container-high rounded-full w-24" />
+        </div>
+      </div>
+    </div>
+  );
 
   const handleSaveLetter = () => {
     if (!title.trim()) {
@@ -71,7 +88,7 @@ export default function TimeLetters() {
   };
 
   const renderList = () => (
-    <div className="flex flex-col">
+    <div className="flex flex-col overflow-x-hidden">
       <AnimatePresence>
         {showToast && (
           <motion.div 
@@ -99,16 +116,22 @@ export default function TimeLetters() {
       />
 
       <div className="px-6 space-y-6">
-        {letters.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
+        {isLoading ? (
+          Array(3).fill(0).map((_, i) => <LetterSkeleton key={i} />)
+        ) : letters.length === 0 ? (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center justify-center py-32 text-center"
+          >
             <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
               <Clock size={40} />
             </div>
             <h3 className="text-xl font-black text-on-surface mb-2">还没有信件</h3>
             <p className="text-sm text-on-surface-variant max-w-[200px]">写一封信给未来的自己，让时光见证温暖</p>
-          </div>
+          </motion.div>
         ) : (
-          letters.map((letter) => {
+          letters.map((letter, index) => {
             const now = Date.now();
             const isUnlocked = now >= letter.unlockAt;
             
@@ -124,14 +147,12 @@ export default function TimeLetters() {
             }).replace(/\//g, '/');
 
             return (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
+              <div 
                 key={letter.id}
                 onClick={() => handleLetterClick(letter)}
                 className={`miao-card flex items-center gap-6 group active:scale-[0.98] transition-all ${!isUnlocked && 'opacity-70 grayscale-[0.5]'}`}
               >
-                <div className={`w-16 h-16 rounded-3xl flex items-center justify-center flex-shrink-0 ${isUnlocked ? "bg-primary/10 text-primary" : "bg-surface-container text-on-surface-variant/40"}`}>
+                <div className={`w-16 h-16 rounded-3xl flex items-center justify-center shrink-0 ${isUnlocked ? "bg-primary/10 text-primary" : "bg-surface-container text-on-surface-variant/40"}`}>
                   {isUnlocked ? <Unlock size={28} /> : <Lock size={28} />}
                 </div>
                 
@@ -157,7 +178,7 @@ export default function TimeLetters() {
                 </div>
                 
                 <ChevronRight className="text-on-surface-variant/20 group-hover:text-primary transition-colors shrink-0" />
-              </motion.div>
+              </div>
             );
           })
         )}
@@ -167,9 +188,12 @@ export default function TimeLetters() {
 
   const renderWrite = () => (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+      key="write"
+      initial={{ opacity: 0, y: '100%' }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-background flex flex-col min-h-screen"
+      exit={{ opacity: 0, y: '100%' }}
+      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+      className="fixed inset-0 z-50 bg-background flex flex-col overflow-y-auto"
     >
       <div className="p-8" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <header className="flex items-center justify-between mb-12 pt-4">
@@ -255,9 +279,12 @@ export default function TimeLetters() {
 
   const renderDetail = () => (
     <motion.div 
+      key="detail"
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="min-h-screen bg-on-primary-container p-8 flex flex-col"
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+      className="fixed inset-0 z-50 bg-on-primary-container p-8 flex flex-col overflow-y-auto"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <header className="flex items-center justify-between mb-12 pt-4">
@@ -310,9 +337,11 @@ export default function TimeLetters() {
 
   return (
     <div className="h-full">
-      {view === 'list' && renderList()}
-      {view === 'write' && renderWrite()}
-      {view === 'detail' && renderDetail()}
+      {renderList()}
+      <AnimatePresence>
+        {view === 'write' && renderWrite()}
+        {view === 'detail' && renderDetail()}
+      </AnimatePresence>
     </div>
   );
 }

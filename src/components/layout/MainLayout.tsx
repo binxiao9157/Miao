@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import HomePage from "../../pages/Home";
 import DiaryPage from "../../pages/Diary";
 import TimeLettersPage from "../../pages/TimeLetters";
+import NotificationListPage from "../../pages/NotificationList";
 import { useAuthContext } from "../../context/AuthContext";
 
 export default function MainLayout() {
@@ -15,6 +16,7 @@ export default function MainLayout() {
   const isHome = location.pathname === "/";
   const isDiary = location.pathname === "/diary";
   const isTimeLetters = location.pathname === "/time-letters";
+  const isNotifications = location.pathname === "/notifications";
   
   const navItems = [
     { icon: BookOpen, label: "日志", path: "/diary" },
@@ -70,9 +72,12 @@ export default function MainLayout() {
       
       {/* Keep TimeLetters alive */}
       {hasCat && renderPersistentTab("/time-letters", TimeLettersPage)}
+
+      {/* Keep Notifications alive */}
+      {hasCat && renderPersistentTab("/notifications", NotificationListPage)}
       
       {/* Other routes will render here - 适配安全区 */}
-      {!isHome && !isDiary && !isTimeLetters && (
+      {!isHome && !isDiary && !isTimeLetters && !isNotifications && (
         <div className="relative z-10 w-full h-full flex flex-col overflow-y-auto no-scrollbar bg-background">
           <div 
             className="min-h-full flex flex-col"
