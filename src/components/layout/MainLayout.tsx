@@ -14,9 +14,8 @@ export default function MainLayout() {
   const { hasCat } = useAuthContext();
 
   const isHome = location.pathname === "/";
-  const isDiary = location.pathname === "/diary";
-  const isTimeLetters = location.pathname === "/time-letters";
-  const isNotifications = location.pathname === "/notifications";
+  const persistentPaths = ['/diary', '/time-letters', '/notifications'];
+  const isPersistentTab = persistentPaths.includes(location.pathname);
   
   const navItems = [
     { icon: BookOpen, label: "日志", path: "/diary" },
@@ -77,7 +76,7 @@ export default function MainLayout() {
       {hasCat && renderPersistentTab("/notifications", NotificationListPage)}
       
       {/* Other routes will render here - 适配安全区 */}
-      {!isHome && !isDiary && !isTimeLetters && !isNotifications && (
+      {!isHome && !isPersistentTab && (
         <div className="relative z-10 w-full h-full flex flex-col overflow-y-auto no-scrollbar bg-background">
           <div 
             className="min-h-full flex flex-col"

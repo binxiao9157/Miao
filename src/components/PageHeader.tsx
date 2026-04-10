@@ -22,7 +22,7 @@ export default function PageHeader({ title, subtitle, action, dark, onBack }: Pa
         {onBack && (
           <button 
             onClick={onBack}
-            className="p-2 -ml-2 text-on-surface-variant active:scale-90 transition-transform"
+            className={`p-2 -ml-2 active:scale-90 transition-transform ${dark ? 'text-white/80' : 'text-on-surface-variant'}`}
           >
             <ArrowLeft size={24} />
           </button>

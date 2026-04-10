@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send, Clock, ChevronRight } from "lucide-react";
 import { storage, TimeLetter } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
@@ -7,7 +8,7 @@ import PageHeader from "../components/PageHeader";
 type ViewState = 'list' | 'write' | 'detail';
 
 export default function TimeLetters() {
-  const [isLoading, setIsLoading] = useState(false);
+  const location = useLocation();
   const [letters, setLetters] = useState<TimeLetter[]>(() => storage.getTimeLetters());
   const [view, setView] = useState<ViewState>('list');
   const [selectedLetter, setSelectedLetter] = useState<TimeLetter | null>(null);
@@ -18,30 +19,17 @@ export default function TimeLetters() {
   const [content, setContent] = useState("");
   const [days, setDays] = useState(1);
 
+  // keep-alive：路由激活时静默刷新数据
   useEffect(() => {
-    setLetters(storage.getTimeLetters());
-  }, []);
+    if (location.pathname === '/time-letters') {
+      setLetters(storage.getTimeLetters());
+    }
+  }, [location.pathname]);
 
   const triggerToast = (msg: string) => {
     setShowToast(msg);
     setTimeout(() => setShowToast(null), 3000);
   };
-
-  const LetterSkeleton = () => (
-    <div className="miao-card flex items-center gap-6 animate-pulse">
-      <div className="w-16 h-16 bg-surface-container-high rounded-3xl shrink-0" />
-      <div className="flex-grow space-y-3">
-        <div className="flex justify-between items-center">
-          <div className="h-5 bg-surface-container-high rounded-full w-1/2" />
-          <div className="h-2 bg-surface-container-high rounded-full w-12" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-3 bg-surface-container-high rounded-full w-full" />
-          <div className="h-2 bg-surface-container-high rounded-full w-24" />
-        </div>
-      </div>
-    </div>
-  );
 
   const handleSaveLetter = () => {
     if (!title.trim()) {
@@ -116,9 +104,7 @@ export default function TimeLetters() {
       />
 
       <div className="px-6 space-y-6">
-        {isLoading ? (
-          Array(3).fill(0).map((_, i) => <LetterSkeleton key={i} />)
-        ) : letters.length === 0 ? (
+        {letters.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

@@ -19,7 +19,6 @@ const EditProfile = lazy(() => import("./pages/EditProfile"));
 const ChangePassword = lazy(() => import("./pages/ChangePassword"));
 const PrivacySettings = lazy(() => import("./pages/PrivacySettings"));
 const Notifications = lazy(() => import("./pages/Notifications"));
-const NotificationList = lazy(() => import("./pages/NotificationList"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const SwitchCompanion = lazy(() => import("./pages/SwitchCompanion"));
 const UploadMaterial = lazy(() => import("./pages/UploadMaterial"));

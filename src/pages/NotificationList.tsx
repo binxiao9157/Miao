@@ -1,7 +1,7 @@
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Settings, Mail, Star, Bell, ChevronRight } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Settings, Mail, Star, Bell, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { storage } from "../services/storage";
 import PageHeader from "../components/PageHeader";
 
@@ -36,52 +36,58 @@ const formatNotificationTime = (timestamp: number) => {
   return `${date.getMonth() + 1}月${date.getDate()}日`;
 };
 
-export default function NotificationList() {
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    const points = storage.getPoints();
-    const letters = storage.getTimeLetters();
-    const now = Date.now();
-    const newNotifications: NotificationItem[] = [];
+/** 从 localStorage 同步计算通知列表 */
+function computeNotifications(): NotificationItem[] {
+  const points = storage.getPoints();
+  const letters = storage.getTimeLetters();
+  const now = Date.now();
+  const items: NotificationItem[] = [];
 
-    const unlockedLetters = letters.filter(l => l.unlockAt <= now);
-    if (unlockedLetters.length > 0) {
-      newNotifications.push({
-        id: 'letter_unlocked',
-        type: 'letter',
-        title: '时光信件解锁',
-        content: `你有 ${unlockedLetters.length} 封时光信件已解锁，快去看看吧～`,
-        timestamp: unlockedLetters[unlockedLetters.length - 1].unlockAt,
-        link: '/time-letters'
-      });
-    }
-
-    if (points.history.length > 0) {
-      const lastTx = points.history[0];
-      newNotifications.push({
-        id: 'points_update',
-        type: 'points',
-        title: '积分变动提醒',
-        content: `${lastTx.type === 'earn' ? '获得' : '消耗'}了 ${lastTx.amount} 积分：${lastTx.reason}`,
-        timestamp: lastTx.timestamp
-      });
-    }
-
-    newNotifications.push({
-      id: 'system_greeting',
-      type: 'system',
-      title: '系统问候',
-      content: '今天也是元气满满的一天，记得给猫咪加餐哦。',
-      timestamp: now
+  const unlockedLetters = letters.filter(l => l.unlockAt <= now);
+  if (unlockedLetters.length > 0) {
+    items.push({
+      id: 'letter_unlocked',
+      type: 'letter',
+      title: '时光信件解锁',
+      content: `你有 ${unlockedLetters.length} 封时光信件已解锁，快去看看吧～`,
+      timestamp: unlockedLetters[unlockedLetters.length - 1].unlockAt,
+      link: '/time-letters'
     });
+  }
 
-    return newNotifications.sort((a, b) => b.timestamp - a.timestamp);
+  if (points.history.length > 0) {
+    const lastTx = points.history[0];
+    items.push({
+      id: 'points_update',
+      type: 'points',
+      title: '积分变动提醒',
+      content: `${lastTx.type === 'earn' ? '获得' : '消耗'}了 ${lastTx.amount} 积分：${lastTx.reason}`,
+      timestamp: lastTx.timestamp
+    });
+  }
+
+  items.push({
+    id: 'system_greeting',
+    type: 'system',
+    title: '系统问候',
+    content: '今天也是元气满满的一天，记得给猫咪加餐哦。',
+    timestamp: now
   });
 
+  return items.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+export default function NotificationList() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => computeNotifications());
+
+  // keep-alive：路由激活时静默刷新数据，不清空列表，无闪烁
   useEffect(() => {
-    // Keep alive component, re-fetch logic can be added here if needed
-  }, []);
+    if (location.pathname === '/notifications') {
+      setNotifications(computeNotifications());
+    }
+  }, [location.pathname]);
 
   const getIcon = (type: string) => {
     const baseClass = "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm";
@@ -95,22 +101,6 @@ export default function NotificationList() {
     }
   };
 
-  const NotificationSkeleton = () => (
-    <div className="miao-card p-5 flex items-start gap-4 animate-pulse">
-      <div className="w-12 h-12 bg-surface-container-high rounded-2xl shrink-0" />
-      <div className="flex-grow space-y-3">
-        <div className="flex justify-between items-center">
-          <div className="h-4 bg-surface-container-high rounded-full w-1/3" />
-          <div className="h-2 bg-surface-container-high rounded-full w-12" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-3 bg-surface-container-high rounded-full w-full" />
-          <div className="h-3 bg-surface-container-high rounded-full w-2/3" />
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div 
       className="bg-background pb-24 font-sans overflow-x-hidden"
@@ -118,7 +108,7 @@ export default function NotificationList() {
       <PageHeader 
         title="消息中心" 
         subtitle="Message Center" 
-        onBack={() => navigate(-1)}
+        onBack={() => navigate("/")}
         action={
           <button 
             onClick={() => navigate("/notification-settings")}
@@ -130,9 +120,7 @@ export default function NotificationList() {
       />
 
       <div className="px-6 space-y-4">
-        {isLoading ? (
-          Array(3).fill(0).map((_, i) => <NotificationSkeleton key={i} />)
-        ) : notifications.length === 0 ? (
+        {notifications.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
