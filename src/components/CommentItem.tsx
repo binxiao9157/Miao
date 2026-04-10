@@ -63,11 +63,13 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
     <div
       ref={itemRef}
       className={`relative p-2 rounded-lg transition-colors ${isMenuOpen ? 'bg-[#F2F2F2]' : ''}`}
+      style={{ touchAction: 'pan-y' }}
       onMouseDown={handleLongPress}
       onMouseUp={clearTimer}
       onMouseLeave={clearTimer}
       onTouchStart={handleLongPress}
       onTouchEnd={clearTimer}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <div className="flex items-start gap-2">
         <span className="text-xs font-black text-primary shrink-0 mt-0.5">我:</span>

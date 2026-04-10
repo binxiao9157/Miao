@@ -21,6 +21,9 @@
 }
 
 @layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
   html {
     @apply w-full h-full;
     /* 阻止 iOS 橡皮筋回弹效果，确保全屏体验 */
@@ -41,6 +44,17 @@
     left: 0;
     right: 0;
     bottom: 0;
+
+    /* 彻底禁用长按选词功能 */
+    -webkit-user-select: none; /* Safari/iOS */
+    -moz-user-select: none;    /* Firefox */
+    -ms-user-select: none;     /* IE10+/Edge */
+    user-select: none;         /* Standard */
+    -webkit-touch-callout: none; /* iOS Safari 禁用长按弹出菜单 */
+  }
+  input, textarea {
+    -webkit-user-select: auto;
+    user-select: auto;
   }
 }
 
