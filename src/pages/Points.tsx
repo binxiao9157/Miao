@@ -28,11 +28,15 @@ export default function Points() {
       setPoints(data.total || 0);
     };
     
-    fetchPoints();
+    // 延迟首次加载，确保页面切换动画流畅
+    const timer = setTimeout(fetchPoints, 300);
     
     // Poll for updates in case Home.tsx adds points in the background
     const interval = setInterval(fetchPoints, 2000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   const today = new Date().toISOString().slice(0, 10);

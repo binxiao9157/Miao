@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Camera, ArrowRight, Upload, PawPrint, ArrowLeft, Eye, EyeOff, Save, RotateCcw, X, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { VolcanoConfig } from "../services/volcanoService";
 import { useAuthContext } from "../context/AuthContext";
+import { storage } from "../services/storage";
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -17,6 +18,36 @@ export default function Welcome() {
   const [debugClickCount, setDebugClickCount] = useState(0);
   const debugTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // 资源预加载逻辑
+  useEffect(() => {
+    const preloadImages = () => {
+      const catList = storage.getCatList();
+      const imagesToPreload = [
+        ...catList.map(cat => cat.avatar),
+        "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4" // 预加载视频（浏览器会处理缓存）
+      ];
+
+      imagesToPreload.forEach(src => {
+        if (!src) return;
+        if (src.endsWith('.mp4')) {
+          const video = document.createElement('video');
+          video.src = src;
+          video.preload = 'auto';
+        } else {
+          const img = new Image();
+          img.src = src;
+        }
+      });
+    };
+
+    // 在页面空闲时预加载
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(preloadImages);
+    } else {
+      setTimeout(preloadImages, 1000);
+    }
+  }, []);
 
   const handleDebugTrigger = () => {
     if (debugTimerRef.current) {

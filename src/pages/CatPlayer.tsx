@@ -233,12 +233,11 @@ export default function CatPlayer() {
 
         <video 
           ref={videoRef}
-          src={cat.videoPaths?.longPress || cat.videoPath}
+          src={cat.videoPaths?.petting || cat.videoPath}
           autoPlay
           loop
           muted
           playsInline
-          referrerPolicy="no-referrer"
           onLoadedMetadata={(e) => {
             const video = e.target as HTMLVideoElement;
             if (video.videoWidth && video.videoHeight) {

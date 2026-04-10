@@ -70,10 +70,15 @@ export default function Diary() {
   }, [commentingId]);
 
   useEffect(() => {
-    mockFriendService.initializeMockData();
-    setDiaries(storage.getDiaries());
-    setFriendDiaries(storage.getFriendDiaries());
-    setCatList(storage.getCatList());
+    // 延迟加载数据，确保页面切换动画流畅
+    const timer = setTimeout(() => {
+      mockFriendService.initializeMockData();
+      setDiaries(storage.getDiaries());
+      setFriendDiaries(storage.getFriendDiaries());
+      setCatList(storage.getCatList());
+    }, 300);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const handlePost = async () => {
@@ -256,7 +261,7 @@ export default function Diary() {
   const handleWechatInvite = async () => {
     if (!selectedCatForQR) return;
 
-    const inviteUrl = `${window.location.origin}/join?uid=${user?.id || 'unknown'}&cat=${selectedCatForQR.id}`;
+    const inviteUrl = `${window.location.origin}/join?uid=${user?.username || 'unknown'}&cat=${selectedCatForQR.id}`;
     const options = {
       title: `快来 Miao 看看我的小猫 ${selectedCatForQR.name} 吧！`,
       text: "我正在 Miao 养猫，邀请你成为我的好友，一起记录萌宠瞬间～",

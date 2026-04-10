@@ -90,77 +90,81 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const refreshCat = () => {
-      const info = storage.getActiveCat();
-      setCat(info);
-      if (info) {
-        setVideoAspectRatio(null);
-      }
-    };
-
-    refreshCat();
-
-    const pointsInfo = storage.getPoints();
-    const today = new Date().toISOString().slice(0, 10);
-    
-    if (pointsInfo.lastLoginDate !== today) {
-      pointsInfo.total += 10;
-      pointsInfo.history.unshift({
-        id: 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7),
-        type: 'earn',
-        amount: 10,
-        reason: '每日登录奖励',
-        timestamp: Date.now()
-      });
-      if (pointsInfo.history.length > 50) pointsInfo.history.pop();
-      pointsInfo.lastLoginDate = today;
-      pointsInfo.onlineMinutes = 0; // Reset daily online minutes
-      pointsInfo.lastOnlineUpdate = Date.now(); // Reset the timer start
-      storage.savePoints(pointsInfo);
-      setPoints(pointsInfo.total);
-      triggerPointToast("+10 每日登录奖励");
-    } else {
-      setPoints(pointsInfo.total);
-    }
-
-    showGreetingOnce();
-
-    onlineTimerRef.current = setInterval(() => {
-      const p = storage.getPoints();
-      const now = Date.now();
-      
-      // If the last update was more than 5 minutes ago, assume they were offline and don't count that gap
-      if (now - p.lastOnlineUpdate > 5 * 60000) {
-        p.lastOnlineUpdate = now;
-        storage.savePoints(p);
-        return;
-      }
-
-      const diffMinutes = Math.floor((now - p.lastOnlineUpdate) / 60000);
-      
-      if (diffMinutes >= 1) {
-        p.onlineMinutes += diffMinutes;
-        p.lastOnlineUpdate = now;
-        
-        // Check if we just crossed the 10 minute threshold
-        if (p.onlineMinutes >= 10 && p.onlineMinutes - diffMinutes < 10) {
-          p.total += 10;
-          p.history.unshift({
-            id: 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7),
-            type: 'earn',
-            amount: 10,
-            reason: '在线时长奖励',
-            timestamp: Date.now()
-          });
-          if (p.history.length > 50) p.history.pop();
-          setPoints(p.total);
-          triggerPointToast("+10 在线时长奖励");
+    // 延迟执行重度逻辑，确保 UI 先渲染
+    const timer = setTimeout(() => {
+      const refreshCat = () => {
+        const info = storage.getActiveCat();
+        setCat(info);
+        if (info) {
+          setVideoAspectRatio(null);
         }
-        storage.savePoints(p);
+      };
+
+      refreshCat();
+
+      const pointsInfo = storage.getPoints();
+      const today = new Date().toISOString().slice(0, 10);
+      
+      if (pointsInfo.lastLoginDate !== today) {
+        pointsInfo.total += 10;
+        pointsInfo.history.unshift({
+          id: 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7),
+          type: 'earn',
+          amount: 10,
+          reason: '每日登录奖励',
+          timestamp: Date.now()
+        });
+        if (pointsInfo.history.length > 50) pointsInfo.history.pop();
+        pointsInfo.lastLoginDate = today;
+        pointsInfo.onlineMinutes = 0; // Reset daily online minutes
+        pointsInfo.lastOnlineUpdate = Date.now(); // Reset the timer start
+        storage.savePoints(pointsInfo);
+        setPoints(pointsInfo.total);
+        triggerPointToast("+10 每日登录奖励");
+      } else {
+        setPoints(pointsInfo.total);
       }
-    }, 60000);
+
+      showGreetingOnce();
+
+      onlineTimerRef.current = setInterval(() => {
+        const p = storage.getPoints();
+        const now = Date.now();
+        
+        // If the last update was more than 5 minutes ago, assume they were offline and don't count that gap
+        if (now - p.lastOnlineUpdate > 5 * 60000) {
+          p.lastOnlineUpdate = now;
+          storage.savePoints(p);
+          return;
+        }
+
+        const diffMinutes = Math.floor((now - p.lastOnlineUpdate) / 60000);
+        
+        if (diffMinutes >= 1) {
+          p.onlineMinutes += diffMinutes;
+          p.lastOnlineUpdate = now;
+          
+          // Check if we just crossed the 10 minute threshold
+          if (p.onlineMinutes >= 10 && p.onlineMinutes - diffMinutes < 10) {
+            p.total += 10;
+            p.history.unshift({
+              id: 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7),
+              type: 'earn',
+              amount: 10,
+              reason: '在线时长奖励',
+              timestamp: Date.now()
+            });
+            if (p.history.length > 50) p.history.pop();
+            setPoints(p.total);
+            triggerPointToast("+10 在线时长奖励");
+          }
+          storage.savePoints(p);
+        }
+      }, 60000);
+    }, 300);
 
     return () => {
+      clearTimeout(timer);
       if (onlineTimerRef.current) clearInterval(onlineTimerRef.current);
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
       if (secretTapTimer.current) clearTimeout(secretTapTimer.current);
@@ -183,16 +187,19 @@ export default function Home() {
         hasPlayedEntry.current = false;
       }
 
-      setCanLoadActions(true);
+      // 延迟加载互动视频，防止首次切换卡顿
+      setTimeout(() => {
+        setCanLoadActions(true);
+      }, 500);
 
       if (!hasPlayedEntry.current) {
         hasPlayedEntry.current = true;
         const playEntryVideo = async () => {
           try {
             setTimeout(() => {
-              const hasRubbing = cat?.videoPaths?.rubbing && actionRefs['rubbing']?.current;
+              const hasRubbing = cat?.videoPaths?.rubbing && (actionRefs['rubbing'] as React.RefObject<HTMLVideoElement | null>)?.current;
               if (hasRubbing) {
-                const video = actionRefs['rubbing'].current!;
+                const video = (actionRefs['rubbing'] as React.RefObject<HTMLVideoElement | null>).current!;
                 video.currentTime = 0;
                 video.play().catch(e => console.log("Entry video play failed:", e));
               } else if (idleVideoRef.current) {
@@ -210,7 +217,7 @@ export default function Home() {
       showGreetingOnce();
     } else {
       if (idleVideoRef.current) idleVideoRef.current.pause();
-      Object.values(actionRefs).forEach(ref => ref.current?.pause());
+      (Object.values(actionRefs) as React.RefObject<HTMLVideoElement | null>[]).forEach(ref => ref.current?.pause());
       if (bubbleTimerRef.current) {
         clearTimeout(bubbleTimerRef.current);
         setBubbleText(null);
@@ -321,7 +328,7 @@ export default function Home() {
       if (visibleLayer !== key) {
         setVisibleLayer(key);
         if (key !== 'idle' && idleVideoRef.current) idleVideoRef.current.pause();
-        Object.entries(actionRefs).forEach(([k, ref]) => {
+        (Object.entries(actionRefs) as [string, React.RefObject<HTMLVideoElement | null>][]).forEach(([k, ref]) => {
           if (k !== key && ref.current) ref.current.pause();
         });
       }

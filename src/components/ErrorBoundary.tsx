@@ -1,8 +1,8 @@
-import React from "react";
+import React, { ErrorInfo, ReactNode } from "react";
 import { AlertCircle, RefreshCw, Home } from "lucide-react";
 
 interface Props {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 interface State {

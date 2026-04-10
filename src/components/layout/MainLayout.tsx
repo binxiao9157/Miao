@@ -6,6 +6,8 @@ import HomePage from "../../pages/Home";
 import DiaryPage from "../../pages/Diary";
 import TimeLettersPage from "../../pages/TimeLetters";
 import NotificationListPage from "../../pages/NotificationList";
+import PointsPage from "../../pages/Points";
+import ProfilePage from "../../pages/Profile";
 import { useAuthContext } from "../../context/AuthContext";
 
 export default function MainLayout() {
@@ -14,7 +16,7 @@ export default function MainLayout() {
   const { hasCat } = useAuthContext();
 
   const isHome = location.pathname === "/";
-  const persistentPaths = ['/diary', '/time-letters', '/notifications'];
+  const persistentPaths = ['/diary', '/time-letters', '/notifications', '/points', '/profile'];
   const isPersistentTab = persistentPaths.includes(location.pathname);
   
   const navItems = [
@@ -39,9 +41,16 @@ export default function MainLayout() {
     if (!hasBeenVisited) return null;
 
     return (
-      <div 
+      <motion.div 
         key={path}
-        className={`fixed inset-0 transition-opacity duration-300 ${isActive ? 'opacity-100 z-10' : 'opacity-0 -z-10 pointer-events-none'}`}
+        initial={false}
+        animate={{ 
+          opacity: isActive ? 1 : 0,
+          zIndex: isActive ? 10 : -10,
+          scale: isActive ? 1 : 0.98
+        }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className={`fixed inset-0 ${isActive ? '' : 'pointer-events-none'}`}
       >
         <div className="w-full h-full overflow-y-auto no-scrollbar bg-background">
           <div 
@@ -55,16 +64,25 @@ export default function MainLayout() {
             <Component />
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   };
 
   return (
     <div className={`w-full h-full relative overflow-hidden ${isHome ? 'bg-black' : 'bg-background'}`}>
       {/* Keep Home alive */}
-      <div className={`fixed inset-0 ${isHome ? 'z-0 opacity-100' : '-z-10 opacity-0 pointer-events-none'}`}>
+      <motion.div 
+        initial={false}
+        animate={{ 
+          opacity: isHome ? 1 : 0,
+          zIndex: isHome ? 0 : -10,
+          scale: isHome ? 1 : 0.98
+        }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className={`fixed inset-0 ${isHome ? '' : 'pointer-events-none'}`}
+      >
         {hasCat && <HomePage />}
-      </div>
+      </motion.div>
       
       {/* Keep Diary alive */}
       {hasCat && renderPersistentTab("/diary", DiaryPage)}
@@ -74,6 +92,12 @@ export default function MainLayout() {
 
       {/* Keep Notifications alive */}
       {hasCat && renderPersistentTab("/notifications", NotificationListPage)}
+
+      {/* Keep Points alive */}
+      {hasCat && renderPersistentTab("/points", PointsPage)}
+
+      {/* Keep Profile alive */}
+      {hasCat && renderPersistentTab("/profile", ProfilePage)}
       
       {/* Other routes will render here - 适配安全区 */}
       {!isHome && !isPersistentTab && (
