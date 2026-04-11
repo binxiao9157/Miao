@@ -22,7 +22,7 @@ export default function AddFriendQR() {
     // 优先使用路由 state 传入的猫咪（日记页入口）
     if (location.state?.cat) return location.state.cat;
     // 兜底：获取当前活跃猫咪或列表第一只（扫一扫入口）
-    return storage.getActiveCat() || storage.getCatList()[0];
+    return storage.getActiveCat() || storage.getCatList()[0] || null;
   }, [location.state]);
 
   // 页面卸载时清理可能影响全局的样式
@@ -184,9 +184,18 @@ export default function AddFriendQR() {
     type: 'miao_friend_invite',
     uid: user.username,
     nickname: user.nickname,
-    catName: cat.name,
+    catName: cat?.name,
     timestamp: Date.now()
-  }), [user.username, user.nickname, cat.name]);
+  }), [user.username, user.nickname, cat?.name]);
+
+  if (!cat) {
+    return (
+      <div className="flex flex-col h-screen bg-background items-center justify-center">
+        <p className="text-on-surface-variant text-sm">暂无猫咪数据，请先创建一只猫咪</p>
+        <button onClick={() => navigate("/welcome")} className="mt-4 text-primary font-bold text-sm">去创建</button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-y-auto">

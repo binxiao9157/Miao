@@ -61,9 +61,15 @@ export default function EditProfile() {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
           
-          // 导出压缩后的 Base64
+          // 导出压缩后的 Base64，并校验大小
           const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-          setAvatar(compressedBase64);
+          // Base64 约为原始大小的 4/3，超过 500KB 则进一步降低质量
+          if (compressedBase64.length > 500 * 1024) {
+            const smallerBase64 = canvas.toDataURL('image/jpeg', 0.4);
+            setAvatar(smallerBase64);
+          } else {
+            setAvatar(compressedBase64);
+          }
           setShowActionSheet(false);
         };
         img.src = reader.result as string;

@@ -31,7 +31,16 @@ export default function CatPlayer() {
       navigate("/");
     }
 
+    // 视频加载超时保护：30 秒后若仍在 loading 则提示错误
+    const loadTimeout = setTimeout(() => {
+      setIsLoading(prev => {
+        if (prev) setErrorDetails("视频加载超时，请检查网络后重试");
+        return false;
+      });
+    }, 30000);
+
     return () => {
+      clearTimeout(loadTimeout);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       // 显式释放视频资源，防止内存泄漏
       if (videoRef.current) {
@@ -226,7 +235,7 @@ export default function CatPlayer() {
         {/* 背景补位：使用模糊的头像或视频首帧填充 */}
         <div className="absolute inset-0 z-0">
           <img 
-            src={cat.avatar || `https://picsum.photos/seed/${cat.breed}/1080/1920`} 
+            src={cat.avatar || ''} 
             alt="" 
             className="w-full h-full object-cover opacity-30 blur-2xl"
             referrerPolicy="no-referrer"

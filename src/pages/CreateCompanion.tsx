@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Check, Sparkles, AlertCircle, Coins, PartyPopper, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Sparkles, AlertCircle, Loader2 } from "lucide-react";
 import { catService } from "../services/catService";
 import { storage } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
@@ -19,8 +19,6 @@ export default function CreateCompanion() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [catName, setCatName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [generationStatus, setGenerationStatus] = useState("");
   const [showToast, setShowToast] = useState<string | null>(null);
 
   const triggerToast = (msg: string) => {
@@ -36,8 +34,10 @@ export default function CreateCompanion() {
         if (!response.ok) throw new Error("Not found");
       } catch (e) {
         console.warn(`Local asset not found or fetch failed: ${url}, using fallback.`);
-        const fallbackUrl = `https://picsum.photos/seed/cat_${fallbackId}/400/400`;
-        response = await fetch(fallbackUrl);
+        // 本地资源加载失败时使用内联 SVG 占位，避免依赖外部 CDN
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect fill="%23FEF6F0" width="400" height="400"/><text x="200" y="220" text-anchor="middle" font-size="120">🐱</text></svg>`;
+        const fallbackBlob = new Blob([svg], { type: 'image/svg+xml' });
+        return URL.createObjectURL(fallbackBlob);
       }
       
       const blob = await response.blob();
@@ -230,7 +230,7 @@ export default function CreateCompanion() {
             {isGenerating ? (
               <>
                 <Loader2 className="animate-spin" size={24} />
-                <span>{generationStatus}</span>
+                <span>生成中...</span>
               </>
             ) : (
               <>
@@ -239,70 +239,8 @@ export default function CreateCompanion() {
               </>
             )}
           </button>
-          
-          {generationStatus === "PWA 缓存异常，建议清理" && (
-            <button 
-              onClick={async () => {
-                if ('caches' in window) {
-                  const names = await caches.keys();
-                  await Promise.all(names.map(name => caches.delete(name)));
-                }
-                if ('serviceWorker' in navigator) {
-                  const regs = await navigator.serviceWorker.getRegistrations();
-                  await Promise.all(regs.map(reg => reg.unregister()));
-                }
-                window.location.reload();
-              }}
-              className="w-full mt-4 py-3 bg-white text-[#5D4037]/40 rounded-full font-bold text-xs border border-[#5D4037]/10 active:scale-95 transition-all"
-            >
-              清理缓存并重置 PWA
-            </button>
-          )}
         </div>
       </div>
-
-      {/* 成功弹窗 */}
-      <AnimatePresence>
-        {showSuccess && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-center justify-center p-6"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-[40px] p-8 w-full max-w-sm shadow-2xl text-center relative overflow-hidden"
-            >
-              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary to-orange-300"></div>
-              
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <PartyPopper className="text-primary" size={40} />
-              </div>
-              
-              <h2 className="text-2xl font-black text-on-surface mb-2">恭喜获得新伙伴！</h2>
-              <p className="text-sm text-on-surface-variant mb-8 leading-relaxed">
-                你成功领养了 <span className="text-primary font-bold">{catName}</span>，它已经在猫窝里等你啦～
-              </p>
-              
-              {isRedemption && (
-                <div className="bg-primary/5 rounded-2xl p-4 mb-8 flex items-center justify-center gap-2">
-                  <Coins size={16} className="text-primary" />
-                  <span className="text-xs font-bold text-primary">已消耗 {redemptionAmount || 200} 积分</span>
-                </div>
-              )}
-
-              <button 
-                onClick={() => navigate("/", { replace: true })}
-                className="w-full py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 active:scale-95 transition-all"
-              >
-                立即去见它
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

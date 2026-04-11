@@ -54,11 +54,12 @@ export default function GenerationProgress() {
     try {
       setPhase('i2v');
 
-      // 积分前置检查
+      // 积分前置扣除（先扣后生成），防止并发消费导致余额透支
       if (isRedemption && !isDebugRedemption) {
-        const currentPoints = storage.getPoints();
         const required = redemptionAmount || 200;
-        if (currentPoints.total < required) {
+        const success = storage.deductPoints(required, "解锁新伙伴");
+        if (!success) {
+          const currentPoints = storage.getPoints();
           throw new Error(`积分不足，需要 ${required} 积分，当前仅有 ${currentPoints.total} 积分`);
         }
       }
@@ -153,10 +154,7 @@ export default function GenerationProgress() {
     // 标记为正在解锁
     await FileManager.updateCatVideos(groupId, {}, true);
 
-    // 扣除积分
-    if (isRedemption && !isDebugRedemption) {
-      storage.deductPoints(redemptionAmount || 200, "解锁新伙伴");
-    }
+    // 积分扣除逻辑已提前至生成前执行
 
     storage.setActiveCatId(groupId);
     refreshCatStatus();
@@ -200,24 +198,9 @@ export default function GenerationProgress() {
       anchorFrame = optimizedImg;
     }
 
-    await FileManager.downloadVideos(
-      { idle: idleVideoUrl }, 
-      groupId, 
-      name || breed || "我的 AI 猫咪", 
-      image || anchorImage || "",
-      { 
-        breed, 
-        furColor, 
-        source: image ? 'upload' : 'created', 
-        placeholderImage: anchorFrame,
-        anchorFrame: anchorFrame 
-      }
-    );
+    await FileManager.updateCatVideos(groupId, { idle: idleVideoUrl }, false);
 
-    // 扣除积分
-    if (isRedemption && !isDebugRedemption) {
-      storage.deductPoints(redemptionAmount || 200, "解锁新伙伴");
-    }
+    // 积分扣除逻辑已提前至生成前执行
 
     storage.setActiveCatId(groupId);
     refreshCatStatus();
@@ -236,7 +219,7 @@ export default function GenerationProgress() {
     checkConnectivity();
 
     if (!image && (!breed || !furColor)) {
-      navigate("/create-cat", { replace: true });
+      navigate("/create-companion", { replace: true });
       return;
     }
 

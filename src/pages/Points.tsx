@@ -31,11 +31,18 @@ export default function Points() {
     // 缩短延迟，平衡动画流畅度与加载速度
     const timer = setTimeout(fetchPoints, 50);
     
-    // Poll for updates in case Home.tsx adds points in the background
-    const interval = setInterval(fetchPoints, 2000);
+    // 监听 storage 变化即可，无需高频轮询
+    const onStorage = (e: StorageEvent) => {
+      if (e.key && e.key.includes('points')) fetchPoints();
+    };
+    window.addEventListener('storage', onStorage);
+    // 页面可见时刷新一次，覆盖同 tab 内变更
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchPoints(); };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       clearTimeout(timer);
-      clearInterval(interval);
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
 

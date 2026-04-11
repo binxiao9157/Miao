@@ -21,8 +21,10 @@ export default function SwitchCompanion() {
     
     fetchData();
     
-    const interval = setInterval(fetchData, 2000);
-    return () => clearInterval(interval);
+    // 页面可见时刷新，替代 2s 轮询
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchData(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   const handleSwitch = (id: string) => {

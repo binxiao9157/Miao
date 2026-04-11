@@ -6,7 +6,18 @@ import { motion, AnimatePresence } from "motion/react";
 
 export default function PrivacySettings() {
   const navigate = useNavigate();
-  const [cacheSize, setCacheSize] = useState("124.8 MB");
+  const [cacheSize, setCacheSize] = useState(() => {
+    // 动态计算 localStorage 占用大小
+    try {
+      let total = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) total += (key.length + (localStorage.getItem(key)?.length || 0)) * 2; // UTF-16
+      }
+      if (total > 1048576) return `${(total / 1048576).toFixed(1)} MB`;
+      return `${(total / 1024).toFixed(1)} KB`;
+    } catch { return "未知"; }
+  });
   const [isClearing, setIsClearing] = useState(false);
   const [showToast, setShowToast] = useState<string | null>(null);
 

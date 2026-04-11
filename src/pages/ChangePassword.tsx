@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, ShieldCheck, Lock } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { storage } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function ChangePassword() {
@@ -26,7 +27,9 @@ export default function ChangePassword() {
       setError("请填写完整信息");
       return;
     }
-    if (currentPassword !== user?.password) {
+    // 通过 storage.findUser 从持久层校验密码，避免仅依赖内存中可能过期的 user 对象
+    const savedUser = user?.username ? storage.findUser(user.username) : null;
+    if (!savedUser || currentPassword !== savedUser.password) {
       setError("当前密码错误");
       return;
     }

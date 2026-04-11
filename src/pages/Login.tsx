@@ -16,8 +16,8 @@ export default function Login() {
   const [isAgreed, setIsAgreed] = useState(false);
   const [shake, setShake] = useState(false);
 
-  // Default cat image fallback
-  const DEFAULT_CAT_IMAGE = "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=1000&auto=format&fit=crop";
+  // Default cat image fallback — 使用本地内联 SVG 占位，避免离线时依赖外部 CDN
+  const DEFAULT_CAT_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%23FEF6F0' width='200' height='200'/%3E%3Ctext x='100' y='115' text-anchor='middle' font-size='80'%3E🐱%3C/text%3E%3C/svg%3E";
 
   useEffect(() => {
     // 1. 实现数据读取逻辑 (Data Fetching)

@@ -73,7 +73,12 @@ export default function ScanFriend() {
           if (isUnmounted) return;
           handleScanResult(decodedText);
         },
-        () => {}
+        (errorMessage) => {
+          // 扫描帧级别的错误（如模糊/无码），仅在非常规错误时记录日志
+          if (errorMessage && !errorMessage.includes('No QR code found')) {
+            console.warn("QR scan frame error:", errorMessage);
+          }
+        }
       );
     } catch (err: any) {
       console.error("Camera start error:", err);
@@ -139,6 +144,9 @@ export default function ScanFriend() {
     } catch (err) {
       setError("未在图片中识别到二维码");
       setTimeout(() => setError(null), 3000);
+    } finally {
+      // 重置 input，确保选择同一文件时仍能触发 onChange
+      e.target.value = '';
     }
   };
 

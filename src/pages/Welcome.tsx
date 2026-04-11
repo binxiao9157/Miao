@@ -22,21 +22,15 @@ export default function Welcome() {
   useEffect(() => {
     const preloadImages = () => {
       const catList = storage.getCatList();
+      // 仅预加载本地头像资源，移除外部 CDN 视频依赖
       const imagesToPreload = [
         ...catList.map(cat => cat.avatar),
-        "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4" // 预加载视频（浏览器会处理缓存）
       ];
 
       imagesToPreload.forEach(src => {
         if (!src) return;
-        if (src.endsWith('.mp4')) {
-          const video = document.createElement('video');
-          video.src = src;
-          video.preload = 'auto';
-        } else {
-          const img = new Image();
-          img.src = src;
-        }
+        const img = new Image();
+        img.src = src;
       });
     };
 
