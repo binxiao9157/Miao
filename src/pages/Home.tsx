@@ -158,7 +158,7 @@ export default function Home() {
         }
       }, 60000);
       onlineTimerRef.current = intervalId;
-    }, 300);
+    }, 50);
 
     return () => {
       clearTimeout(timer);

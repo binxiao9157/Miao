@@ -16,7 +16,7 @@ export default function Profile() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
-    // 延迟加载数据，确保页面切换动画流畅
+    // 缩短延迟，平衡动画流畅度与加载速度
     const timer = setTimeout(() => {
       const diaries = storage.getDiaries();
       const cat = storage.getActiveCat();
@@ -32,7 +32,7 @@ export default function Profile() {
         days,
         entries: diaries.length
       });
-    }, 300);
+    }, 50);
 
     return () => clearTimeout(timer);
   }, []);

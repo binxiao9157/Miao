@@ -17,9 +17,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // 移除免登录逻辑，每次打开 App 均需重新登录
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [catCount, setCatCount] = useState(0);
 
   const hasCat = useMemo(() => catCount > 0, [catCount]);
@@ -29,27 +30,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // 尝试从 localStorage 恢复用户会话，并检查 5 分钟免登录有效期
-    const savedUser = storage.getUserInfo();
-    const token = storage.getToken();
-    const lastActiveTime = storage.getLastActiveTime();
-    const currentTime = Date.now();
-    const threshold = 5 * 60 * 1000; // 5 分钟测试阈值
-
-    if (savedUser && token && lastActiveTime && (currentTime - lastActiveTime <= threshold)) {
-      // 在有效期内，恢复会话并更新活跃时间戳（滑动窗口）
-      setUser(savedUser);
-      setIsAuthenticated(true);
-      storage.saveLastActiveTime(currentTime);
-      refreshCatStatus();
-    } else {
-      // 超过 5 分钟或无会话数据，强制登出
-      storage.clearCurrentUser();
-      refreshCatStatus();
-    }
-    
-    // 校验逻辑完成，关闭初始化状态
-    setIsInitializing(false);
+    // 初始挂载时清除旧会话，确保“每次打开都需要登录”
+    storage.clearCurrentUser();
+    refreshCatStatus();
   }, [refreshCatStatus]);
 
   const login = (username: string, password: string): boolean => {

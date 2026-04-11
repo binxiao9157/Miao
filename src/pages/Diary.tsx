@@ -70,13 +70,13 @@ export default function Diary() {
   }, [commentingId]);
 
   useEffect(() => {
-    // 延迟加载数据，确保页面切换动画流畅
+    // 缩短延迟，平衡动画流畅度与加载速度
     const timer = setTimeout(() => {
       mockFriendService.initializeMockData();
       setDiaries(storage.getDiaries());
       setFriendDiaries(storage.getFriendDiaries());
       setCatList(storage.getCatList());
-    }, 300);
+    }, 50);
     
     return () => clearTimeout(timer);
   }, []);

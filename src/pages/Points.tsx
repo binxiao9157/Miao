@@ -28,8 +28,8 @@ export default function Points() {
       setPoints(data.total || 0);
     };
     
-    // 延迟首次加载，确保页面切换动画流畅
-    const timer = setTimeout(fetchPoints, 300);
+    // 缩短延迟，平衡动画流畅度与加载速度
+    const timer = setTimeout(fetchPoints, 50);
     
     // Poll for updates in case Home.tsx adds points in the background
     const interval = setInterval(fetchPoints, 2000);
