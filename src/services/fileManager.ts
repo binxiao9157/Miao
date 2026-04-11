@@ -47,6 +47,32 @@ export class FileManager {
   }
 
   /**
+   * 更新现有猫咪的视频数据
+   */
+  public static async updateCatVideos(
+    catId: string,
+    newVideoUrls: { [key: string]: string },
+    isUnlocking: boolean = false
+  ): Promise<void> {
+    const cat = storage.getCatById(catId);
+    if (!cat) return;
+
+    const updatedCat: CatInfo = {
+      ...cat,
+      videoPaths: {
+        ...cat.videoPaths,
+        ...newVideoUrls
+      },
+      isUnlocking
+    };
+
+    storage.saveCatInfo(updatedCat);
+    
+    // 触发自定义事件通知 UI 更新
+    window.dispatchEvent(new CustomEvent('cat-updated', { detail: { catId } }));
+  }
+
+  /**
    * 模拟下载单个视频 (保持兼容)
    */
   public static async downloadVideo(videoUrl: string, taskId: string, catName: string, avatarUrl: string): Promise<string> {

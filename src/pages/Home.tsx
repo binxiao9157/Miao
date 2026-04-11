@@ -41,10 +41,9 @@ export default function Home() {
   const longPressVideoRef = useRef<HTMLVideoElement>(null);
 
   const actionRefs = useMemo<{ [key: string]: RefObject<HTMLVideoElement | null> }>(() => ({
-    rubbing: clickVideoRef,
-    tail: swipeVideoRef,
+    tail: doubleClickVideoRef,
+    rubbing: swipeVideoRef,
     blink: longPressVideoRef,
-    // feeding: doubleClickVideoRef, // 暂时保留或映射到其他动作
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), []);
   
@@ -173,6 +172,24 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const handleCatUpdate = (e: any) => {
+      if (e.detail?.catId === cat?.id || !cat) {
+        const updatedCat = storage.getActiveCat();
+        if (updatedCat) {
+          setCat(updatedCat);
+          // 如果是解锁完成，显示一个气泡提示
+          if (cat && Object.keys(updatedCat.videoPaths || {}).length > Object.keys(cat.videoPaths || {}).length) {
+            showFloatingBubble("新动作已解锁！快来试试双击、滑动或长按吧～");
+          }
+        }
+      }
+    };
+
+    window.addEventListener('cat-updated', handleCatUpdate);
+    return () => window.removeEventListener('cat-updated', handleCatUpdate);
+  }, [cat]);
+
   // Handle visibility changes (KeepAlive resume) and cat changes
   useEffect(() => {
     if (location.pathname === "/") {
@@ -257,6 +274,14 @@ export default function Home() {
   };
 
   const triggerInteraction = (actionName: string, bubbleText: string, actionKey?: string) => {
+    const videoCount = Object.keys(cat?.videoPaths || {}).length;
+    const isUnlocked = actionKey === 'idle' || (cat?.videoPaths && actionKey && cat.videoPaths[actionKey as keyof typeof cat.videoPaths]);
+
+    if (!isUnlocked && actionKey !== 'idle') {
+      showFloatingBubble("该动作尚未解锁哦～");
+      return;
+    }
+
     showFloatingBubble(bubbleText);
     handleInteraction(actionName);
     
@@ -277,18 +302,38 @@ export default function Home() {
   };
 
   const handleRegenerate = () => {
+    if (!cat) return;
+
     // 暂停所有视频
     idleVideoRef.current?.pause();
-    clickVideoRef.current?.pause();
-    doubleClickVideoRef.current?.pause();
-    swipeVideoRef.current?.pause();
-    longPressVideoRef.current?.pause();
+    (Object.values(actionRefs) as React.RefObject<HTMLVideoElement | null>[]).forEach(ref => ref.current?.pause());
     
-    storage.deleteCat(); 
+    // 执行精准删除逻辑
+    const remainingCats = storage.deleteCatById(cat.id);
+    
+    // 同步刷新全局状态 (AuthContext)
     refreshCatStatus();
-    setCat(null);
-    setShowRegenerateConfirm(false);
-    navigate('/welcome', { replace: true });
+    
+    if (remainingCats.length > 0) {
+      // 还有其他猫咪，切换到下一只
+      const nextCat = storage.getActiveCat();
+      setCat(nextCat);
+      
+      // 重置视频播放状态
+      setIsInitialized(false);
+      setIsVideoReady(false);
+      setVisibleLayer('idle');
+      hasPlayedEntry.current = false;
+      setShowRegenerateConfirm(false);
+      
+      // 提示用户
+      showFloatingBubble(`已送走 ${cat.name}，正在迎接新伙伴...`);
+    } else {
+      // 没有猫咪了，清理状态并跳转欢迎页
+      setCat(null);
+      setShowRegenerateConfirm(false);
+      navigate('/welcome', { replace: true });
+    }
   };
 
   const handleRetryPlay = () => {
@@ -337,7 +382,7 @@ export default function Home() {
     isLongPressTriggered.current = false;
     longPressTimer.current = setTimeout(() => {
       isLongPressTriggered.current = true;
-      triggerInteraction('安静眨眼', '眨眨眼～', 'blink');
+      triggerInteraction('逗猫棒玩耍', '小羽毛，抓不到～', 'blink');
     }, 600);
   };
 
@@ -386,13 +431,13 @@ export default function Home() {
     if (absDx > 50 || absDy > 50) {
       // Swipe detected
       e.preventDefault(); // 阻止默认行为
-      triggerInteraction('治愈甩尾', '尾巴摇摇～', 'tail');
+      triggerInteraction('踩奶互动', '踩奶中，好舒服～', 'rubbing');
       wakeupUI();
     } else if (absDx < 10 && absDy < 10) {
       if (now - lastTapTime.current < 300) {
         // Double tap
         if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-        triggerInteraction('安静眨眼', '眨眨眼～', 'blink');
+        triggerInteraction('摸头享受', '摸摸头，真乖～', 'tail');
         wakeupUI();
         lastTapTime.current = 0;
       } else {
@@ -400,7 +445,7 @@ export default function Home() {
         lastTapTime.current = now;
         setTimeout(() => {
           if (lastTapTime.current === now) {
-            triggerInteraction('温柔轻蹭', '蹭蹭你～', 'rubbing');
+            triggerInteraction('蹭镜头互动', '蹭蹭你～', 'idle');
             wakeupUI();
           }
         }, 300);
@@ -620,6 +665,21 @@ export default function Home() {
         )}
       </AnimatePresence>
 
+      {/* 后台解锁进度提示 */}
+      <AnimatePresence>
+        {cat?.isUnlocking && (
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="absolute top-28 right-4 z-50 bg-white/20 backdrop-blur-md border border-white/30 px-4 py-2 rounded-2xl flex items-center gap-2"
+          >
+            <Loader2 size={14} className="text-white animate-spin" />
+            <span className="text-[10px] font-bold text-white uppercase tracking-wider">更多动作加载中...</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 重新生成确认弹窗 */}
       {showRegenerateConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
@@ -631,9 +691,9 @@ export default function Home() {
             <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <RefreshCw className="w-8 h-8 text-orange-500" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">重新领养？</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">调试确认</h3>
             <p className="text-sm text-gray-500 mb-8 leading-relaxed">
-              确定要送走当前的小猫并重新领养一只吗？这会清除当前的猫咪形象。
+              确定要永久送走这只当前的小猫吗？（不影响其他小伙伴）
             </p>
             <div className="flex flex-col gap-3">
               <button 

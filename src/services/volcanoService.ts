@@ -5,22 +5,32 @@ import axios from 'axios';
  */
 export const VolcanoConfig = {
   MOCK_MODE: false,
-  // API Key 已迁移至 server.ts 环境变量，前端不再持有凭证
+  ModelId: import.meta.env.VITE_VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215",
+  BaseUrl: import.meta.env.VITE_VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks",
 };
 
-/** 请求头：API Key 已迁移至 server.ts 环境变量，前端不再发送凭证 */
+/** 请求头：根据方舟 Ark v3 规范构建鉴权头 */
 function buildHeaders() {
-  return { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 
+    'Content-Type': 'application/json' 
+  };
+  
+  const apiKey = import.meta.env.VITE_VOLC_API_KEY;
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+  
+  return headers;
 }
 
 /**
  * 互动动作对应的 Prompt 模版 (Seedance 高精度指令)
  */
 export const ACTION_PROMPTS = {
-  idle: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一；全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏；缓慢站起走向镜头轻蹭后退回蹲坐，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；保留原始毛色与真实质感，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；超写实风格，固定摄像头，竖屏 9:16，480P，6 秒无音频，种子值 12345。",
-  tail: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 镜头缓慢、小幅拉近聚焦猫咪面部，全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏；虚拟手轻摸头顶，猫咪眯眼、耳朵后贴呈现享受状态，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后镜头缓慢拉远，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；超写实风格，竖屏 9:16，480P，6 秒无音频，种子值 12345。",
-  rubbing: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 镜头缓慢、小幅拉近聚焦猫咪前爪与上半身，全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏；猫咪前爪在柔软地毯上缓慢交替踩奶，身体轻微起伏，呈现放松舒适状态，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后停止踩奶、镜头缓慢拉远，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；超写实风格，固定摄像头，竖屏 9:16，480P，6 秒无音频，种子值 12345。",
-  blink: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 镜头缓慢、小幅拉近聚焦猫咪上半身，全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏；主人手从右侧伸入持羽毛逗猫棒晃动，猫咪兴奋抬头、挥爪、原地小跳 2 次，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后逗猫棒移开、镜头缓慢拉远，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；超写实风格，竖屏 9:16，480P，6 秒无音频，种子值 12345。"
+  idle: "一只可爱的猫咪蹲坐在温馨的房间里，正视镜头。它缓慢站起来，走向镜头轻轻蹭了一下，然后退回到原来的位置蹲好。画面清晰，光影真实，竖屏构图。",
+  tail: "特写猫咪的面部。一只手轻轻抚摸猫咪的头顶，猫咪舒服地眯起眼睛。随后镜头拉远，猫咪保持蹲坐姿态。画面温馨，细节丰富。",
+  rubbing: "聚焦猫咪的前爪。猫咪在柔软的地毯上左右交替踩奶，看起来非常放松和舒适。随后它停止动作，静静地蹲坐在原地。",
+  blink: "猫咪兴奋地看着镜头。主人拿着羽毛逗猫棒在旁边晃动，猫咪抬头挥动爪子尝试捕捉。随后逗猫棒移开，猫咪恢复安静蹲坐。"
 };
 
 /**
@@ -48,6 +58,7 @@ export class VolcanoService {
     for (let i = 0; i <= retries; i++) {
       try {
         const response = await axios.post("/api/generate-video", {
+          model: VolcanoConfig.ModelId,
           prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
           image_base64: imageBase64,
           parameters: {
@@ -152,6 +163,7 @@ export class VolcanoService {
     try {
       const response = await axios.post("/api/generate-image", {
         prompt,
+        model: import.meta.env.VITE_VOLC_T2I_MODEL_ID || "doubao-t2i-v2"
       }, {
         timeout: 60000,
         headers: buildHeaders()
