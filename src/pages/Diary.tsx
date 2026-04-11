@@ -58,29 +58,27 @@ export default function Diary() {
   }, []);
 
   useEffect(() => {
-    if (commentingId) {
-      // 延迟一小会儿等待键盘弹出或弹窗渲染
-      setTimeout(() => {
-        const element = document.getElementById(commentingId);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 300);
-    }
+    if (!commentingId) return;
+    // 延迟一小会儿等待键盘弹出或弹窗渲染
+    const timer = setTimeout(() => {
+      const element = document.getElementById(commentingId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 300);
+    return () => clearTimeout(timer);
   }, [commentingId]);
 
   useEffect(() => {
-    // 使用 rAF 延迟一帧加载数据
-    let cancelled = false;
-    requestAnimationFrame(() => {
-      if (cancelled) return;
+    // 延迟加载数据，确保页面切换动画流畅
+    const timer = setTimeout(() => {
       mockFriendService.initializeMockData();
       setDiaries(storage.getDiaries());
       setFriendDiaries(storage.getFriendDiaries());
       setCatList(storage.getCatList());
-    });
+    }, 300);
     
-    return () => { cancelled = true; };
+    return () => clearTimeout(timer);
   }, []);
 
   const handlePost = async () => {

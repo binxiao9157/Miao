@@ -4,34 +4,13 @@ import axios from 'axios';
  * 火山引擎配置中心 (方舟 Ark 平台)
  */
 export const VolcanoConfig = {
-  // 开启 API 调用
-  MOCK_MODE: false, 
-  
-  // 凭证信息 (从环境变量读取)
-  ApiKey: import.meta.env.VITE_VOLC_API_KEY,
-  ModelId: import.meta.env.VITE_VOLC_MODEL_ID || 'doubao-seedance-1-5-pro-251215',
-  T2IModelId: import.meta.env.VITE_VOLC_T2I_MODEL_ID || 'doubao-t2i-v2',
-  BaseUrl: 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks',
+  MOCK_MODE: false,
+  // API Key 已迁移至 server.ts 环境变量，前端不再持有凭证
 };
 
-/**
- * 统一请求头构建辅助函数
- */
-function buildHeaders(options?: { includeT2I?: boolean }) {
-  const apiKey = localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey;
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-Volc-API-Key': apiKey || '',
-  };
-
-  if (options?.includeT2I) {
-    headers['X-Volc-T2I-Model-Id'] = localStorage.getItem('VOLC_T2I_MODEL_ID') || VolcanoConfig.T2IModelId;
-  } else {
-    headers['X-Volc-Model-Id'] = localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId;
-  }
-
-  return headers;
+/** 请求头：API Key 已迁移至 server.ts 环境变量，前端不再发送凭证 */
+function buildHeaders() {
+  return { 'Content-Type': 'application/json' };
 }
 
 /**
@@ -160,7 +139,7 @@ export class VolcanoService {
         prompt,
       }, {
         timeout: 60000,
-        headers: buildHeaders({ includeT2I: true })
+        headers: buildHeaders()
       });
       
       const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;
@@ -206,9 +185,7 @@ export class VolcanoService {
       let result: any;
       try {
         const response = await axios.get(`/api/image-status/${taskId}`, {
-          headers: {
-            'X-Volc-API-Key': localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey
-          },
+          headers: buildHeaders(),
           signal
         });
         result = response.data;

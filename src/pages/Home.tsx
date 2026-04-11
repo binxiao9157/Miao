@@ -266,12 +266,12 @@ export default function Home() {
       const video = actionRefs[actionKey].current;
       if (video) {
         video.currentTime = 0;
-        video.play().catch(() => {});
+        video.play().catch(() => { /* autoplay may be blocked by browser */ });
       }
     } else {
       if (idleVideoRef.current) {
         idleVideoRef.current.currentTime = 0;
-        idleVideoRef.current.play().catch(() => {});
+        idleVideoRef.current.play().catch(() => { /* autoplay may be blocked by browser */ });
       }
     }
   };
@@ -295,7 +295,7 @@ export default function Home() {
     setLoadError(false);
     setIsInitialized(false);
     idleVideoRef.current?.load();
-    idleVideoRef.current?.play().catch(() => {});
+    idleVideoRef.current?.play().catch(() => { /* autoplay may be blocked by browser */ });
     clickVideoRef.current?.load();
     doubleClickVideoRef.current?.load();
     swipeVideoRef.current?.load();
@@ -451,7 +451,7 @@ export default function Home() {
           src={url}
           muted
           playsInline
-          preload="auto"
+          preload="metadata"
           onTimeUpdate={(e) => handleTimeUpdate(e, key)}
           onEnded={(e) => {
             const video = e.target as HTMLVideoElement;

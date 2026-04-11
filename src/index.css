@@ -45,15 +45,14 @@
     right: 0;
     bottom: 0;
 
-    /* 禁用 iOS 长按弹出菜单，但保留文本可选性 */
-    -webkit-touch-callout: none;
+    /* 彻底禁用长按选词功能 */
+    -webkit-user-select: none; /* Safari/iOS */
+    -moz-user-select: none;    /* Firefox */
+    -ms-user-select: none;     /* IE10+/Edge */
+    user-select: none;         /* Standard */
+    -webkit-touch-callout: none; /* iOS Safari 禁用长按弹出菜单 */
   }
-  /* 仅在按钮和交互元素上禁用选中 */
-  button, a, [role="button"] {
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  input, textarea, select {
+  input, textarea {
     -webkit-user-select: auto;
     user-select: auto;
   }

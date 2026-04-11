@@ -83,29 +83,26 @@ async function startServer() {
       return res.status(400).json({ error: "缺少必要参数: prompt", code: "INVALID_PARAMETER" });
     }
 
-    const finalApiKey = req.headers['x-volc-api-key'] as string || ARK_API_KEY;
-    const finalModelId = req.headers['x-volc-t2i-model-id'] as string || ARK_T2I_MODEL_ID;
-
     try {
-      if (!finalApiKey) {
+      if (!ARK_API_KEY) {
         return res.status(500).json({ error: "服务器未配置 API Key" });
       }
 
       const requestBody = {
-        model: finalModelId,
+        model: ARK_T2I_MODEL_ID,
         prompt: prompt,
         size: "1024x1024"
       };
 
       console.log("Submitting T2I task to Ark:", {
-        model: finalModelId,
+        model: ARK_T2I_MODEL_ID,
         url: ARK_T2I_URL,
         prompt: prompt.substring(0, 50) + "..."
       });
 
       const response = await axios.post(ARK_T2I_URL, requestBody, {
         headers: {
-          'Authorization': `Bearer ${finalApiKey}`,
+          'Authorization': `Bearer ${ARK_API_KEY}`,
           'Content-Type': 'application/json'
         },
         timeout: 60000
@@ -149,12 +146,10 @@ async function startServer() {
       return res.json({ status: 'succeeded', image_url: url });
     }
 
-    const finalApiKey = req.headers['x-volc-api-key'] as string || ARK_API_KEY;
-
     try {
       const response = await axios.get(`${ARK_BASE_URL}/${taskId}`, {
         headers: {
-          'Authorization': `Bearer ${finalApiKey}`
+          'Authorization': `Bearer ${ARK_API_KEY}`
         }
       });
       res.json(response.data);
@@ -222,24 +217,17 @@ async function startServer() {
         }
       };
 
-      const frontendApiKey = req.headers['x-volc-api-key'] as string;
-      const frontendModelId = req.headers['x-volc-model-id'] as string;
-      
-      const finalApiKey = frontendApiKey || ARK_API_KEY;
-      const finalModelId = frontendModelId || ARK_MODEL_ID;
-
       console.log("Submitting task to Ark:", {
-        model: finalModelId,
-        url: ARK_BASE_URL,
-        usingFrontendKey: !!frontendApiKey
+        model: ARK_MODEL_ID,
+        url: ARK_BASE_URL
       });
 
       const response = await axios.post(
         ARK_BASE_URL,
-        { ...requestBody, model: finalModelId },
+        requestBody,
         {
           headers: {
-            'Authorization': `Bearer ${finalApiKey}`,
+            'Authorization': `Bearer ${ARK_API_KEY}`,
             'Content-Type': 'application/json'
           },
           maxContentLength: Infinity,
@@ -264,15 +252,12 @@ async function startServer() {
       return res.status(400).json({ error: "无效的任务 ID 格式" });
     }
 
-    const frontendApiKey = req.headers['x-volc-api-key'] as string;
-    const finalApiKey = frontendApiKey || ARK_API_KEY;
-
     try {
       const response = await axios.get(
         `${ARK_BASE_URL}/${taskId}`,
         {
           headers: {
-            'Authorization': `Bearer ${finalApiKey}`
+            'Authorization': `Bearer ${ARK_API_KEY}`
           },
           timeout: 60000
         }

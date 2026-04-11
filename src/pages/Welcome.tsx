@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Camera, ArrowRight, Upload, PawPrint, ArrowLeft, Eye, EyeOff, Save, RotateCcw, X, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { VolcanoConfig } from "../services/volcanoService";
 import { useAuthContext } from "../context/AuthContext";
 import { storage } from "../services/storage";
 
@@ -19,23 +18,33 @@ export default function Welcome() {
   const debugTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // 预加载猫咪头像资源
+  // 资源预加载逻辑
   useEffect(() => {
-    const preloadAvatars = () => {
-      storage.getCatList().forEach(cat => {
-        if (cat.avatar) {
+    const preloadImages = () => {
+      const catList = storage.getCatList();
+      const imagesToPreload = [
+        ...catList.map(cat => cat.avatar),
+        "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4" // 预加载视频（浏览器会处理缓存）
+      ];
+
+      imagesToPreload.forEach(src => {
+        if (!src) return;
+        if (src.endsWith('.mp4')) {
+          const video = document.createElement('video');
+          video.src = src;
+          video.preload = 'auto';
+        } else {
           const img = new Image();
-          img.src = cat.avatar;
+          img.src = src;
         }
       });
     };
 
+    // 在页面空闲时预加载
     if ('requestIdleCallback' in window) {
-      const id = (window as unknown as { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(preloadAvatars);
-      return () => (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(id);
+      (window as any).requestIdleCallback(preloadImages);
     } else {
-      const timer = setTimeout(preloadAvatars, 1000);
-      return () => clearTimeout(timer);
+      setTimeout(preloadImages, 1000);
     }
   }, []);
 
@@ -163,17 +172,14 @@ export default function Welcome() {
  */
 function DebugDialog({ onClose, onSave }: { onClose: () => void, onSave: () => void }) {
   const [config, setConfig] = useState({
-    VOLC_API_KEY: localStorage.getItem('VOLC_API_KEY') || VolcanoConfig.ApiKey || '',
-    VOLC_ACCESS_KEY: localStorage.getItem('VOLC_ACCESS_KEY') || '',
-    VOLC_SECRET_KEY: localStorage.getItem('VOLC_SECRET_KEY') || '',
-    VOLC_MODEL_ID: localStorage.getItem('VOLC_MODEL_ID') || VolcanoConfig.ModelId || '',
-    VOLC_T2I_MODEL_ID: localStorage.getItem('VOLC_T2I_MODEL_ID') || VolcanoConfig.T2IModelId || '',
+    // 注意：API Key 已迁移至服务端环境变量，此处配置仅供调试参考
+    VOLC_API_KEY: localStorage.getItem('VOLC_API_KEY') || '',
+    VOLC_MODEL_ID: localStorage.getItem('VOLC_MODEL_ID') || '',
+    VOLC_T2I_MODEL_ID: localStorage.getItem('VOLC_T2I_MODEL_ID') || '',
   });
 
   const [visible, setVisible] = useState({
     VOLC_API_KEY: false,
-    VOLC_ACCESS_KEY: false,
-    VOLC_SECRET_KEY: false,
     VOLC_MODEL_ID: false,
     VOLC_T2I_MODEL_ID: false,
   });
@@ -195,11 +201,9 @@ function DebugDialog({ onClose, onSave }: { onClose: () => void, onSave: () => v
     if (window.confirm("确定要恢复默认配置吗？")) {
       Object.keys(config).forEach(key => localStorage.removeItem(key));
       setConfig({
-        VOLC_API_KEY: VolcanoConfig.ApiKey || '',
-        VOLC_ACCESS_KEY: '',
-        VOLC_SECRET_KEY: '',
-        VOLC_MODEL_ID: VolcanoConfig.ModelId || '',
-        VOLC_T2I_MODEL_ID: VolcanoConfig.T2IModelId || '',
+        VOLC_API_KEY: '',
+        VOLC_MODEL_ID: '',
+        VOLC_T2I_MODEL_ID: '',
       });
     }
   };
@@ -210,8 +214,6 @@ function DebugDialog({ onClose, onSave }: { onClose: () => void, onSave: () => v
 
   const fields = [
     { key: 'VOLC_API_KEY', label: 'API Key' },
-    { key: 'VOLC_ACCESS_KEY', label: 'Access Key' },
-    { key: 'VOLC_SECRET_KEY', label: 'Secret Key' },
     { key: 'VOLC_MODEL_ID', label: 'Video Model ID' },
     { key: 'VOLC_T2I_MODEL_ID', label: 'T2I Model ID' },
   ] as const;

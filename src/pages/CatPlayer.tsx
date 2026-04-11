@@ -18,6 +18,7 @@ export default function CatPlayer() {
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showToast, setShowToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const list = storage.getCatList();
@@ -31,6 +32,7 @@ export default function CatPlayer() {
     }
 
     return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       // 显式释放视频资源，防止内存泄漏
       if (videoRef.current) {
         try {
@@ -38,7 +40,7 @@ export default function CatPlayer() {
           videoRef.current.src = "";
           videoRef.current.load();
         } catch (e) {
-          // 忽略清理过程中的错误
+          console.warn("视频清理时出错:", e);
         }
       }
     };
@@ -67,7 +69,8 @@ export default function CatPlayer() {
     document.body.removeChild(link);
     
     setShowToast("视频已开始下载到您的设备");
-    setTimeout(() => setShowToast(null), 3000);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setShowToast(null), 3000);
   };
 
   const handleDelete = () => {
@@ -233,7 +236,7 @@ export default function CatPlayer() {
 
         <video 
           ref={videoRef}
-          src={cat.videoPaths?.petting || cat.videoPaths?.longPress || cat.videoPath}
+          src={cat.videoPaths?.petting || cat.videoPath}
           autoPlay
           loop
           muted

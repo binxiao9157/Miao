@@ -113,6 +113,11 @@ const USER_DATA_KEYS = {
   FRIEND_DIARIES: 'miao_friend_diaries',
 };
 
+/** 各类数据的滑动窗口上限 */
+const MAX_DIARIES = 200;
+const MAX_FRIEND_DIARIES = 100;
+const MAX_TIME_LETTERS = 100;
+
 // 内部缓存，减少频繁的 JSON.parse
 let cachedUserPrefix: string = 'guest';
 let cachedCurrentUserRaw: string | null = null;
@@ -120,21 +125,42 @@ let cachedCurrentUserRaw: string | null = null;
 // 高频读取的内存缓存（按 storageKey 索引）
 const memCache = new Map<string, { raw: string | null; parsed: unknown }>();
 
+// 跨 tab 同步：其他 tab 修改 localStorage 时清除本 tab 的内存缓存
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (!e.key) {
+      // storage.clear() 被调用，清空所有缓存
+      memCache.clear();
+      cachedCurrentUserRaw = null;
+      refreshUserPrefix();
+      return;
+    }
+    invalidateCache(e.key);
+    if (e.key === STORAGE_KEYS.CURRENT_USER) {
+      cachedCurrentUserRaw = null;
+      refreshUserPrefix();
+    }
+  });
+}
+
 function cachedRead<T>(storageKey: string, defaultValue: T): T {
   const raw = localStorage.getItem(storageKey);
   const entry = memCache.get(storageKey);
-  if (entry && entry.raw === raw) return entry.parsed as T;
+  if (entry && entry.raw === raw) {
+    // 返回深拷贝，防止调用方修改缓存
+    return structuredClone(entry.parsed as T);
+  }
   if (raw === null) {
     memCache.set(storageKey, { raw: null, parsed: defaultValue });
-    return defaultValue;
+    return structuredClone(defaultValue);
   }
   try {
     const parsed = JSON.parse(raw) as T;
     memCache.set(storageKey, { raw, parsed });
-    return parsed ?? defaultValue;
+    return parsed ?? structuredClone(defaultValue);
   } catch {
     memCache.set(storageKey, { raw, parsed: defaultValue });
-    return defaultValue;
+    return structuredClone(defaultValue);
   }
 }
 
@@ -577,8 +603,10 @@ export const storage = {
   },
 
   saveDiaries: (diaries: DiaryEntry[]) => {
-    storage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(diaries));
-    return diaries;
+    // 滑动窗口：只保留最近 MAX_DIARIES 条，按时间倒序（新在前）
+    const trimmed = diaries.length > MAX_DIARIES ? diaries.slice(0, MAX_DIARIES) : diaries;
+    storage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(trimmed));
+    return trimmed;
   },
 
   deleteDiary: (id: string) => {
@@ -604,7 +632,8 @@ export const storage = {
   },
 
   saveTimeLetters: (letters: TimeLetter[]) => {
-    storage.setItem(getUserKey(USER_DATA_KEYS.TIME_LETTERS), JSON.stringify(letters));
+    const trimmed = letters.length > MAX_TIME_LETTERS ? letters.slice(0, MAX_TIME_LETTERS) : letters;
+    storage.setItem(getUserKey(USER_DATA_KEYS.TIME_LETTERS), JSON.stringify(trimmed));
   },
 
   clearMediaCache: () => {
@@ -687,6 +716,7 @@ export const storage = {
   },
 
   saveFriendDiaries: (diaries: FriendDiaryEntry[]) => {
-    storage.setItem(getUserKey(USER_DATA_KEYS.FRIEND_DIARIES), JSON.stringify(diaries));
+    const trimmed = diaries.length > MAX_FRIEND_DIARIES ? diaries.slice(0, MAX_FRIEND_DIARIES) : diaries;
+    storage.setItem(getUserKey(USER_DATA_KEYS.FRIEND_DIARIES), JSON.stringify(trimmed));
   },
 };

@@ -46,7 +46,8 @@ export default function MainLayout() {
         initial={false}
         animate={{ 
           opacity: isActive ? 1 : 0,
-          zIndex: isActive ? 10 : 0
+          zIndex: isActive ? 10 : -10,
+          scale: isActive ? 1 : 0.98
         }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         className={`fixed inset-0 ${isActive ? '' : 'pointer-events-none'}`}
@@ -74,7 +75,8 @@ export default function MainLayout() {
         initial={false}
         animate={{ 
           opacity: isHome ? 1 : 0,
-          zIndex: isHome ? 0 : 0
+          zIndex: isHome ? 0 : -10,
+          scale: isHome ? 1 : 0.98
         }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         className={`fixed inset-0 ${isHome ? '' : 'pointer-events-none'}`}
