@@ -1,7 +1,5 @@
-const CACHE_NAME = 'miao-v4';
-// 预缓存列表：仅包含应用 shell 资源。
-// Vite 构建产物（JS/CSS bundles）的哈希文件名由浏览器缓存策略处理，
-// 如需完整离线支持，建议集成 vite-plugin-pwa 自动注入 manifest。
+const CACHE_NAME = 'miao-v5';
+// 预缓存列表：应用 shell 资源
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -123,7 +121,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. 其他 GET 资源：网络优先，失败回退缓存；非 GET 请求直接走网络
+  // 3. Vite 哈希资源（/assets/xxx.hash.js|css）：缓存优先，首次访问后缓存
+  if (url.pathname.startsWith('/assets/') && url.pathname.match(/\.[a-f0-9]{8}\.(js|css)$/)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        if (cached) return cached;
+        const response = await fetch(event.request);
+        if (response.ok) {
+          cache.put(event.request, response.clone()).catch(() => {});
+        }
+        return response;
+      })
+    );
+    return;
+  }
+
+  // 4. 其他 GET 资源：网络优先，失败回退缓存；非 GET 请求直接走网络
   if (event.request.method !== 'GET') {
     return;
   }

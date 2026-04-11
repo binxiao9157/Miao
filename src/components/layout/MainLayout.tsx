@@ -1,14 +1,16 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { BookOpen, Mail, Home, Star, User } from "lucide-react";
 import { motion } from "motion/react";
-import HomePage from "../../pages/Home";
-import DiaryPage from "../../pages/Diary";
-import TimeLettersPage from "../../pages/TimeLetters";
-import NotificationListPage from "../../pages/NotificationList";
-import PointsPage from "../../pages/Points";
-import ProfilePage from "../../pages/Profile";
 import { useAuthContext } from "../../context/AuthContext";
+
+// 延迟加载所有页面组件，首屏只加载当前 tab
+const HomePage = lazy(() => import("../../pages/Home"));
+const DiaryPage = lazy(() => import("../../pages/Diary"));
+const TimeLettersPage = lazy(() => import("../../pages/TimeLetters"));
+const NotificationListPage = lazy(() => import("../../pages/NotificationList"));
+const PointsPage = lazy(() => import("../../pages/Points"));
+const ProfilePage = lazy(() => import("../../pages/Profile"));
 
 export default function MainLayout() {
   const navigate = useNavigate();
@@ -32,6 +34,23 @@ export default function MainLayout() {
   React.useEffect(() => {
     setVisitedTabs(prev => new Set(prev).add(location.pathname));
   }, [location.pathname]);
+
+  // 首屏渲染完成后，空闲时预加载其他 tab 的 chunk，避免切换时闪 loading
+  React.useEffect(() => {
+    const prefetch = () => {
+      import("../../pages/Home");
+      import("../../pages/Diary");
+      import("../../pages/TimeLetters");
+      import("../../pages/NotificationList");
+      import("../../pages/Points");
+      import("../../pages/Profile");
+    };
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(prefetch);
+    } else {
+      setTimeout(prefetch, 2000);
+    }
+  }, []);
 
   // 模拟 IndexedStack，保持页面状态并消除切换跳动
   const renderPersistentTab = (path: string, Component: React.ComponentType) => {
@@ -70,6 +89,7 @@ export default function MainLayout() {
 
   return (
     <div className={`w-full h-full relative overflow-hidden ${isHome ? 'bg-black' : 'bg-background'}`}>
+      <Suspense fallback={<div className="fixed inset-0 bg-[#FFF5F0] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
       {/* Keep Home alive */}
       <motion.div 
         initial={false}
@@ -98,6 +118,7 @@ export default function MainLayout() {
 
       {/* Keep Profile alive */}
       {hasCat && renderPersistentTab("/profile", ProfilePage)}
+      </Suspense>
       
       {/* Other routes will render here - 适配安全区 */}
       {!isHome && !isPersistentTab && (

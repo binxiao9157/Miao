@@ -423,8 +423,18 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    // Vite 哈希资源（JS/CSS）：强缓存1年，浏览器无需重新验证
+    app.use('/assets', express.static(path.join(distPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true,
+    }));
+    // 其他静态文件（图片、manifest 等）：短缓存
+    app.use(express.static(distPath, {
+      maxAge: '1h',
+    }));
+    // index.html：不缓存，确保用户总是拿到最新版本
     app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

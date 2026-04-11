@@ -5,10 +5,9 @@
 
 import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import MainLayout from "./components/layout/MainLayout";
-import Login from "./pages/Login";
-
-// 使用 React.lazy 延迟加载非核心页面
+// 使用 React.lazy 延迟加载所有页面和布局
+const MainLayout = lazy(() => import("./components/layout/MainLayout"));
+const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -31,34 +30,7 @@ const AddFriendQR = lazy(() => import("./pages/AddFriendQR"));
 const ScanFriend = lazy(() => import("./pages/ScanFriend"));
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
-import { storage } from "./services/storage";
 
-import { motion, AnimatePresence } from "motion/react";
-
-function SplashScreen() {
-  return (
-    <motion.div 
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2, ease: "easeInOut" }}
-      className="fixed inset-0 bg-[#FFF5F0] flex flex-col items-center justify-center z-[9999]"
-    >
-      <div className="relative">
-        {/* 简单的猫爪加载动画或 Logo */}
-        <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center mb-4">
-          <span className="text-2xl font-black text-[#FF9D76]">Miao</span>
-        </div>
-        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
-          <div className="flex gap-1">
-            <div className="w-2 h-2 bg-[#FF9D76] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-            <div className="w-2 h-2 bg-[#FF9D76] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-            <div className="w-2 h-2 bg-[#FF9D76] rounded-full animate-bounce"></div>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isInitializing } = useAuthContext();
@@ -77,20 +49,11 @@ function AppRoutes() {
   const { isAuthenticated, isInitializing, hasCat } = useAuthContext();
   const location = useLocation(); // Force re-render on route change
 
+  if (isInitializing) return null;
+
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {isInitializing ? (
-        <SplashScreen key="splash" />
-      ) : (
-        <motion.div 
-          key="content"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.2 }}
-          className="w-full h-full"
-        >
-          <Suspense fallback={<div className="min-h-screen bg-[#FFF5F0] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
-            <Routes location={location}>
+    <Suspense fallback={<div className="min-h-screen bg-[#FFF5F0] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
+      <Routes location={location}>
         {/* Auth Routes */}
         <Route path="/login" element={
           isAuthenticated ? (
@@ -143,9 +106,6 @@ function AppRoutes() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Suspense>
-    </motion.div>
-      )}
-    </AnimatePresence>
   );
 }
 
