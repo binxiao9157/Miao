@@ -17,10 +17,10 @@ function buildHeaders() {
  * 互动动作对应的 Prompt 模版 (Seedance 高精度指令)
  */
 export const ACTION_PROMPTS = {
-  rubbing: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，缓慢站起走向镜头轻蹭后退回蹲坐，尾帧回归初始蹲坐姿态，与首帧画面一致；保留原始毛色与真实质感，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；超写实风格，固定摄像头。",
-  petting: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，镜头拉近聚焦面部，虚拟手轻摸头顶，猫咪眯眼、耳朵后贴呈现享受状态，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后镜头拉远，尾帧回归初始蹲坐姿态，与首帧画面一致；超写实风格。",
-  feeding: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，镜头拉近，猫咪缓慢放松躺平、自然露出肚皮，虚拟手轻柔抚摸腹部，猫咪姿态放松舒适，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后猫咪起身恢复蹲坐、镜头拉远，尾帧回归初始蹲坐姿态，与首帧画面一致；超写实风格，固定摄像头，480P，5 秒无音频，种子值 12345。",
-  teasing: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，镜头拉近，主人手从右侧伸入持羽毛逗猫棒晃动，猫咪兴奋抬头、挥爪、原地小跳 2 次，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后逗猫棒移开、镜头拉远，尾帧回归初始蹲坐姿态，与首帧画面一致；超写实风格。"
+  idle: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，呈现自然的呼吸起伏，身体有微小的起伏感；保留原始毛色与真实质感，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；超写实风格，固定摄像头。",
+  tail: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 猫咪保持蹲坐姿态，尾巴自然、有节奏地左右摆动，呈现治愈感；动作流畅自然，无视觉跳变；超写实风格，固定摄像头。",
+  rubbing: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 猫咪缓慢站起走向镜头温柔轻蹭，随后退回原位，动作轻盈温顺；保留原始毛色与真实质感；超写实风格，固定摄像头。",
+  blink: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 猫咪保持蹲坐姿态，安静地眨眼 2-3 次，眼神温柔清澈；嘴巴细节严格遵循真实猫咪生理结构；超写实风格，固定摄像头。"
 };
 
 /**
@@ -36,51 +36,66 @@ export const IMAGE_PROMPTS = {
  */
 export class VolcanoService {
   /**
-   * 提交视频生成任务 (SubmitTask)
+   * 提交视频生成任务 (SubmitTask) - 增加重试机制
    */
-  public static async submitTask(imageBase64: string, prompt?: string) {
+  public static async submitTask(imageBase64: string, prompt?: string, retries: number = 2) {
     if (VolcanoConfig.MOCK_MODE) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       return { id: 'mock_task_' + Date.now() };
     }
 
-    try {
-      const response = await axios.post("/api/generate-video", {
-        prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
-        image_base64: imageBase64,
-        parameters: {
-          seed: 12345, // 固定种子值，确保连贯性
-          resolution: "480p",
-          duration: 5,
-          audio: false
+    let lastError: any;
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const response = await axios.post("/api/generate-video", {
+          prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
+          image_base64: imageBase64,
+          parameters: {
+            seed: 12345, // 固定种子值，确保连贯性
+            resolution: "480p",
+            duration: 5,
+            audio: false
+          }
+        }, {
+          timeout: 120000, // 2 minutes for browser to wait
+          headers: buildHeaders()
+        });
+        
+        const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;
+        
+        if (!taskId) {
+          throw new Error("服务器返回数据格式错误，未获取到任务 ID");
         }
-      }, {
-        timeout: 310000, 
-        headers: buildHeaders()
-      });
-      
-      // 兼容不同的返回结构 (id 或 task_id)
-      const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;
-      
-      if (!taskId) {
-        throw new Error("服务器返回数据格式错误，未获取到任务 ID");
-      }
 
-      return {
-        ...response.data,
-        id: taskId
-      };
-    } catch (error: any) {
-      if (error.response) {
-        console.error("提交失败详情 (HTTP Error):", error.response.status, error.response.data);
-        throw new Error(error.response.data.error || `提交失败 (${error.response.status})`);
-      } else if (error.request) {
-        console.error("网络错误 (No Response):", error.request);
-        throw new Error("网络错误: 无法连接到服务器，请检查网络或稍后重试");
-      } else {
-        console.error("请求配置错误:", error.message);
-        throw new Error(`请求错误: ${error.message}`);
+        return {
+          ...response.data,
+          id: taskId
+        };
+      } catch (error: any) {
+        lastError = error;
+        // 仅对 5xx 或网络错误进行重试
+        const status = error.response?.status;
+        const isNetworkError = !error.response;
+        const shouldRetry = (status && status >= 500) || isNetworkError;
+        
+        if (!shouldRetry || i === retries) break;
+        
+        console.warn(`提交任务失败，正在进行第 ${i + 1} 次重试...`, error.message);
+        await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1))); // 指数退避
       }
+    }
+
+    // 统一错误处理
+    const error = lastError;
+    if (error.response) {
+      console.error("提交失败详情 (HTTP Error):", error.response.status, error.response.data);
+      throw new Error(error.response.data.error || `提交失败 (${error.response.status})`);
+    } else if (error.request) {
+      console.error("网络错误 (No Response):", error.request);
+      throw new Error("网络错误: 无法连接到服务器，请检查网络或稍后重试");
+    } else {
+      console.error("请求配置错误:", error.message);
+      throw new Error(`请求错误: ${error.message}`);
     }
   }
 

@@ -6,6 +6,7 @@ import { VolcanoService, ACTION_PROMPTS, IMAGE_PROMPTS } from "../services/volca
 import { FileManager } from "../services/fileManager";
 import { storage } from "../services/storage";
 import { useAuthContext } from "../context/AuthContext";
+import { extractFrameFromUrl } from "../lib/videoUtils";
 
 import { GoogleGenAI } from "@google/genai";
 
@@ -45,7 +46,7 @@ export default function GenerationProgress() {
     try {
       setPhase('i2v');
 
-      // 积分前置检查：在生成视频之前验证积分是否足够
+      // 积分前置检查
       if (isRedemption && !isDebugRedemption) {
         const currentPoints = storage.getPoints();
         const required = redemptionAmount || 200;
@@ -54,8 +55,6 @@ export default function GenerationProgress() {
         }
       }
       
-      // 优化：在提交 I2V 之前，如果图片是 base64 且尺寸过大，进行压缩
-      // 这可以有效防止 "timeout of 150000ms exceeded" 错误
       let optimizedImg = img;
       if (img.startsWith('data:image')) {
         setStatus("正在优化图像数据...");
@@ -89,78 +88,88 @@ export default function GenerationProgress() {
         }
       }
 
-      // 2. 提交 I2V 任务 (优先级排序)
-      setStatus("正在教小猫学习第一个技能...");
-      setProgress(40);
+      // 第一阶段：生成核心待机视频 (0-40%)
+      setStatus("第一阶段：正在生成核心待机视频...");
+      setProgress(10);
       
-      const actions = Object.keys(ACTION_PROMPTS) as Array<keyof typeof ACTION_PROMPTS>;
-      const priorityAction = 'petting'; // 摸头/待机作为优先级最高的视频
-      const otherActions = actions.filter(a => a !== priorityAction);
-
-      // 先提交优先级任务
-      const priorityPrompt = ACTION_PROMPTS[priorityAction];
-      const priorityTask = await VolcanoService.submitTask(optimizedImg, priorityPrompt);
+      const idleTask = await VolcanoService.submitTask(optimizedImg, ACTION_PROMPTS.idle);
+      setProgress(20);
       
-      // 立即开始轮询优先级任务
-      setStatus("正在生成核心互动视频...");
-      setProgress(60);
-      const priorityVideoUrl = await VolcanoService.pollTaskResult(
-        priorityTask.id,
-        undefined,
+      const idleVideoUrl = await VolcanoService.pollTaskResult(
+        idleTask.id,
+        (s) => setStatus(`正在生成待机视频 (${s})...`),
         abortSignal
       );
+      setProgress(40);
 
-      // 3. 优先级视频就绪，先保存基础信息
-      setStatus("核心技能已就绪！");
-      setProgress(90);
+      // 第二阶段：提取锚定帧 (40-50%)
+      setStatus("第二阶段：正在提取高精度锚定帧...");
+      let anchorFrame;
+      try {
+        anchorFrame = await extractFrameFromUrl(idleVideoUrl, 0.1);
+      } catch (e) {
+        console.warn("锚定帧提取失败，将使用原始图片作为备选:", e);
+        // 如果提取失败，回退到原始优化后的图片，确保流程不中断
+        anchorFrame = optimizedImg;
+      }
+      setProgress(50);
+
+      // 第三阶段：并行提交后续任务 (50-100%)
+      setStatus("第三阶段：正在同步生成系列互动动作...");
+      const secondaryActions = ['tail', 'rubbing', 'blink'] as const;
+      const tasks = secondaryActions.map(action => 
+        VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS[action])
+      );
+      
+      const taskResults = await Promise.all(tasks);
+      setProgress(60);
+
+      // 轮询后续任务
+      const videoUrls: { [key: string]: string } = { idle: idleVideoUrl };
+      const pollPromises = taskResults.map((task, index) => 
+        VolcanoService.pollTaskResult(
+          task.id, 
+          undefined, 
+          abortSignal
+        ).then(url => {
+          videoUrls[secondaryActions[index]] = url;
+          // 每完成一个增加一点进度
+          setProgress(prev => Math.min(95, prev + 10));
+        })
+      );
+
+      await Promise.all(pollPromises);
+      setStatus("所有技能已就绪！");
+      setProgress(95);
+
       const groupId = 'group_' + Date.now();
       
-      // 先保存包含首个视频的猫咪信息
-      const initialVideoMap: { [key: string]: string } = { [priorityAction]: priorityVideoUrl };
+      // 保存猫咪信息，包含锚定帧
       await FileManager.downloadVideos(
-        initialVideoMap, 
+        videoUrls, 
         groupId, 
         name || breed || "我的 AI 猫咪", 
         img,
-        { breed, furColor, source: image ? 'upload' : 'created', placeholderImage: image }
+        { 
+          breed, 
+          furColor, 
+          source: image ? 'upload' : 'created', 
+          placeholderImage: anchorFrame, // 使用锚定帧作为占位图
+          anchorFrame: anchorFrame 
+        }
       );
 
-      // 4. 触发后台生成任务 (不阻塞 UI)
-      const runBackgroundTasks = async (signal: AbortSignal) => {
-        for (const action of otherActions) {
-          if (signal.aborted) return;
-          try {
-            const prompt = ACTION_PROMPTS[action];
-            const task = await VolcanoService.submitTask(optimizedImg, prompt);
-            const url = await VolcanoService.pollTaskResult(task.id, undefined, signal);
-            
-            // 更新本地存储中的视频路径
-            const currentCat = storage.getCatById(groupId);
-            if (currentCat) {
-              const updatedPaths = { ...currentCat.videoPaths, [action]: url };
-              storage.saveCatInfo({ ...currentCat, videoPaths: updatedPaths });
-            }
-          } catch (e) {
-          }
-        }
-      };
-      
-      runBackgroundTasks(abortSignal); // 异步执行，不 await
-
-      // 5. 扣除积分 (已在前面预检查过，在 UI 更新之前执行)
+      // 扣除积分
       if (isRedemption && !isDebugRedemption) {
         storage.deductPoints(redemptionAmount || 200, "解锁新伙伴");
       }
 
-      // 6. 完成并显示入场
+      // 完成并显示入场
       setStatus("生成成功！");
       setProgress(100);
       setPhase('success');
 
-      // 确保活跃 ID 已设置
       storage.setActiveCatId(groupId);
-      
-      // 更新全局猫咪状态
       refreshCatStatus();
       
       setTimeout(() => {
@@ -170,12 +179,22 @@ export default function GenerationProgress() {
       }, 1000);
     } catch (err: any) {
       if (err.message === "任务轮询已中止" || err.message === "任务中止") return;
-      console.error("I2V 过程出错:", err);
-      setError(err.message || "视频生成失败");
+      console.error("生成过程出错:", err);
+      setError(err.message || "生成失败");
     }
   };
 
   useEffect(() => {
+    const checkConnectivity = async () => {
+      try {
+        await axios.get('/api/health', { timeout: 5000 });
+        console.log("Server connectivity confirmed");
+      } catch (e) {
+        console.warn("Server connectivity check failed, but proceeding anyway...", e);
+      }
+    };
+    checkConnectivity();
+
     if (!image && (!breed || !furColor)) {
       navigate("/create-cat", { replace: true });
       return;
@@ -400,9 +419,10 @@ export default function GenerationProgress() {
 
             {/* 状态步骤列表 */}
             <div className="mt-12 w-full space-y-4 text-left">
-              <StatusStep label="分析图片特征" active={progress >= 20} done={progress > 20} />
-              <StatusStep label="注入 4 种灵魂技能" active={progress >= 50} done={progress > 50} />
-              <StatusStep label="渲染高清互动视频" active={progress >= 80} done={progress > 80} />
+              <StatusStep label="分析图片特征" active={progress >= 5} done={progress > 5} />
+              <StatusStep label="生成核心待机动作" active={progress >= 10} done={progress > 40} />
+              <StatusStep label="提取高精度锚定帧" active={progress >= 40} done={progress > 50} />
+              <StatusStep label="渲染系列互动视频" active={progress >= 50} done={progress > 95} />
               <StatusStep label="同步到本地猫窝" active={progress >= 100} done={progress === 100} />
             </div>
           </motion.div>

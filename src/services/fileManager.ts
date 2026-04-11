@@ -18,7 +18,7 @@ export class FileManager {
     groupId: string, 
     catName: string, 
     avatarUrl: string,
-    metadata?: { breed?: string; furColor?: string; source?: 'upload' | 'created'; placeholderImage?: string }
+    metadata?: { breed?: string; furColor?: string; source?: 'upload' | 'created'; placeholderImage?: string; anchorFrame?: string }
   ): Promise<{ [key: string]: string }> {
     const finalPaths: { [key: string]: string } = {};
     
@@ -34,10 +34,11 @@ export class FileManager {
       color: metadata?.furColor || '未知',
       avatar: avatarUrl,
       source: metadata?.source === 'created' ? 'created' : 'uploaded',
-      videoPath: finalPaths.petting || Object.values(finalPaths)[0], // 默认使用摸头(休息)作为待机视频
+      videoPath: finalPaths.idle || finalPaths.petting || Object.values(finalPaths)[0], 
       videoPaths: finalPaths,
-      remoteVideoUrl: finalPaths.petting || Object.values(finalPaths)[0],
+      remoteVideoUrl: finalPaths.idle || finalPaths.petting || Object.values(finalPaths)[0],
       placeholderImage: metadata?.placeholderImage,
+      anchorFrame: metadata?.anchorFrame,
     };
 
     storage.saveCatInfo(newCat);

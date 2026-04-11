@@ -42,9 +42,9 @@ export default function Home() {
 
   const actionRefs = useMemo<{ [key: string]: RefObject<HTMLVideoElement | null> }>(() => ({
     rubbing: clickVideoRef,
-    feeding: doubleClickVideoRef,
-    teasing: swipeVideoRef,
-    petting: longPressVideoRef
+    tail: swipeVideoRef,
+    blink: longPressVideoRef,
+    // feeding: doubleClickVideoRef, // 暂时保留或映射到其他动作
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), []);
   
@@ -337,7 +337,7 @@ export default function Home() {
     isLongPressTriggered.current = false;
     longPressTimer.current = setTimeout(() => {
       isLongPressTriggered.current = true;
-      triggerInteraction('摸头享受', '好舒服喵~ ❤️', 'petting');
+      triggerInteraction('安静眨眼', '眨眨眼～', 'blink');
     }, 600);
   };
 
@@ -386,13 +386,13 @@ export default function Home() {
     if (absDx > 50 || absDy > 50) {
       // Swipe detected
       e.preventDefault(); // 阻止默认行为
-      triggerInteraction('逗猫棒玩耍', '抓到了！', 'teasing');
+      triggerInteraction('治愈甩尾', '尾巴摇摇～', 'tail');
       wakeupUI();
     } else if (absDx < 10 && absDy < 10) {
       if (now - lastTapTime.current < 300) {
         // Double tap
         if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-        triggerInteraction('露肚皮抚摸', '咯咯咯咯...', 'feeding');
+        triggerInteraction('安静眨眼', '眨眨眼～', 'blink');
         wakeupUI();
         lastTapTime.current = 0;
       } else {
@@ -400,7 +400,7 @@ export default function Home() {
         lastTapTime.current = now;
         setTimeout(() => {
           if (lastTapTime.current === now) {
-            triggerInteraction('蹭镜头互动', '轻轻抚摸！', 'rubbing');
+            triggerInteraction('温柔轻蹭', '蹭蹭你～', 'rubbing');
             wakeupUI();
           }
         }, 300);
@@ -488,7 +488,7 @@ export default function Home() {
         {/* 1. 待机视频层 (Idle) */}
         <video
           ref={idleVideoRef}
-          src={cat?.videoPath || cat?.remoteVideoUrl || cat?.videoPaths?.petting || VIDEOS.DEFAULT}
+          src={cat?.videoPaths?.idle || cat?.videoPath || cat?.remoteVideoUrl || VIDEOS.DEFAULT}
           muted
           playsInline
           preload="auto"

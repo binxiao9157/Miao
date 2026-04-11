@@ -12,6 +12,16 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
 
+  // Health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      env: process.env.NODE_ENV,
+      hasApiKey: !!process.env.VOLC_API_KEY
+    });
+  });
+
   const ARK_API_KEY = process.env.VOLC_API_KEY;
   const ARK_MODEL_ID = process.env.VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215";
   const ARK_T2I_MODEL_ID = process.env.VOLC_T2I_MODEL_ID || "doubao-t2i-v2";
@@ -219,7 +229,8 @@ async function startServer() {
 
       console.log("Submitting task to Ark:", {
         model: ARK_MODEL_ID,
-        url: ARK_BASE_URL
+        url: ARK_BASE_URL,
+        payloadSize: JSON.stringify(requestBody).length
       });
 
       const response = await axios.post(
@@ -232,7 +243,7 @@ async function startServer() {
           },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
-          timeout: 300000
+          timeout: 120000 // 2 minutes for submission
         }
       );
 
@@ -268,6 +279,32 @@ async function startServer() {
     } catch (error: any) {
       console.error("Ark Status Error:", error.message);
       sendError(res, error, "查询状态失败");
+    }
+  });
+
+  // Video proxy to bypass CORS for frame extraction
+  app.get("/api/proxy-video", async (req, res) => {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).send("Missing url parameter");
+    }
+
+    try {
+      const response = await axios({
+        method: 'get',
+        url: url,
+        responseType: 'stream',
+        timeout: 60000 // 增加到 60 秒
+      });
+
+      // Forward headers
+      res.setHeader('Content-Type', response.headers['content-type'] || 'video/mp4');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      
+      response.data.pipe(res);
+    } catch (error: any) {
+      console.error("Video proxy error:", error.message);
+      res.status(500).send("Failed to proxy video");
     }
   });
 
