@@ -14,7 +14,7 @@ interface Props {
 export default function FloatingDebugPanel({ isDebugMode, setIsDebugMode, setPoints, setPointsInfo, showToast }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
-  if (!import.meta.env.DEV) return null;
+  if (!import.meta.env.DEV || import.meta.env.MODE !== 'development') return null;
 
   return (
     <>

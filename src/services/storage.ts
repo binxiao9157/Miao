@@ -148,24 +148,30 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// structuredClone polyfill：兼容 iOS Safari < 15.4 等旧浏览器
+function safeClone<T>(value: T): T {
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
+}
+
 function cachedRead<T>(storageKey: string, defaultValue: T): T {
   const raw = localStorage.getItem(storageKey);
   const entry = memCache.get(storageKey);
   if (entry && entry.raw === raw) {
     // 返回深拷贝，防止调用方修改缓存
-    return structuredClone(entry.parsed as T);
+    return safeClone(entry.parsed as T);
   }
   if (raw === null) {
     memCache.set(storageKey, { raw: null, parsed: defaultValue });
-    return structuredClone(defaultValue);
+    return safeClone(defaultValue);
   }
   try {
     const parsed = JSON.parse(raw) as T;
     memCache.set(storageKey, { raw, parsed });
-    return parsed ?? structuredClone(defaultValue);
+    return parsed ?? safeClone(defaultValue);
   } catch {
     memCache.set(storageKey, { raw, parsed: defaultValue });
-    return structuredClone(defaultValue);
+    return safeClone(defaultValue);
   }
 }
 

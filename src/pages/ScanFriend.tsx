@@ -41,7 +41,9 @@ export default function ScanFriend() {
         try {
           if (scannerRef.current.isScanning) await scannerRef.current.stop();
           scannerRef.current.clear();
-        } catch (e) {}
+        } catch (e) {
+          console.warn("Scanner cleanup warning:", e);
+        }
       }
       
       stopTracks();
@@ -73,10 +75,13 @@ export default function ScanFriend() {
         },
         () => {}
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error("Camera start error:", err);
       if (!isUnmounted) {
-        setError("无法启动相机，请检查权限设置");
+        const isPermissionDenied = err?.name === 'NotAllowedError' || err?.message?.includes('Permission');
+        setError(isPermissionDenied
+          ? "摄像头权限被拒绝，请在系统设置 > 隐私 > 摄像头中开启本应用的权限后重试"
+          : "无法启动相机，请检查权限设置");
       }
     }
   };

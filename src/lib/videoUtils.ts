@@ -48,9 +48,12 @@ export async function extractFrameFromUrl(videoUrl: string, time: number = 0.1):
       };
 
       video.onloadedmetadata = () => {
-        // 确保时间在有效范围内
-        const seekTime = Math.min(time, video.duration > 0 ? video.duration : time);
-        video.currentTime = seekTime;
+        // 确保时间在有效范围内，且 duration 已加载
+        if (video.duration > 0 && video.duration !== Infinity) {
+          video.currentTime = Math.min(time, video.duration - 0.01);
+        } else {
+          video.currentTime = time;
+        }
       };
 
       video.onseeked = () => {

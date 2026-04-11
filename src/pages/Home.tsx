@@ -5,9 +5,7 @@ import { storage, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";
 
-const VIDEOS = {
-  DEFAULT: "https://assets.mixkit.co/videos/preview/mixkit-cute-cat-lying-on-a-bed-34537-large.mp4",
-};
+// 不再依赖外部 CDN 兜底视频，离线场景下显示猫咪头像
 
 export default function Home() {
   const navigate = useNavigate();
@@ -35,7 +33,6 @@ export default function Home() {
   const onlineTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const idleVideoRef = useRef<HTMLVideoElement>(null);
-  const clickVideoRef = useRef<HTMLVideoElement>(null);
   const doubleClickVideoRef = useRef<HTMLVideoElement>(null);
   const swipeVideoRef = useRef<HTMLVideoElement>(null);
   const longPressVideoRef = useRef<HTMLVideoElement>(null);
@@ -341,7 +338,6 @@ export default function Home() {
     setIsInitialized(false);
     idleVideoRef.current?.load();
     idleVideoRef.current?.play().catch(() => { /* autoplay may be blocked by browser */ });
-    clickVideoRef.current?.load();
     doubleClickVideoRef.current?.load();
     swipeVideoRef.current?.load();
     longPressVideoRef.current?.load();
@@ -533,7 +529,7 @@ export default function Home() {
         {/* 1. 待机视频层 (Idle) */}
         <video
           ref={idleVideoRef}
-          src={cat?.videoPaths?.idle || cat?.videoPath || cat?.remoteVideoUrl || VIDEOS.DEFAULT}
+          src={cat?.videoPaths?.idle || cat?.videoPath || cat?.remoteVideoUrl || ''}
           muted
           playsInline
           preload="auto"

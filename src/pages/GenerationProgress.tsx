@@ -46,7 +46,7 @@ export default function GenerationProgress() {
 
   const handleRetry = () => {
     resetGenerationState();
-    const target = image ? "/upload-material" : "/create-cat";
+    const target = image ? "/upload-material" : "/create-companion";
     navigate(target, { state: { image, name, breed, furColor }, replace: true });
   };
 

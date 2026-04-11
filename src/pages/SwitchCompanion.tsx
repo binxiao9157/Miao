@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Check, Coins, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, Check, Coins, Sparkles, Trash2 } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 
 export default function SwitchCompanion() {
   const navigate = useNavigate();
   const [cats, setCats] = useState<CatInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [points, setPoints] = useState(0);
+  const [deletingCat, setDeletingCat] = useState<CatInfo | null>(null);
   const REDEEM_THRESHOLD = storage.getUnlockThreshold();
 
   useEffect(() => {
@@ -33,6 +34,22 @@ export default function SwitchCompanion() {
   const handleAddNew = () => {
     if (points >= REDEEM_THRESHOLD) {
       navigate("/welcome", { state: { isRedemption: true, redemptionAmount: REDEEM_THRESHOLD } });
+    }
+  };
+
+  const handleDeleteCat = (cat: CatInfo, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingCat(cat);
+  };
+
+  const confirmDelete = () => {
+    if (!deletingCat) return;
+    const remaining = storage.deleteCatById(deletingCat.id);
+    setCats(remaining);
+    setActiveId(storage.getActiveCatId());
+    setDeletingCat(null);
+    if (remaining.length === 0) {
+      navigate("/empty-cat", { replace: true });
     }
   };
 
@@ -94,6 +111,15 @@ export default function SwitchCompanion() {
                   <Sparkles size={12} />
                 </div>
               )}
+
+              {cats.length > 1 && (
+                <button
+                  onClick={(e) => handleDeleteCat(cat, e)}
+                  className="absolute top-6 left-6 w-7 h-7 bg-red-500/80 backdrop-blur-md rounded-full flex items-center justify-center text-white shadow-sm active:scale-90 transition-transform"
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
             </motion.div>
           ))}
 
@@ -128,6 +154,46 @@ export default function SwitchCompanion() {
           </div>
         )}
       </div>
+
+      {/* 删除确认弹窗 */}
+      <AnimatePresence>
+        {deletingCat && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={() => setDeletingCat(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl"
+            >
+              <h3 className="text-lg font-bold text-center mb-2">确认告别</h3>
+              <p className="text-sm text-on-surface-variant text-center mb-6">
+                确定要和 <span className="font-bold text-on-surface">{deletingCat.name}</span> 说再见吗？此操作不可撤销。
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeletingCat(null)}
+                  className="flex-1 py-3 bg-surface-container rounded-full font-bold text-on-surface active:scale-95 transition-transform"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 py-3 bg-red-500 text-white rounded-full font-bold active:scale-95 transition-transform"
+                >
+                  确认告别
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

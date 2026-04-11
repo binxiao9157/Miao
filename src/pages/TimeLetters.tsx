@@ -7,12 +7,24 @@ import PageHeader from "../components/PageHeader";
 
 type ViewState = 'list' | 'write' | 'detail';
 
+function formatCountdown(unlockAt: number): string {
+  const diff = unlockAt - Date.now();
+  if (diff <= 0) return '已解锁';
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  if (days > 0) return `${days} 天 ${hours} 小时`;
+  if (hours > 0) return `${hours} 小时 ${minutes} 分钟`;
+  return `${minutes} 分钟`;
+}
+
 export default function TimeLetters() {
   const location = useLocation();
   const [letters, setLetters] = useState<TimeLetter[]>(() => storage.getTimeLetters());
   const [view, setView] = useState<ViewState>('list');
   const [selectedLetter, setSelectedLetter] = useState<TimeLetter | null>(null);
   const [showToast, setShowToast] = useState<string | null>(null);
+  const [, setTick] = useState(0);
   
   // Write state
   const [title, setTitle] = useState("");
@@ -25,6 +37,14 @@ export default function TimeLetters() {
       setLetters(storage.getTimeLetters());
     }
   }, [location.pathname]);
+
+  // 实时倒计时：每分钟刷新一次，让未解锁信件显示精确剩余时间
+  useEffect(() => {
+    const hasLocked = letters.some(l => Date.now() < l.unlockAt);
+    if (!hasLocked) return;
+    const timer = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(timer);
+  }, [letters]);
 
   const triggerToast = (msg: string) => {
     setShowToast(msg);
@@ -153,9 +173,9 @@ export default function TimeLetters() {
                   </div>
                   <div className="flex flex-col gap-1">
                     <p className={`text-sm text-on-surface-variant font-medium ${isUnlocked ? 'line-clamp-1' : ''}`}>
-                      {isUnlocked 
-                        ? letter.content 
-                        : `距离解锁还有 ${daysLeft} 天`}
+                      {isUnlocked
+                        ? letter.content
+                        : `距离解锁还有 ${formatCountdown(letter.unlockAt)}`}
                     </p>
                     <p className="text-[10px] text-on-surface-variant/30 font-bold">
                       解锁日期：{unlockDateStr}
