@@ -32,12 +32,41 @@ export default function AddFriendQR() {
     };
   }, []);
 
+  // 页面空闲时预渲染 QR 卡片图，加速后续保存操作
+  useEffect(() => {
+    const prerender = async () => {
+      if (!qrCardRef.current) return;
+      try {
+        const canvas = await html2canvas(qrCardRef.current, {
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#FFFFFF',
+          scale: 2,
+          logging: false,
+        });
+        cachedImageRef.current = canvas.toDataURL("image/png");
+      } catch (e) {
+        // 预渲染失败不影响功能，保存时会重新渲染
+      }
+    };
+    // 延迟到页面渲染完成后再执行
+    const timer = setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(prerender);
+      } else {
+        prerender();
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [cat, user]);
+
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const cachedImageRef = useRef<string | null>(null);
 
   // 将图片 URL 转换为 DataURL 以规避 html2canvas 的跨域限制
   const toDataURL = (url: string): Promise<string> => {
@@ -61,57 +90,54 @@ export default function AddFriendQR() {
     });
   };
 
-  // 保存图片功能
+  // 保存图片功能 — 三级降级：Web Share → <a download> → 长按保存
   const handleSaveImage = async () => {
     if (!qrCardRef.current || isSaving) return;
 
     try {
       setIsSaving(true);
-      
-      // 1. 预处理：将所有外部图片转换为 DataURL
-      const images = qrCardRef.current.querySelectorAll('img');
-      const originalSrcs: string[] = [];
-      
-      try {
-        for (let i = 0; i < images.length; i++) {
-          const img = images[i];
-          originalSrcs.push(img.src);
-          const dataUrl = await toDataURL(img.src);
-          img.src = dataUrl;
+
+      // 优先使用预渲染缓存，无缓存时实时渲染
+      let dataUrl = cachedImageRef.current;
+      if (!dataUrl) {
+        const images = qrCardRef.current.querySelectorAll('img');
+        const originalSrcs: string[] = [];
+        try {
+          for (let i = 0; i < images.length; i++) {
+            const img = images[i];
+            originalSrcs.push(img.src);
+            const converted = await toDataURL(img.src);
+            img.src = converted;
+          }
+        } catch (e) {
+          console.warn("图片转换 DataURL 失败，尝试直接截图:", e);
         }
-      } catch (e) {
-        console.warn("图片转换 DataURL 失败，尝试直接截图:", e);
+
+        const canvas = await html2canvas(qrCardRef.current, {
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#FFFFFF',
+          scale: 3,
+          logging: false,
+        });
+
+        images.forEach((img, i) => {
+          if (originalSrcs[i]) img.src = originalSrcs[i];
+        });
+        dataUrl = canvas.toDataURL("image/png");
+        cachedImageRef.current = dataUrl;
       }
 
-      // 2. 执行截图
-      const canvas = await html2canvas(qrCardRef.current, {
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#FFFFFF', 
-        scale: 3,
-        logging: false,
-      });
+      const fileName = `Miao_Card_${user?.nickname || 'friend'}.png`;
 
-      // 3. 恢复原始图片地址
-      images.forEach((img, i) => {
-        if (originalSrcs[i]) img.src = originalSrcs[i];
-      });
-
-      // 4. 导出图片
-      const dataUrl = canvas.toDataURL("image/png");
-      
-      // 尝试使用 Web Share API 分享文件 (移动端 App 环境最可靠的方案)
+      // Stage 1: Web Share API (移动端原生分享)
       if (navigator.canShare && navigator.share) {
         try {
           const response = await fetch(dataUrl);
           const blob = await response.blob();
-          const file = new File([blob], `Miao_Card_${user?.nickname}.png`, { type: 'image/png' });
-          
+          const file = new File([blob], fileName, { type: 'image/png' });
           if (navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: '保存名片',
-            });
+            await navigator.share({ files: [file], title: '保存名片' });
             showToast("请选择保存图片或发送给好友");
             return;
           }
@@ -120,10 +146,24 @@ export default function AddFriendQR() {
         }
       }
 
-      // 兜底方案：展示预览图，引导用户长按保存 (App 内最通用的方案)
+      // Stage 2: <a download> 触发浏览器下载
+      try {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast("图片已保存到下载目录");
+        return;
+      } catch (e) {
+        console.warn("<a download> 下载失败:", e);
+      }
+
+      // Stage 3: 长按保存预览图 (最终兜底)
       setGeneratedImageUrl(dataUrl);
       showToast("请长按图片保存到相册");
-      
+
     } catch (error) {
       console.error("保存图片失败:", error);
       showToast("保存失败，请尝试截屏保存", "error");

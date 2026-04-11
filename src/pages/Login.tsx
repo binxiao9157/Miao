@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuthContext } from "../context/AuthContext";
 import { PawPrint, Eye, EyeOff } from "lucide-react";
 import { storage } from "../services/storage";
@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "motion/react";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useAuthContext();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -47,11 +48,17 @@ export default function Login() {
     }
     const success = login(username, password);
     if (success) {
-      const hasCat = storage.getCatList().length > 0;
-      if (hasCat) {
-        navigate("/", { replace: true });
+      // 登录后回跳：优先跳转 returnUrl（仅允许站内路径），否则走默认流程
+      const returnUrl = searchParams.get("returnUrl");
+      if (returnUrl && returnUrl.startsWith("/")) {
+        navigate(returnUrl, { replace: true });
       } else {
-        navigate("/empty-cat", { replace: true });
+        const hasCat = storage.getCatList().length > 0;
+        if (hasCat) {
+          navigate("/", { replace: true });
+        } else {
+          navigate("/empty-cat", { replace: true });
+        }
       }
     } else {
       setError("用户名或密码错误");
