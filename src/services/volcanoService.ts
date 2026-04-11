@@ -17,10 +17,10 @@ function buildHeaders() {
  * 互动动作对应的 Prompt 模版 (Seedance 高精度指令)
  */
 export const ACTION_PROMPTS = {
-  idle: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一，呈现自然的呼吸起伏，身体有微小的起伏感；保留原始毛色与真实质感，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；超写实风格，固定摄像头。",
-  tail: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 猫咪保持蹲坐姿态，尾巴自然、有节奏地左右摆动，呈现治愈感；动作流畅自然，无视觉跳变；超写实风格，固定摄像头。",
-  rubbing: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 猫咪缓慢站起走向镜头温柔轻蹭，随后退回原位，动作轻盈温顺；保留原始毛色与真实质感；超写实风格，固定摄像头。",
-  blink: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 猫咪保持蹲坐姿态，安静地眨眼 2-3 次，眼神温柔清澈；嘴巴细节严格遵循真实猫咪生理结构；超写实风格，固定摄像头。"
+  idle: "基于输入猫咪照片，首帧严格固定：猫咪蹲坐在温馨家庭场景的地毯中央，正视镜头，姿态、场景、光线、构图完全统一；全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏；缓慢站起走向镜头轻蹭后退回蹲坐，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；保留原始毛色与真实质感，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；超写实风格，固定摄像头，竖屏 9:16，480P，6 秒无音频，种子值 12345。",
+  tail: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 镜头缓慢、小幅拉近聚焦猫咪面部，全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏；虚拟手轻摸头顶，猫咪眯眼、耳朵后贴呈现享受状态，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后镜头缓慢拉远，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；超写实风格，竖屏 9:16，480P，6 秒无音频，种子值 12345。",
+  rubbing: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 镜头缓慢、小幅拉近聚焦猫咪前爪与上半身，全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏；猫咪前爪在柔软地毯上缓慢交替踩奶，身体轻微起伏，呈现放松舒适状态，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后停止踩奶、镜头缓慢拉远，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；超写实风格，固定摄像头，竖屏 9:16，480P，6 秒无音频，种子值 12345。",
+  blink: "基于输入锚定底图，Strictly follow the appearance, lighting, and composition of the input frame, ensure zero visual gap with the reference image. 镜头缓慢、小幅拉近聚焦猫咪上半身，全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏；主人手从右侧伸入持羽毛逗猫棒晃动，猫咪兴奋抬头、挥爪、原地小跳 2 次，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后逗猫棒移开、镜头缓慢拉远，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；超写实风格，竖屏 9:16，480P，6 秒无音频，种子值 12345。"
 };
 
 /**
