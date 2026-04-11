@@ -28,7 +28,6 @@ const EmptyCatPage = lazy(() => import("./pages/EmptyCatPage"));
 const AccompanyMilestonePage = lazy(() => import("./pages/AccompanyMilestonePage"));
 const AddFriendQR = lazy(() => import("./pages/AddFriendQR"));
 const ScanFriend = lazy(() => import("./pages/ScanFriend"));
-const JoinFriend = lazy(() => import("./pages/JoinFriend"));
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 
@@ -103,9 +102,6 @@ function AppRoutes() {
         <Route path="/add-friend-qr" element={<ProtectedRoute><AddFriendQR /></ProtectedRoute>} />
         <Route path="/scan-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />
   
-        {/* 分享深链落地页 — 不包裹 ProtectedRoute，未登录用户也需访问 */}
-        <Route path="/join" element={<JoinFriend />} />
-
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
