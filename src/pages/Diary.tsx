@@ -8,6 +8,7 @@ import { useAuthContext } from "../context/AuthContext";
 import DiaryCard from "../components/DiaryCard";
 import { shareService } from "../services/shareService";
 import PageHeader from "../components/PageHeader";
+import { mediaStorage } from "../services/mediaStorage";
 import { mockFriendService } from "../services/mockFriendService";
 
 export default function Diary() {
@@ -18,12 +19,13 @@ export default function Diary() {
   const [sharingEntry, setSharingEntry] = useState<DiaryEntry | null>(null);
   const [showWeChatGuide, setShowWeChatGuide] = useState(false);
   const [newContent, setNewContent] = useState("");
-  const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video'; file?: File } | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
   const [showPostToast, setShowPostToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isReadingFile, setIsReadingFile] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [showShareToast, setShowShareToast] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
@@ -102,6 +104,19 @@ export default function Diary() {
     };
   }, [loadData]);
 
+  const closePostingModal = () => {
+    // 释放 URL 对象
+    if (selectedMedia?.url && selectedMedia.url.startsWith('blob:')) {
+      URL.revokeObjectURL(selectedMedia.url);
+    }
+    setIsPosting(false);
+    setNewContent("");
+    setSelectedMedia(null);
+    setIsReadingFile(false);
+    setIsLoading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handlePost = async () => {
     if ((!newContent.trim() && !selectedMedia) || isLoading) return;
 
@@ -114,11 +129,29 @@ export default function Diary() {
       // 模拟保存延迟与媒体文件处理耗时
       await new Promise(resolve => setTimeout(resolve, 1200));
 
+      const diaryId = 'diary_' + Date.now();
+      let mediaUrl = selectedMedia?.url;
+      
+      // 如果有文件，则将其转换为 Base64 并存入 IndexedDB
+      if (selectedMedia?.file) {
+        const reader = new FileReader();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(selectedMedia.file!);
+        });
+        
+        // 存入 IndexedDB
+        await mediaStorage.saveMedia(diaryId, base64);
+        // localStorage 中只存一个标记，实际展示时从 IndexedDB 取
+        mediaUrl = `indexeddb:${diaryId}`;
+      }
+
       const newEntry: DiaryEntry = {
-        id: 'diary_' + Date.now(),
+        id: diaryId,
         catId: activeCatId,
         content: newContent,
-        media: selectedMedia?.url,
+        media: mediaUrl,
         mediaType: selectedMedia?.type,
         createdAt: Date.now(),
         likes: 0,
@@ -129,26 +162,29 @@ export default function Diary() {
       // 1. 写入持久化存储
       const allDiaries = storage.getDiaries();
       const updatedAllDiaries = [newEntry, ...allDiaries];
-      storage.saveDiaries(updatedAllDiaries);
+      const success = storage.saveDiaries(updatedAllDiaries);
+      
+      if (!success) {
+        alert("存储空间不足，日记保存失败。请尝试删除一些旧记录或减小图片/视频大小。");
+        return; // finally will handle setIsLoading(false)
+      }
       
       // 2. 更新本地状态刷新列表 (仅展示当前猫咪的)
       setDiaries(prev => [newEntry, ...prev]);
       
-      // 3. 重置输入状态
-      setNewContent("");
-      setSelectedMedia(null);
-      
-      // 4. 显示成功提示
+      // 3. 显示成功提示
       setShowPostToast(true);
       setTimeout(() => setShowPostToast(false), 2000);
+
+      // 4. 成功后关闭并重置
+      closePostingModal();
 
     } catch (error) {
       console.error("发布日记失败:", error);
       alert("发布失败，请稍后重试");
     } finally {
-      // 无论成功还是失败，强制关闭加载状态并关闭弹窗 (相当于 Navigator.pop)
+      // 无论成功还是失败，确保加载状态被重置
       setIsLoading(false);
-      setIsPosting(false);
     }
   };
 
@@ -259,57 +295,29 @@ export default function Diary() {
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const type = file.type.startsWith('video') ? 'video' : 'image';
+    if (!file) return;
 
-      // 视频大小预检查：在读取文件前就拦截，避免浪费 IO
-      if (type === 'video' && file.size > 2 * 1024 * 1024) {
-        alert("视频文件太大啦，请选择 2MB 以内的视频哦");
-        return;
-      }
+    const type = file.type.startsWith('video') ? 'video' : 'image';
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (!isMountedRef.current) return;
-        if (type === 'image') {
-          // 图片压缩逻辑：限制最大尺寸并降低质量以节省存储空间
-          const img = new Image();
-          img.onload = () => {
-            if (!isMountedRef.current) return;
-            const canvas = document.createElement('canvas');
-            const MAX_SIZE = 800; // 限制最大宽度/高度为 800px
-            let width = img.width;
-            let height = img.height;
-
-            if (width > height) {
-              if (width > MAX_SIZE) {
-                height *= MAX_SIZE / width;
-                width = MAX_SIZE;
-              }
-            } else {
-              if (height > MAX_SIZE) {
-                width *= MAX_SIZE / height;
-                height = MAX_SIZE;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, width, height);
-            
-            // 导出压缩后的 Base64 (JPEG 格式，质量 0.6)
-            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
-            setSelectedMedia({ url: compressedBase64, type: 'image' });
-          };
-          img.src = reader.result as string;
-        } else {
-          // 视频处理
-          setSelectedMedia({ url: reader.result as string, type: 'video' });
-        }
-      };
-      reader.readAsDataURL(file);
+    // 预检大小
+    const sizeLimit = type === 'video' ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > sizeLimit) {
+      alert(`${type === 'video' ? '视频' : '图片'}文件太大啦，请选择 ${sizeLimit / (1024 * 1024)}MB 以内的文件哦`);
+      e.target.value = '';
+      return;
     }
+
+    // 释放旧的预览 URL
+    if (selectedMedia?.url && selectedMedia.url.startsWith('blob:')) {
+      URL.revokeObjectURL(selectedMedia.url);
+    }
+
+    // 使用 URL.createObjectURL 进行即时预览，不阻塞 UI
+    const previewUrl = URL.createObjectURL(file);
+    setSelectedMedia({ url: previewUrl, type, file });
+    
+    // 重置 input
+    e.target.value = '';
   };
 
   const handleWechatInvite = async () => {
@@ -501,7 +509,7 @@ export default function Diary() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-6"
-                onClick={() => setIsPosting(false)}
+                onClick={closePostingModal}
               >
                 <motion.div 
                   initial={{ y: "100%" }}
@@ -527,7 +535,7 @@ export default function Diary() {
                       <h2 className="text-2xl font-black text-on-surface">记录此刻</h2>
                       <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Capture the moment</p>
                     </div>
-                    <button onClick={() => setIsPosting(false)} className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform">
+                    <button onClick={closePostingModal} className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform">
                       <X size={20} />
                     </button>
                   </div>
@@ -543,18 +551,31 @@ export default function Diary() {
                     />
 
                     {selectedMedia && (
-                  <div className="relative w-32 h-32 rounded-3xl overflow-hidden mb-2 group shadow-lg">
+                  <div className="relative w-32 h-32 rounded-3xl overflow-hidden mb-2 group shadow-lg bg-black">
                     {selectedMedia.type === 'video' ? (
-                      <video src={selectedMedia.url} className="w-full h-full object-cover" />
+                      <video 
+                        src={selectedMedia.url} 
+                        className="w-full h-full object-cover" 
+                        muted 
+                        playsInline 
+                        autoPlay 
+                        loop 
+                      />
                     ) : (
                       <img src={selectedMedia.url} className="w-full h-full object-cover" />
                     )}
                     <button 
                       onClick={() => setSelectedMedia(null)}
-                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center backdrop-blur-sm active:scale-90 transition-transform"
+                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center backdrop-blur-sm active:scale-90 transition-transform z-10"
                     >
                       <X size={16} />
                     </button>
+                  </div>
+                )}
+                {isReadingFile && (
+                  <div className="w-32 h-32 rounded-3xl bg-surface-container flex flex-col items-center justify-center mb-2 animate-pulse">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary mb-2" />
+                    <span className="text-[10px] font-bold text-on-surface-variant">读取中...</span>
                   </div>
                 )}
               </div>

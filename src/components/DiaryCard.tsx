@@ -4,6 +4,8 @@ import { motion } from "motion/react";
 import { DiaryEntry, FriendDiaryEntry } from "../services/storage";
 import CommentItem from "./CommentItem";
 
+import { mediaStorage } from "../services/mediaStorage";
+
 interface DiaryCardProps {
   entry: DiaryEntry | FriendDiaryEntry;
   isFriend?: boolean;
@@ -27,6 +29,19 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
   onDelete,
   onDeleteComment
 }) => {
+  const [displayMedia, setDisplayMedia] = React.useState<string | undefined>(entry.media);
+
+  React.useEffect(() => {
+    if (entry.media?.startsWith('indexeddb:')) {
+      const mediaId = entry.media.split(':')[1];
+      mediaStorage.getMedia(mediaId).then(data => {
+        if (data) setDisplayMedia(data);
+      });
+    } else {
+      setDisplayMedia(entry.media);
+    }
+  }, [entry.media]);
+
   const friendEntry = isFriend ? (entry as FriendDiaryEntry) : null;
   
   const avatar = isFriend ? friendEntry?.authorAvatar : userAvatar;
@@ -74,12 +89,24 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
         )}
       </div>
 
-      {entry.media && (
-        <div className="aspect-square w-full bg-surface-container flex items-center justify-center overflow-hidden">
+      {displayMedia && (
+        <div className="aspect-square w-full bg-surface-container flex items-center justify-center overflow-hidden relative">
           {entry.mediaType === 'video' ? (
-            <video src={entry.media} controls className="w-full h-full object-cover" />
+            <video 
+              src={displayMedia} 
+              controls 
+              playsInline
+              muted
+              webkit-playsinline="true"
+              className="w-full h-full object-cover" 
+            />
           ) : (
-            <img src={entry.media} alt="Diary media" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            <img 
+              src={displayMedia} 
+              alt="Diary media" 
+              className="w-full h-full object-cover" 
+              referrerPolicy="no-referrer" 
+            />
           )}
         </div>
       )}
