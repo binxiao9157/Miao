@@ -5,7 +5,21 @@ import axios from 'axios';
  */
 export const VolcanoConfig = {
   MOCK_MODE: false,
-  ModelId: import.meta.env.VITE_VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215",
+  get ModelId() {
+    return localStorage.getItem('VOLC_MODEL_ID') || import.meta.env.VITE_VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215";
+  },
+  get T2IModelId() {
+    return localStorage.getItem('VOLC_T2I_MODEL_ID') || import.meta.env.VITE_VOLC_T2I_MODEL_ID || "doubao-t2i-v2";
+  },
+  get ApiKey() {
+    return localStorage.getItem('VOLC_API_KEY') || import.meta.env.VITE_VOLC_API_KEY;
+  },
+  get SecretKey() {
+    return localStorage.getItem('VOLC_SECRET_KEY') || '';
+  },
+  get AccessKey() {
+    return localStorage.getItem('VOLC_ACCESS_KEY') || '';
+  },
   BaseUrl: import.meta.env.VITE_VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks",
 };
 
@@ -15,7 +29,7 @@ function buildHeaders() {
     'Content-Type': 'application/json' 
   };
   
-  const apiKey = import.meta.env.VITE_VOLC_API_KEY;
+  const apiKey = VolcanoConfig.ApiKey;
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
@@ -66,6 +80,12 @@ export class VolcanoService {
             resolution: "480p",
             duration: 5,
             audio: false
+          },
+          // 传递调试参数
+          debug_config: {
+            api_key: VolcanoConfig.ApiKey,
+            secret_key: VolcanoConfig.SecretKey,
+            access_key: VolcanoConfig.AccessKey
           }
         }, {
           timeout: 120000, // 2 minutes for browser to wait
@@ -99,8 +119,12 @@ export class VolcanoService {
     // 统一错误处理
     const error = lastError;
     if (error.response) {
-      console.error("提交失败详情 (HTTP Error):", error.response.status, error.response.data);
-      throw new Error(error.response.data.error || `提交失败 (${error.response.status})`);
+      const data = error.response.data;
+      console.error("提交失败详情 (HTTP Error):", error.response.status, data);
+      
+      // 优先提取更详细的 message，如果没有则使用 error 字段
+      const detailedMsg = data.message || data.error?.message || data.error || `提交失败 (${error.response.status})`;
+      throw new Error(detailedMsg);
     } else if (error.request) {
       console.error("网络错误 (No Response):", error.request);
       throw new Error("网络错误: 无法连接到服务器，请检查网络或稍后重试");
@@ -131,6 +155,9 @@ export class VolcanoService {
 
     try {
       const response = await axios.get(`/api/video-status/${taskId}`, {
+        params: {
+          api_key: VolcanoConfig.ApiKey
+        },
         timeout: 60000, // Added 60 seconds timeout
         headers: buildHeaders()
       });
@@ -163,7 +190,13 @@ export class VolcanoService {
     try {
       const response = await axios.post("/api/generate-image", {
         prompt,
-        model: import.meta.env.VITE_VOLC_T2I_MODEL_ID || "doubao-t2i-v2"
+        model: VolcanoConfig.T2IModelId,
+        // 传递调试参数
+        debug_config: {
+          api_key: VolcanoConfig.ApiKey,
+          secret_key: VolcanoConfig.SecretKey,
+          access_key: VolcanoConfig.AccessKey
+        }
       }, {
         timeout: 60000,
         headers: buildHeaders()
@@ -212,6 +245,9 @@ export class VolcanoService {
       let result: any;
       try {
         const response = await axios.get(`/api/image-status/${taskId}`, {
+          params: {
+            api_key: VolcanoConfig.ApiKey
+          },
           headers: buildHeaders(),
           signal
         });
@@ -302,7 +338,9 @@ export class VolcanoService {
           throw new Error(`任务成功但未获取到有效的视频播放地址。`);
         }
       } else if (status === 'failed' || status === 'cancelled') {
-        throw new Error(`任务失败，状态: ${status}, 错误: ${JSON.stringify(result.error || result.message)}`);
+        const errorDetail = result.error || result.message || "未知错误";
+        const errorMsg = typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail);
+        throw new Error(`任务失败 (${status}): ${errorMsg}`);
       }
 
       // 等待并增加延迟

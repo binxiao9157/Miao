@@ -30,11 +30,16 @@ async function startServer() {
     });
   });
 
-  const ARK_API_KEY = process.env.VITE_VOLC_API_KEY || process.env.VOLC_API_KEY;
-  const ARK_MODEL_ID = process.env.VITE_VOLC_MODEL_ID || process.env.VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215";
-  const ARK_T2I_MODEL_ID = process.env.VITE_VOLC_T2I_MODEL_ID || process.env.VOLC_T2I_MODEL_ID || "doubao-t2i-v2";
-  // 还原为用户确认可用的 Seedance 专用任务接口端点
-  const ARK_BASE_URL = process.env.VITE_VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks";
+  const ARK_API_KEY = (process.env.VITE_VOLC_API_KEY || process.env.VOLC_API_KEY || "").trim();
+  const ARK_MODEL_ID = (process.env.VITE_VOLC_MODEL_ID || process.env.VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215").trim();
+  const ARK_T2I_MODEL_ID = (process.env.VITE_VOLC_T2I_MODEL_ID || process.env.VOLC_T2I_MODEL_ID || "doubao-t2i-v2").trim();
+  
+  // 确保 ARK_BASE_URL 是一个有效的绝对 URL，且移除末尾斜杠
+  let ARK_BASE_URL = (process.env.VITE_VOLC_ENDPOINT || process.env.VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks").trim().replace(/\/$/, '');
+  if (!ARK_BASE_URL.startsWith('http')) {
+    console.warn(`[Server] Warning: ARK_BASE_URL "${ARK_BASE_URL}" is not a valid URL. Falling back to default.`);
+    ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks";
+  }
 
   console.log("Server Config:", {
     hasApiKey: !!ARK_API_KEY,
@@ -94,7 +99,10 @@ async function startServer() {
 
   // API Route for Image Generation (Ark T2I)
   app.post("/api/generate-image", async (req, res) => {
-    const { prompt } = req.body;
+    const { prompt, debug_config } = req.body;
+    
+    // 优先使用前端传来的调试 Key
+    const currentApiKey = debug_config?.api_key || ARK_API_KEY;
 
     // 恢复前置校验，防止空指针
     if (!prompt || typeof prompt !== 'string') {
@@ -102,7 +110,7 @@ async function startServer() {
     }
 
     try {
-      if (!ARK_API_KEY) {
+      if (!currentApiKey) {
         return res.status(500).json({ error: "服务器未配置 API Key" });
       }
 
@@ -113,9 +121,10 @@ async function startServer() {
       };
 
       console.log("Submitting T2I task to Ark:", {
-        model: ARK_T2I_MODEL_ID,
+        model: requestBody.model,
         url: ARK_T2I_URL,
-        prompt: prompt.substring(0, 50) + "..."
+        prompt: prompt.substring(0, 50) + "...",
+        usingDebugKey: !!debug_config?.api_key
       });
 
       let response;
@@ -124,7 +133,7 @@ async function startServer() {
         try {
           response = await axios.post(ARK_T2I_URL, requestBody, {
             headers: {
-              'Authorization': `Bearer ${ARK_API_KEY}`,
+              'Authorization': `Bearer ${currentApiKey}`,
               'Content-Type': 'application/json'
             },
             httpsAgent,
@@ -174,6 +183,7 @@ async function startServer() {
   // Image status polling
   app.get("/api/image-status/:taskId", async (req, res) => {
     const { taskId } = req.params;
+    const { api_key } = req.query;
 
     if (!isValidTaskId(taskId)) {
       return res.status(400).json({ error: "无效的任务 ID 格式" });
@@ -184,6 +194,8 @@ async function startServer() {
       return res.json({ status: 'succeeded', image_url: url });
     }
 
+    const currentApiKey = (api_key as string) || ARK_API_KEY;
+
     try {
       let response;
       let retries = 2;
@@ -191,7 +203,7 @@ async function startServer() {
         try {
           response = await axios.get(`${ARK_BASE_URL}/${taskId}`, {
             headers: {
-              'Authorization': `Bearer ${ARK_API_KEY}`
+              'Authorization': `Bearer ${currentApiKey}`
             },
             httpsAgent
           });
@@ -215,7 +227,9 @@ async function startServer() {
 
   // API Route for Video Generation (Ark Task API)
   app.post("/api/generate-video", async (req, res) => {
-    const { prompt, negative_prompt, image_base64, parameters } = req.body;
+    const { prompt, negative_prompt, image_base64, parameters, debug_config } = req.body;
+    
+    const currentApiKey = debug_config?.api_key || ARK_API_KEY;
 
     // 恢复 image_base64 非空校验
     if (!image_base64) {
@@ -223,7 +237,7 @@ async function startServer() {
     }
 
     try {
-      if (!ARK_API_KEY) {
+      if (!currentApiKey) {
         console.error("Missing VOLC_API_KEY environment variable");
         return res.status(500).json({ error: "服务器未配置 API Key，请检查环境变量" });
       }
@@ -276,9 +290,10 @@ async function startServer() {
       }
 
       console.log("Submitting task to Ark:", {
-        model: ARK_MODEL_ID,
+        model: requestBody.model,
         url: ARK_BASE_URL,
-        payloadSize: JSON.stringify(requestBody).length
+        payloadSize: JSON.stringify(requestBody).length,
+        usingDebugKey: !!debug_config?.api_key
       });
 
       let response;
@@ -290,7 +305,7 @@ async function startServer() {
             requestBody,
             {
               headers: {
-                'Authorization': `Bearer ${ARK_API_KEY}`,
+                'Authorization': `Bearer ${currentApiKey}`,
                 'Content-Type': 'application/json'
               },
               httpsAgent,
@@ -336,10 +351,13 @@ async function startServer() {
   // Polling endpoint
   app.get("/api/video-status/:taskId", async (req, res) => {
     const { taskId } = req.params;
+    const { api_key } = req.query;
 
     if (!isValidTaskId(taskId)) {
       return res.status(400).json({ error: "无效的任务 ID 格式" });
     }
+
+    const currentApiKey = (api_key as string) || ARK_API_KEY;
 
     try {
       let response;
@@ -350,7 +368,7 @@ async function startServer() {
             `${ARK_BASE_URL}/${taskId}`,
             {
               headers: {
-                'Authorization': `Bearer ${ARK_API_KEY}`
+                'Authorization': `Bearer ${currentApiKey}`
               },
               httpsAgent,
               timeout: 60000
@@ -373,9 +391,18 @@ async function startServer() {
       if (response.data.status === 'failed') {
         console.error(`Ark Task ${taskId} FAILED. Full Response:`, JSON.stringify(response.data, null, 2));
         const arkError = response.data.error || response.data.message || "Unknown Ark Error";
+        
+        // 针对任务执行过程中的限额错误提供友好提示
+        if (typeof arkError === 'object' && arkError.code === 'SetLimitExceeded') {
+          return res.status(200).json({
+            ...response.data,
+            error: "账号推理限额已达上限。请前往火山引擎方舟控制台，在『模型接入』页面关闭『安全体验模式』或调高限额。"
+          });
+        }
+
         return res.status(200).json({
           ...response.data,
-          error: arkError
+          error: typeof arkError === 'string' ? arkError : JSON.stringify(arkError)
         });
       }
 

@@ -168,12 +168,16 @@ function DebugDialog({ onClose, onSave }: { onClose: () => void, onSave: () => v
   const [config, setConfig] = useState({
     // 注意：API Key 已迁移至服务端环境变量，此处配置仅供调试参考
     VOLC_API_KEY: localStorage.getItem('VOLC_API_KEY') || '',
+    VOLC_SECRET_KEY: localStorage.getItem('VOLC_SECRET_KEY') || '',
+    VOLC_ACCESS_KEY: localStorage.getItem('VOLC_ACCESS_KEY') || '',
     VOLC_MODEL_ID: localStorage.getItem('VOLC_MODEL_ID') || '',
     VOLC_T2I_MODEL_ID: localStorage.getItem('VOLC_T2I_MODEL_ID') || '',
   });
 
   const [visible, setVisible] = useState({
     VOLC_API_KEY: false,
+    VOLC_SECRET_KEY: false,
+    VOLC_ACCESS_KEY: false,
     VOLC_MODEL_ID: false,
     VOLC_T2I_MODEL_ID: false,
   });
@@ -196,6 +200,8 @@ function DebugDialog({ onClose, onSave }: { onClose: () => void, onSave: () => v
       Object.keys(config).forEach(key => localStorage.removeItem(key));
       setConfig({
         VOLC_API_KEY: '',
+        VOLC_SECRET_KEY: '',
+        VOLC_ACCESS_KEY: '',
         VOLC_MODEL_ID: '',
         VOLC_T2I_MODEL_ID: '',
       });
@@ -208,6 +214,8 @@ function DebugDialog({ onClose, onSave }: { onClose: () => void, onSave: () => v
 
   const fields = [
     { key: 'VOLC_API_KEY', label: 'API Key' },
+    { key: 'VOLC_SECRET_KEY', label: 'Secret Key' },
+    { key: 'VOLC_ACCESS_KEY', label: 'Access Key' },
     { key: 'VOLC_MODEL_ID', label: 'Video Model ID' },
     { key: 'VOLC_T2I_MODEL_ID', label: 'T2I Model ID' },
   ] as const;
