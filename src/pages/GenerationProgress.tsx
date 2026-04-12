@@ -20,6 +20,9 @@ export default function GenerationProgress() {
   const { refreshCatStatus } = useAuthContext();
   const { image, name, breed, furColor, isRedemption, isDebugRedemption, redemptionAmount } = location.state || {};
 
+  // 1. 深度排查猫咪对象初始化逻辑：强制生成绝对唯一的新 ID
+  const [newCatId] = useState(() => `cat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+
   const [status, setStatus] = useState<string>("正在准备生成...");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -51,10 +54,11 @@ export default function GenerationProgress() {
   };
 
   const startI2VPhase = async (img: string, abortSignal: AbortSignal) => {
+    let pointsDeducted = 0;
     try {
       setPhase('i2v');
 
-      // 积分前置扣除（先扣后生成），防止并发消费导致余额透支
+      // 4. 检查积分扣除状态：在确认生成第一段视频前就扣分
       if (isRedemption && !isDebugRedemption) {
         const required = redemptionAmount || 200;
         const success = storage.deductPoints(required, "解锁新伙伴");
@@ -62,6 +66,7 @@ export default function GenerationProgress() {
           const currentPoints = storage.getPoints();
           throw new Error(`积分不足，需要 ${required} 积分，当前仅有 ${currentPoints.total} 积分`);
         }
+        pointsDeducted = required;
       }
       
       let optimizedImg = img;
@@ -94,6 +99,7 @@ export default function GenerationProgress() {
             image.src = img;
           });
         } catch (e) {
+          console.warn("Image optimization failed, using original.", e);
         }
       }
 
@@ -113,9 +119,43 @@ export default function GenerationProgress() {
       console.log("Idle video generated:", url);
       setIdleVideoUrl(url);
       setProgress(100);
+
+      // 2. 修复数据写入时机：在展示弹窗前正式入库
+      setStatus("正在同步到本地猫窝...");
+      
+      let anchorFrame;
+      try {
+        anchorFrame = await extractFrameFromUrl(url, 0.1);
+      } catch (e) {
+        anchorFrame = optimizedImg;
+      }
+
+      // 物理入库，确保跳转首页时数据已存在
+      await FileManager.downloadVideos(
+        { idle: url }, 
+        newCatId, 
+        name || breed || "我的 AI 猫咪", 
+        image || anchorImage || optimizedImg,
+        { 
+          breed, 
+          furColor, 
+          source: image ? 'upload' : 'created', 
+          placeholderImage: anchorFrame,
+          anchorFrame: anchorFrame 
+        }
+      );
+      
+      // 立即设置为活跃 ID
+      storage.setActiveCatId(newCatId);
+      refreshCatStatus();
+
       setPhase('confirm');
       setStatus("生成成功！");
     } catch (err: any) {
+      // 生成失败则退还积分
+      if (pointsDeducted > 0) {
+        storage.addPoints(pointsDeducted, "生成失败退还");
+      }
       if (err.message === "任务轮询已中止" || err.message === "任务中止") return;
       console.error("生成过程出错:", err);
       setError(err.message || "生成失败");
@@ -125,46 +165,21 @@ export default function GenerationProgress() {
   const handleUnlockAll = async () => {
     if (!idleVideoUrl) return;
     
-    const groupId = 'group_' + Date.now();
-    const optimizedImg = anchorImage || image;
-
-    // 1. 提取锚定帧
-    let anchorFrame;
-    try {
-      anchorFrame = await extractFrameFromUrl(idleVideoUrl, 0.1);
-    } catch (e) {
-      anchorFrame = optimizedImg;
-    }
-
-    // 2. 先以基础版保存并进入首页
-    await FileManager.downloadVideos(
-      { idle: idleVideoUrl }, 
-      groupId, 
-      name || breed || "我的 AI 猫咪", 
-      image || anchorImage || "",
-      { 
-        breed, 
-        furColor, 
-        source: image ? 'upload' : 'created', 
-        placeholderImage: anchorFrame,
-        anchorFrame: anchorFrame 
-      }
-    );
-    
-    // 标记为正在解锁
-    await FileManager.updateCatVideos(groupId, {}, true);
-
-    // 积分扣除逻辑已提前至生成前执行
-
-    storage.setActiveCatId(groupId);
-    refreshCatStatus();
+    // 3. 完善“异步后台生成”逻辑：立即跳转首页
     navigate("/", { replace: true });
 
-    // 3. 后台静默发起剩余任务
+    // 标记为正在解锁
+    await FileManager.updateCatVideos(newCatId, {}, true);
+
+    // 后台静默发起剩余任务
     const secondaryActions = ['tail', 'rubbing', 'blink'] as const;
     try {
+      // 提取锚定帧用于后续生成（如果需要）
+      const currentCat = storage.getCatById(newCatId);
+      const anchorFrame = currentCat?.anchorFrame || anchorImage || image;
+
       const tasks = secondaryActions.map(action => 
-        VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS[action])
+        VolcanoService.submitTask(anchorFrame || "", ACTION_PROMPTS[action])
       );
       const taskResults = await Promise.all(tasks);
       
@@ -172,38 +187,22 @@ export default function GenerationProgress() {
       const pollPromises = taskResults.map((task, index) => 
         VolcanoService.pollTaskResult(task.id).then(url => {
           videoUrls[secondaryActions[index]] = url;
+          // 安全写入：每次获取到一个新 URL 时，重新读出并合并，防止属性覆盖
+          FileManager.updateCatVideos(newCatId, { [secondaryActions[index]]: url }, true);
         })
       );
 
       await Promise.all(pollPromises);
-      // 更新猫咪信息并取消解锁标记
-      await FileManager.updateCatVideos(groupId, videoUrls, false);
+      // 取消解锁标记
+      await FileManager.updateCatVideos(newCatId, {}, false);
     } catch (e) {
       console.error("后台生成任务失败:", e);
-      await FileManager.updateCatVideos(groupId, {}, false);
+      await FileManager.updateCatVideos(newCatId, {}, false);
     }
   };
 
   const handleStayBasic = async () => {
-    if (!idleVideoUrl) return;
-    
-    const groupId = 'group_' + Date.now();
-    const optimizedImg = anchorImage || image;
-
-    // 提取锚定帧作为占位
-    let anchorFrame;
-    try {
-      anchorFrame = await extractFrameFromUrl(idleVideoUrl, 0.1);
-    } catch (e) {
-      anchorFrame = optimizedImg;
-    }
-
-    await FileManager.updateCatVideos(groupId, { idle: idleVideoUrl }, false);
-
-    // 积分扣除逻辑已提前至生成前执行
-
-    storage.setActiveCatId(groupId);
-    refreshCatStatus();
+    // 由于在 confirm 阶段前已经入库并设置了活跃 ID，这里直接跳转即可
     navigate("/", { replace: true });
   };
 

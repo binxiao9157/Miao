@@ -64,15 +64,25 @@ async function startServer() {
 
     if (errorCode === "AccountBalanceInsufficient" || errorMessage?.toLowerCase().includes("balance")) {
       return res.status(403).json({ 
-        error: "账户余额不足，请联系管理员充值",
+        error: "账户余额不足",
+        message: "您的火山引擎账户余额不足，请及时充值以恢复服务。",
         code: "BALANCE_INSUFFICIENT"
       });
     }
 
     if (errorCode === "QuotaExceeded" || errorMessage?.toLowerCase().includes("quota")) {
       return res.status(403).json({ 
-        error: "API 额度已耗尽，请检查资源包状态",
+        error: "API 额度已耗尽",
+        message: "您的资源包额度已用完或 QPS 超过限制，请检查火山引擎控制台。",
         code: "QUOTA_EXCEEDED"
+      });
+    }
+
+    if (errorCode === "AccessDenied" || errorCode === "Forbidden" || status === 403) {
+      return res.status(403).json({
+        error: "访问被拒绝 (403)",
+        message: "鉴权失败。请检查 API Key 是否有效，以及该 Key 是否拥有访问指定推理接入点 (Model ID) 的权限。",
+        code: "ACCESS_DENIED"
       });
     }
 
@@ -163,7 +173,11 @@ async function startServer() {
         throw new Error("未获取到生成的图片地址");
       }
     } catch (error: any) {
-      console.error("Ark T2I API Error:", error.message);
+      console.error("Ark T2I API Error:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
       sendError(res, error, "生成图片失败");
     }
   });
@@ -333,7 +347,11 @@ async function startServer() {
       console.log("Ark Submit Success:", response.data.id || "No ID");
       res.json(response.data);
     } catch (error: any) {
-      console.error("Ark API Error:", error.message);
+      console.error("Ark API Error (Video Submit):", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
       
       // 针对 SetLimitExceeded 错误提供友好提示
       if (error.response?.data?.code === 'SetLimitExceeded') {
@@ -409,7 +427,11 @@ async function startServer() {
       console.log(`Ark Status for ${taskId}:`, response.data.status);
       res.json(response.data);
     } catch (error: any) {
-      console.error("Ark Status Error:", error.message);
+      console.error("Ark Status Error:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
       sendError(res, error, "查询状态失败");
     }
   });
