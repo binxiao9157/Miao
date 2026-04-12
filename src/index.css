@@ -100,4 +100,12 @@
     margin: 0 !important;
     z-index: 0;
   }
+
+  /* 隐藏原生视频控件 */
+  .diary-video::-webkit-media-controls {
+    display: none !important;
+  }
+  .diary-video::-webkit-media-controls-enclosure {
+    display: none !important;
+  }
 }

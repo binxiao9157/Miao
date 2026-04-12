@@ -1,6 +1,6 @@
-import React from "react";
-import { Heart, MessageCircle, Share2, Trash2 } from "lucide-react";
-import { motion } from "motion/react";
+import React, { useState, useRef, useEffect } from "react";
+import { Heart, MessageCircle, Share2, Trash2, Play } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { DiaryEntry, FriendDiaryEntry } from "../services/storage";
 import CommentItem from "./CommentItem";
 
@@ -29,9 +29,11 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
   onDelete,
   onDeleteComment
 }) => {
-  const [displayMedia, setDisplayMedia] = React.useState<string | undefined>(entry.media);
+  const [displayMedia, setDisplayMedia] = useState<string | undefined>(entry.media);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (entry.media?.startsWith('indexeddb:')) {
       const mediaId = entry.media.split(':')[1];
       mediaStorage.getMedia(mediaId).then(data => {
@@ -41,6 +43,17 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
       setDisplayMedia(entry.media);
     }
   }, [entry.media]);
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (videoRef.current.paused) {
+      videoRef.current.play();
+      setIsPlaying(true);
+    } else {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+  };
 
   const friendEntry = isFriend ? (entry as FriendDiaryEntry) : null;
   
@@ -90,16 +103,39 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
       </div>
 
       {displayMedia && (
-        <div className="aspect-square w-full bg-surface-container flex items-center justify-center overflow-hidden relative">
+        <div 
+          className="aspect-square w-full bg-surface-container flex items-center justify-center overflow-hidden relative cursor-pointer group"
+          onClick={entry.mediaType === 'video' ? togglePlay : undefined}
+        >
           {entry.mediaType === 'video' ? (
-            <video 
-              src={displayMedia} 
-              controls 
-              playsInline
-              muted
-              webkit-playsinline="true"
-              className="w-full h-full object-cover" 
-            />
+            <>
+              <video 
+                ref={videoRef}
+                src={displayMedia} 
+                playsInline
+                muted
+                loop
+                disablePictureInPicture
+                webkit-playsinline="true"
+                className="w-full h-full object-cover diary-video" 
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+              />
+              <AnimatePresence>
+                {!isPlaying && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="absolute inset-0 flex items-center justify-center bg-black/10"
+                  >
+                    <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 shadow-xl">
+                      <Play size={32} className="text-white fill-white ml-1" />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </>
           ) : (
             <img 
               src={displayMedia} 
