@@ -30,6 +30,7 @@ const MOCK_FRIENDS: FriendInfo[] = [
 const MOCK_DIARIES: FriendDiaryEntry[] = [
   {
     id: "fdiary_001_1",
+    catId: "mock_cat_001",
     authorId: "friend_001",
     authorNickname: "林深时见鹿",
     authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
@@ -47,6 +48,7 @@ const MOCK_DIARIES: FriendDiaryEntry[] = [
   },
   {
     id: "fdiary_002_1",
+    catId: "mock_cat_002",
     authorId: "friend_002",
     authorNickname: "夏天的风",
     authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Summer",
@@ -63,6 +65,7 @@ const MOCK_DIARIES: FriendDiaryEntry[] = [
   },
   {
     id: "fdiary_003_1",
+    catId: "mock_cat_003",
     authorId: "friend_003",
     authorNickname: "半糖主义",
     authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sugar",
@@ -77,6 +80,7 @@ const MOCK_DIARIES: FriendDiaryEntry[] = [
   },
   {
     id: "fdiary_001_2",
+    catId: "mock_cat_001",
     authorId: "friend_001",
     authorNickname: "林深时见鹿",
     authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, ChangeEvent } from "react";
+import { useState, useEffect, useRef, ChangeEvent, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { Plus, Heart, MessageCircle, Share2, Image as ImageIcon, Video, X, Send, Sparkles, Trash2, CheckCircle, Loader2, ArrowUpRight, UserPlus, QrCode } from "lucide-react";
@@ -12,6 +12,7 @@ import { mockFriendService } from "../services/mockFriendService";
 
 export default function Diary() {
   const { user } = useAuthContext();
+  const [activeCat, setActiveCat] = useState<CatInfo | null>(null);
   const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [sharingEntry, setSharingEntry] = useState<DiaryEntry | null>(null);
@@ -69,17 +70,37 @@ export default function Diary() {
     return () => clearTimeout(timer);
   }, [commentingId]);
 
+  const loadData = useCallback(() => {
+    mockFriendService.initializeMockData();
+    const currentActiveCat = storage.getActiveCat();
+    setActiveCat(currentActiveCat);
+    
+    const allDiaries = storage.getDiaries();
+    if (currentActiveCat) {
+      setDiaries(allDiaries.filter(d => d.catId === currentActiveCat.id));
+    } else {
+      setDiaries([]);
+    }
+    
+    setFriendDiaries(storage.getFriendDiaries());
+    setCatList(storage.getCatList());
+  }, []);
+
   useEffect(() => {
     // 缩短延迟，平衡动画流畅度与加载速度
-    const timer = setTimeout(() => {
-      mockFriendService.initializeMockData();
-      setDiaries(storage.getDiaries());
-      setFriendDiaries(storage.getFriendDiaries());
-      setCatList(storage.getCatList());
-    }, 50);
+    const timer = setTimeout(loadData, 50);
     
-    return () => clearTimeout(timer);
-  }, []);
+    // 监听猫咪切换事件
+    const handleCatChange = () => {
+      loadData();
+    };
+    window.addEventListener('active-cat-changed', handleCatChange);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('active-cat-changed', handleCatChange);
+    };
+  }, [loadData]);
 
   const handlePost = async () => {
     if ((!newContent.trim() && !selectedMedia) || isLoading) return;
@@ -87,11 +108,15 @@ export default function Diary() {
     try {
       setIsLoading(true);
       
+      const activeCatId = storage.getActiveCatId();
+      if (!activeCatId) throw new Error("未找到活跃猫咪，无法发布日记");
+
       // 模拟保存延迟与媒体文件处理耗时
       await new Promise(resolve => setTimeout(resolve, 1200));
 
       const newEntry: DiaryEntry = {
         id: 'diary_' + Date.now(),
+        catId: activeCatId,
         content: newContent,
         media: selectedMedia?.url,
         mediaType: selectedMedia?.type,
@@ -102,12 +127,12 @@ export default function Diary() {
       };
 
       // 1. 写入持久化存储
-      const currentDiaries = storage.getDiaries();
-      const updatedDiaries = [newEntry, ...currentDiaries];
-      const savedDiaries = storage.saveDiaries(updatedDiaries) || updatedDiaries;
+      const allDiaries = storage.getDiaries();
+      const updatedAllDiaries = [newEntry, ...allDiaries];
+      storage.saveDiaries(updatedAllDiaries);
       
-      // 2. 更新本地状态刷新列表 (使用保存后的数据，可能包含自动清理后的结果)
-      setDiaries(savedDiaries);
+      // 2. 更新本地状态刷新列表 (仅展示当前猫咪的)
+      setDiaries(prev => [newEntry, ...prev]);
       
       // 3. 重置输入状态
       setNewContent("");
@@ -129,7 +154,9 @@ export default function Diary() {
 
   const handleLike = (id: string) => {
     if (activeTab === 'mine') {
-      const updated = diaries.map(d => {
+      // 1. 获取所有日记并更新对应项
+      const allDiaries = storage.getDiaries();
+      const updatedAll = allDiaries.map(d => {
         if (d.id === id) {
           return {
             ...d,
@@ -139,8 +166,19 @@ export default function Diary() {
         }
         return d;
       });
-      const saved = storage.saveDiaries(updated) || updated;
-      setDiaries(saved);
+      // 2. 保存全量数据
+      storage.saveDiaries(updatedAll);
+      // 3. 同步更新本地过滤后的状态
+      setDiaries(prev => prev.map(d => {
+        if (d.id === id) {
+          return {
+            ...d,
+            isLiked: !d.isLiked,
+            likes: d.isLiked ? d.likes - 1 : d.likes + 1
+          };
+        }
+        return d;
+      }));
     } else {
       const updated = friendDiaries.map(d => {
         if (d.id === id) {
@@ -161,17 +199,29 @@ export default function Diary() {
     if (!commentText.trim() || commentText.length > MAX_COMMENT_LENGTH) return;
     
     if (activeTab === 'mine') {
-      const updated = diaries.map(d => {
+      const allDiaries = storage.getDiaries();
+      const newComment = { id: Date.now().toString(), content: commentText };
+      
+      const updatedAll = allDiaries.map(d => {
         if (d.id === id) {
           return {
             ...d,
-            comments: [...d.comments, { id: Date.now().toString(), content: commentText }]
+            comments: [...d.comments, newComment]
           };
         }
         return d;
       });
-      const saved = storage.saveDiaries(updated) || updated;
-      setDiaries(saved);
+      storage.saveDiaries(updatedAll);
+      
+      setDiaries(prev => prev.map(d => {
+        if (d.id === id) {
+          return {
+            ...d,
+            comments: [...d.comments, newComment]
+          };
+        }
+        return d;
+      }));
     } else {
       const updated = friendDiaries.map(d => {
         if (d.id === id) {
@@ -195,9 +245,10 @@ export default function Diary() {
   };
 
   const handleDelete = (id: string) => {
-    const updated = storage.deleteDiary(id);
-    const saved = storage.saveDiaries(updated) || updated;
-    setDiaries(saved);
+    // 1. 从全量存储中删除
+    storage.deleteDiary(id);
+    // 2. 从本地过滤列表中移除
+    setDiaries(prev => prev.filter(d => d.id !== id));
     setDeletingId(null);
   };
 
@@ -373,7 +424,9 @@ export default function Diary() {
                 <ImageIcon size={40} />
               </div>
               <h3 className="text-xl font-black text-on-surface mb-2">还没有记录</h3>
-              <p className="text-sm text-on-surface-variant max-w-[200px]">快去分享你与猫咪的第一个温暖瞬间吧</p>
+              <p className="text-sm text-on-surface-variant max-w-[200px]">
+                还没有关于 {activeCat?.name || '猫咪'} 的记录，快去分享你们的第一个温暖瞬间吧～
+              </p>
             </div>
           ) : (
             diaries.map((entry) => (
@@ -387,8 +440,29 @@ export default function Diary() {
                 onShare={handleShare}
                 onDelete={(id) => setDeletingId(id)}
                 onDeleteComment={(dId, cId) => {
-                  const updated = storage.deleteComment(dId, cId);
-                  setDiaries(updated);
+                  // 1. 更新全量存储
+                  const allDiaries = storage.getDiaries();
+                  const updatedAll = allDiaries.map(d => {
+                    if (d.id === dId) {
+                      return {
+                        ...d,
+                        comments: d.comments.filter(c => c.id !== cId)
+                      };
+                    }
+                    return d;
+                  });
+                  storage.saveDiaries(updatedAll);
+                  
+                  // 2. 更新本地过滤列表
+                  setDiaries(prev => prev.map(d => {
+                    if (d.id === dId) {
+                      return {
+                        ...d,
+                        comments: d.comments.filter(c => c.id !== cId)
+                      };
+                    }
+                    return d;
+                  }));
                 }}
               />
             ))

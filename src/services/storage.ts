@@ -46,6 +46,7 @@ export interface Comment {
 
 export interface DiaryEntry {
   id: string;
+  catId: string; // 所属猫咪 ID
   content: string;
   media?: string;
   mediaType?: 'image' | 'video';
@@ -475,6 +476,10 @@ export const storage = {
 
   setActiveCatId: (id: string) => {
     storage.setItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID), id);
+    // 触发自定义事件通知 UI 更新
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('active-cat-changed', { detail: { catId: id } }));
+    }
   },
 
   getActiveCat: (): CatInfo | null => {
@@ -689,6 +694,7 @@ export const storage = {
       const mockDiaries: FriendDiaryEntry[] = [
         {
           id: `fdiary_${friend.id}_1`,
+          catId: `cat_${friend.id}`,
           authorId: friend.id,
           authorNickname: friend.nickname,
           authorAvatar: friend.avatar,
@@ -703,6 +709,7 @@ export const storage = {
         },
         {
           id: `fdiary_${friend.id}_2`,
+          catId: `cat_${friend.id}`,
           authorId: friend.id,
           authorNickname: friend.nickname,
           authorAvatar: friend.avatar,
@@ -717,6 +724,7 @@ export const storage = {
         },
         {
           id: `fdiary_${friend.id}_3`,
+          catId: `cat_${friend.id}`,
           authorId: friend.id,
           authorNickname: friend.nickname,
           authorAvatar: friend.avatar,
