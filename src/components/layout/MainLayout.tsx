@@ -35,21 +35,17 @@ export default function MainLayout() {
     setVisitedTabs(prev => new Set(prev).add(location.pathname));
   }, [location.pathname]);
 
-  // 首屏渲染完成后，空闲时预加载其他 tab 的 chunk，避免切换时闪 loading
+  // 首屏渲染后立即预加载所有 tab chunk（不等 idle/2s），确保用户切换时 chunk 已就绪
   React.useEffect(() => {
-    const prefetch = () => {
+    // 微任务中触发，不阻塞首帧渲染但比 requestIdleCallback/setTimeout 更快完成
+    Promise.resolve().then(() => {
       import("../../pages/Home");
       import("../../pages/Diary");
       import("../../pages/TimeLetters");
       import("../../pages/NotificationList");
       import("../../pages/Points");
       import("../../pages/Profile");
-    };
-    if ('requestIdleCallback' in window) {
-      requestIdleCallback(prefetch);
-    } else {
-      setTimeout(prefetch, 2000);
-    }
+    });
   }, []);
 
   // 模拟 IndexedStack，保持页面状态并消除切换跳动
@@ -80,7 +76,10 @@ export default function MainLayout() {
               paddingRight: 'env(safe-area-inset-right)'
             }}
           >
-            <Component />
+            {/* 每个 tab 独立 Suspense，fallback 为空：chunk 未就绪时保持空白而非全屏 spinner */}
+            <Suspense fallback={null}>
+              <Component />
+            </Suspense>
           </div>
         </div>
       </motion.div>
@@ -89,7 +88,6 @@ export default function MainLayout() {
 
   return (
     <div className={`w-full h-full relative overflow-hidden ${isHome ? 'bg-black' : 'bg-background'}`}>
-      <Suspense fallback={<div className="fixed inset-0 bg-[#FFF5F0] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
       {/* Keep Home alive */}
       <motion.div 
         initial={false}
@@ -101,7 +99,7 @@ export default function MainLayout() {
         transition={{ duration: 0.2, ease: "easeOut" }}
         className={`fixed inset-0 ${isHome ? '' : 'pointer-events-none'}`}
       >
-        {hasCat && <HomePage />}
+        {hasCat && <Suspense fallback={null}><HomePage /></Suspense>}
       </motion.div>
       
       {/* Keep Diary alive */}
@@ -118,7 +116,6 @@ export default function MainLayout() {
 
       {/* Keep Profile alive */}
       {hasCat && renderPersistentTab("/profile", ProfilePage)}
-      </Suspense>
       
       {/* Other routes will render here - 适配安全区 */}
       {!isHome && !isPersistentTab && (
