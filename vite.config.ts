@@ -3,9 +3,12 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
+    esbuild: {
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
+    },
     // Gemini API Key 已移至服务端，不再注入客户端包
     resolve: {
       alias: {

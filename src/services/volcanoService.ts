@@ -4,7 +4,7 @@ import axios from 'axios';
  * 火山引擎配置中心 (方舟 Ark 平台)
  */
 export const VolcanoConfig = {
-  MOCK_MODE: false,
+  get MOCK_MODE() { return import.meta.env.DEV && localStorage.getItem('VOLC_MOCK_MODE') === 'true'; },
   get ModelId() {
     return localStorage.getItem('VOLC_MODEL_ID') || import.meta.env.VITE_VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215";
   },

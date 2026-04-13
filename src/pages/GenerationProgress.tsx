@@ -74,8 +74,10 @@ export default function GenerationProgress() {
         setStatus("正在优化图像数据...");
         try {
           optimizedImg = await new Promise((resolve, reject) => {
+            if (abortSignal.aborted) { resolve(img); return; }
             const image = new Image();
             image.onload = () => {
+              if (abortSignal.aborted) { resolve(img); return; }
               const canvas = document.createElement('canvas');
               const maxSide = 1280;
               let width = image.width;
@@ -145,7 +147,9 @@ export default function GenerationProgress() {
         }
       );
       
-      // 立即设置为活跃 ID
+      // 校验入库成功后再激活
+      const saved = storage.getCatById(newCatId);
+      if (!saved) throw new Error('猫咪数据保存失败');
       storage.setActiveCatId(newCatId);
       refreshCatStatus();
 
@@ -183,17 +187,17 @@ export default function GenerationProgress() {
       );
       const taskResults = await Promise.all(tasks);
       
-      const videoUrls: { [key: string]: string } = {};
-      const pollPromises = taskResults.map((task, index) => 
+      const pollPromises = taskResults.map((task, index) =>
         VolcanoService.pollTaskResult(task.id).then(url => {
-          videoUrls[secondaryActions[index]] = url;
-          // 安全写入：每次获取到一个新 URL 时，重新读出并合并，防止属性覆盖
           FileManager.updateCatVideos(newCatId, { [secondaryActions[index]]: url }, true);
         })
       );
 
-      await Promise.all(pollPromises);
-      // 取消解锁标记
+      const results = await Promise.allSettled(pollPromises);
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') console.error(`动作 ${secondaryActions[i]} 生成失败:`, r.reason);
+      });
+      // 无论部分成功还是全部失败，清除解锁标记
       await FileManager.updateCatVideos(newCatId, {}, false);
     } catch (e) {
       console.error("后台生成任务失败:", e);
@@ -303,9 +307,9 @@ export default function GenerationProgress() {
 
     return () => {
       abortController.abort();
-      // 同时中止 I2V 阶段的任务
       if (i2vAbortRef.current) {
         i2vAbortRef.current.abort();
+        i2vAbortRef.current = null;
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

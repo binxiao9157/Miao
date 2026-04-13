@@ -141,10 +141,13 @@ export default function Diary() {
           reader.readAsDataURL(selectedMedia.file!);
         });
         
-        // 存入 IndexedDB
-        await mediaStorage.saveMedia(diaryId, base64);
-        // localStorage 中只存一个标记，实际展示时从 IndexedDB 取
-        mediaUrl = `indexeddb:${diaryId}`;
+        // 存入 IndexedDB，失败时降级为 inline base64（兼容隐私模式）
+        try {
+          await mediaStorage.saveMedia(diaryId, base64);
+          mediaUrl = `indexeddb:${diaryId}`;
+        } catch {
+          mediaUrl = base64;
+        }
       }
 
       const newEntry: DiaryEntry = {

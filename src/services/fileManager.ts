@@ -1,6 +1,33 @@
 import { storage, CatInfo } from './storage';
 
 /**
+ * 压缩 base64 图片为缩略图，降低 localStorage 占用
+ * 非 base64 数据（URL 等）原样返回
+ */
+function compressForStorage(base64: string | undefined, maxSize: number, quality: number): Promise<string | undefined> {
+  if (!base64 || !base64.startsWith('data:image')) return Promise.resolve(base64);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        const ratio = Math.min(maxSize / w, maxSize / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(base64);
+    img.src = base64;
+  });
+}
+
+/**
  * 文件管理服务 (模拟 Flutter 的 path_provider 和 dart:io)
  * 在 Web 环境下，我们使用 Blob URL 和 localStorage 来模拟本地存储
  */
@@ -26,7 +53,13 @@ export class FileManager {
       finalPaths[action] = url;
     }
 
-    // 3. 记录元数据到本地数据库
+    // 压缩大图为缩略图再入库，防止 localStorage 爆容量
+    const [compressedPlaceholder, compressedAnchor] = await Promise.all([
+      compressForStorage(metadata?.placeholderImage, 200, 0.5),
+      compressForStorage(metadata?.anchorFrame, 600, 0.7),
+    ]);
+
+    // 记录元数据到本地数据库
     const newCat: CatInfo = {
       id: groupId,
       name: catName,
@@ -37,8 +70,8 @@ export class FileManager {
       videoPath: finalPaths.idle || finalPaths.petting || Object.values(finalPaths)[0], 
       videoPaths: finalPaths,
       remoteVideoUrl: finalPaths.idle || finalPaths.petting || Object.values(finalPaths)[0],
-      placeholderImage: metadata?.placeholderImage,
-      anchorFrame: metadata?.anchorFrame,
+      placeholderImage: compressedPlaceholder,
+      anchorFrame: compressedAnchor,
     };
 
     storage.saveCatInfo(newCat);
