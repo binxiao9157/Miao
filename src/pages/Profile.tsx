@@ -15,6 +15,8 @@ export default function Profile() {
   const [activeCat, setActiveCat] = useState<CatInfo | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [clickCount, setClickCount] = useState(0);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
     // 缩短延迟，平衡动画流畅度与加载速度
@@ -258,15 +260,38 @@ export default function Profile() {
         )}
       </AnimatePresence>
 
-      <footer className="mt-12 text-center">
-        <p className="text-[10px] font-bold text-on-surface-variant opacity-30 uppercase tracking-widest">Miao Version 1.0.0</p>
+      <footer className="mt-12 text-center pb-10">
+        <p 
+          onClick={() => {
+            setClickCount(prev => {
+              const next = prev + 1;
+              if (next >= 5) {
+                setShowAdmin(true);
+                return 0;
+              }
+              return next;
+            });
+          }}
+          className="text-[10px] font-bold text-on-surface-variant opacity-30 uppercase tracking-widest cursor-pointer select-none"
+        >
+          Miao Version 1.0.0
+        </p>
         <div className="flex justify-center gap-1 mt-1">
           <Heart size={8} className="text-primary fill-current" />
           <Heart size={8} className="text-secondary fill-current" />
           <Heart size={8} className="text-primary fill-current" />
         </div>
       </footer>
+
+      {/* Admin Panel Modal */}
+      <AnimatePresence>
+        {showAdmin && (
+          <AdminPresetConfig onClose={() => setShowAdmin(false)} />
+        )}
+      </AnimatePresence>
       </div>
     </div>
   );
 }
+
+import AdminPresetConfig from "../components/AdminPresetConfig";

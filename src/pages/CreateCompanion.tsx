@@ -1,101 +1,48 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Check, Sparkles, AlertCircle, Loader2 } from "lucide-react";
-import { catService } from "../services/catService";
-import { storage } from "../services/storage";
+import { ArrowLeft, Check, Sparkles, Loader2 } from "lucide-react";
+import { storage, PresetCat } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
-import { VolcanoService } from "../services/volcanoService";
 import { useAuthContext } from "../context/AuthContext";
 
 export default function CreateCompanion() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { refreshCatStatus } = useAuthContext();
   const isRedemption = location.state?.isRedemption || false;
   const isDebugRedemption = location.state?.isDebugRedemption || false;
   const redemptionAmount = location.state?.redemptionAmount || 200;
   
-  const [selectedBreed, setSelectedBreed] = useState<string | null>(null);
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [presets, setPresets] = useState<PresetCat[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [catName, setCatName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [showToast, setShowToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPresets(storage.getPresetCats());
+  }, []);
 
   const triggerToast = (msg: string) => {
     setShowToast(msg);
     setTimeout(() => setShowToast(null), 3000);
   };
 
-  const getBase64FromUrl = async (url: string, fallbackId: string): Promise<string> => {
-    try {
-      let response;
-      try {
-        response = await fetch(url);
-        if (!response.ok) throw new Error("Not found");
-      } catch (e) {
-        console.warn(`Local asset not found or fetch failed: ${url}, using fallback.`);
-        // 本地资源加载失败时使用内联 SVG 占位，避免依赖外部 CDN
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect fill="%23FEF6F0" width="400" height="400"/><text x="200" y="220" text-anchor="middle" font-size="120">🐱</text></svg>`;
-        const fallbackBlob = new Blob([svg], { type: 'image/svg+xml' });
-        return URL.createObjectURL(fallbackBlob);
-      }
-      
-      const blob = await response.blob();
-      
-      // 使用 Canvas 进行图片压缩和尺寸调整，确保 API 兼容性
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          
-          // 限制最大尺寸为 512px，减小 payload 大小，加快上传速度
-          const maxSide = 512;
-          if (width > maxSide || height > maxSide) {
-            if (width > height) {
-              height = (height / width) * maxSide;
-              width = maxSide;
-            } else {
-              width = (width / height) * maxSide;
-              height = maxSide;
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          
-          // 导出为 jpeg 格式，质量设为 0.8
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-          resolve(dataUrl);
-        };
-        img.onerror = reject;
-        img.src = URL.createObjectURL(blob);
-      });
-    } catch (error) {
-      console.error("Failed to convert image to base64:", error);
-      return url;
-    }
-  };
-
   const handleGenerate = () => {
-    if (!catName.trim() || !selectedBreed || !selectedColor) {
+    if (!catName.trim() || !selectedPresetId) {
       triggerToast("请填写完整信息后再生成哦！");
       return;
     }
 
-    const breed = catService.breeds.find(b => b.id === selectedBreed);
-    const color = catService.colors.find(c => c.id === selectedColor);
+    const selectedPreset = presets.find(p => p.id === selectedPresetId);
+    if (!selectedPreset) return;
 
-    // 跳转到生成进度页，执行两步式生成 (T2I -> I2V)
+    // 跳转到生成进度页，执行 I2V 链路
     navigate("/generation-progress", { 
       state: { 
-        image: null, // T2I 模式
+        image: selectedPreset.imageUrl, // 直接传递预设图片 URL
         name: catName, 
-        breed: breed?.name || "", 
-        furColor: color?.name || "",
+        breed: selectedPreset.name, 
+        furColor: "预设",
         isRedemption, 
         isDebugRedemption,
         redemptionAmount
@@ -103,8 +50,8 @@ export default function CreateCompanion() {
     });
   };
 
-  // 交互逻辑：只有输入了昵称且选择了品种后，按钮才变为高亮可点击状态
-  const isFormComplete = catName.trim() !== "" && selectedBreed !== null;
+  // 交互逻辑：只有输入了昵称且选择了预设后，按钮才变为高亮可点击状态
+  const isFormComplete = catName.trim() !== "" && selectedPresetId !== null;
 
   return (
     <div 
@@ -146,66 +93,37 @@ export default function CreateCompanion() {
             />
           </div>
 
-          {/* 品种选择 - 2x2 Grid */}
+          {/* 品种选择 - Grid */}
           <div className="space-y-4">
             <label className="text-xs font-black uppercase tracking-[0.2em] text-[#5D4037]/40 ml-1">选择品种</label>
             <div className="grid grid-cols-2 gap-4">
-              {catService.breeds.map((breed) => (
+              {presets.map((preset) => (
                 <button
-                  key={breed.id}
-                  onClick={() => setSelectedBreed(breed.id)}
-                  className={`p-5 rounded-[32px] border-[3px] transition-all flex flex-col items-center gap-4 relative overflow-hidden ${
-                    selectedBreed === breed.id 
+                  key={preset.id}
+                  onClick={() => setSelectedPresetId(preset.id)}
+                  className={`p-4 rounded-[32px] border-[3px] transition-all flex flex-col items-center gap-3 relative overflow-hidden ${
+                    selectedPresetId === preset.id 
                       ? "border-[#8B4513] bg-[#8B4513]/5 scale-[1.02] shadow-lg" 
                       : "border-transparent bg-white shadow-sm hover:bg-[#5D4037]/5"
                   }`}
                 >
-                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-white shadow-md bg-[#5D4037]/5">
+                  <div className="w-full aspect-square rounded-2xl overflow-hidden border-2 border-white shadow-md bg-[#5D4037]/5">
                     <img 
-                      src={breed.image} 
-                      alt={breed.name} 
+                      src={preset.imageUrl} 
+                      alt={preset.name} 
                       className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer"
                       onError={(e) => {
-                        // 如果本地素材缺失，使用高质量的占位图
-                        (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${breed.id}&backgroundColor=f8d4c1`;
+                        (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${preset.id}&backgroundColor=f8d4c1`;
                       }}
                     />
                   </div>
-                  <span className={`text-sm font-black ${selectedBreed === breed.id ? "text-[#8B4513]" : "text-[#5D4037]/60"}`}>
-                    {breed.name}
+                  <span className={`text-sm font-black ${selectedPresetId === preset.id ? "text-[#8B4513]" : "text-[#5D4037]/60"}`}>
+                    {preset.name}
                   </span>
-                  {selectedBreed === breed.id && (
+                  {selectedPresetId === preset.id && (
                     <div className="absolute top-3 right-3 bg-[#8B4513] text-white rounded-full p-1 shadow-sm">
                       <Check size={14} strokeWidth={4} />
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 毛色选择 */}
-          <div className="space-y-4">
-            <label className="text-xs font-black uppercase tracking-[0.2em] text-[#5D4037]/40 ml-1">选择毛色</label>
-            <div className="flex flex-wrap items-center gap-6 px-2">
-              {catService.colors.map((color) => (
-                <button
-                  key={color.id}
-                  onClick={() => setSelectedColor(color.id)}
-                  className={`relative shrink-0 w-14 h-14 rounded-full transition-all shadow-md ${
-                    selectedColor === color.id 
-                      ? "scale-110 ring-4 ring-[#FF9D76] ring-offset-4 z-10" 
-                      : "hover:scale-105 active:scale-95"
-                  }`}
-                  style={{ background: color.hex }}
-                >
-                  {selectedColor === color.id && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Check 
-                        size={28} 
-                        className={color.id === 'white' ? "text-[#FF9D76]" : "text-white"} 
-                        strokeWidth={4}
-                      />
                     </div>
                   )}
                 </button>
@@ -215,7 +133,7 @@ export default function CreateCompanion() {
         </div>
       </div>
 
-      {/* 底部固定按钮区域 - 使用 SafeArea 逻辑 */}
+      {/* 底部固定按钮区域 */}
       <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[#FFF5F0] via-[#FFF5F0] to-transparent pt-12 z-50">
         <div className="max-w-md mx-auto w-full">
           <button 

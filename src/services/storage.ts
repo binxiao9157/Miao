@@ -100,6 +100,12 @@ export interface PointsInfo {
   history: PointTransaction[];
 }
 
+export interface PresetCat {
+  id: string;
+  name: string;
+  imageUrl: string;
+}
+
 const STORAGE_KEYS = {
   USERS: 'miao_users', // 所有用户信息
   CURRENT_USER: 'miao_current_user', // 当前登录用户
@@ -108,7 +114,16 @@ const STORAGE_KEYS = {
   LAST_CAT_IMAGE: 'miao_last_cat_image', // 全局最后一次使用的猫咪图片
   LAST_CAT_BREED: 'miao_last_cat_breed', // 全局最后一次使用的猫咪品种
   LAST_USERNAME: 'miao_last_username', // 记住上次登录的用户名
+  APP_PRESET_CATS: 'app_preset_cats', // 预设猫咪底图
 };
+
+const DEFAULT_PRESET_CATS: PresetCat[] = [
+  { id: 'british_shorthair', name: '英国短毛猫', imageUrl: 'https://picsum.photos/seed/british_shorthair/800/800' },
+  { id: 'ragdoll', name: '布偶猫', imageUrl: 'https://picsum.photos/seed/ragdoll/800/800' },
+  { id: 'persian', name: '波斯猫', imageUrl: 'https://picsum.photos/seed/persian/800/800' },
+  { id: 'maine_coon', name: '缅因猫', imageUrl: 'https://picsum.photos/seed/maine_coon/800/800' },
+  { id: 'siamese', name: '暹罗猫', imageUrl: 'https://picsum.photos/seed/siamese/800/800' },
+];
 
 const USER_DATA_KEYS = {
   CAT_LIST: 'miao_cat_list',
@@ -756,5 +771,14 @@ export const storage = {
   saveFriendDiaries: (diaries: FriendDiaryEntry[]) => {
     const trimmed = diaries.length > MAX_FRIEND_DIARIES ? diaries.slice(0, MAX_FRIEND_DIARIES) : diaries;
     storage.setItem(getUserKey(USER_DATA_KEYS.FRIEND_DIARIES), JSON.stringify(trimmed));
+  },
+
+  // Preset Cats Management
+  getPresetCats: (): PresetCat[] => {
+    return storage.safeParse<PresetCat[]>(STORAGE_KEYS.APP_PRESET_CATS, DEFAULT_PRESET_CATS);
+  },
+
+  savePresetCats: (presets: PresetCat[]) => {
+    storage.setItem(STORAGE_KEYS.APP_PRESET_CATS, JSON.stringify(presets));
   },
 };
