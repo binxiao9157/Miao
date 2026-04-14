@@ -18,6 +18,7 @@ export interface CatInfo {
   color: string;
   avatar: string;
   source: 'created' | 'uploaded';
+  createdAt?: number; // 新增：猫咪创建/领养时间戳
   videoPath?: string; // 默认视频路径 (Idle/Petting)
   videoPaths?: {
     idle?: string;

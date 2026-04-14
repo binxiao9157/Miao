@@ -19,25 +19,47 @@ export default function Profile() {
   const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
-    // 缩短延迟，平衡动画流畅度与加载速度
-    const timer = setTimeout(() => {
-      const diaries = storage.getDiaries();
+    const loadStats = () => {
       const cat = storage.getActiveCat();
       setActiveCat(cat);
+
+      if (!cat) {
+        setStats({ days: 0, entries: 0 });
+        return;
+      }
+
+      // 1. 计算陪伴天数 (专属)
+      const diaries = storage.getDiaries();
+      const catDiaries = diaries.filter(d => d.catId === cat.id);
       
-      const firstDiary = diaries.length > 0 ? diaries[diaries.length - 1] : null;
-      const firstCreatedAt = firstDiary?.createdAt ? new Date(firstDiary.createdAt).getTime() : NaN;
-      const days = (!isNaN(firstCreatedAt) && firstCreatedAt > 0)
-        ? Math.max(1, Math.ceil((Date.now() - firstCreatedAt) / (1000 * 60 * 60 * 24)))
+      // 优先级：cat.createdAt > 第一条日记时间 > 1天
+      let startTime = cat.createdAt;
+      if (!startTime && catDiaries.length > 0) {
+        // 兜底：取该猫咪最早的一条日记时间
+        startTime = Math.min(...catDiaries.map(d => d.createdAt));
+      }
+
+      const days = startTime
+        ? Math.max(1, Math.ceil((Date.now() - startTime) / (1000 * 60 * 60 * 24)))
         : 1;
 
+      // 2. 计算记录瞬间 (专属)
       setStats({
         days,
-        entries: diaries.length
+        entries: catDiaries.length
       });
-    }, 50);
+    };
 
-    return () => clearTimeout(timer);
+    loadStats();
+
+    // 监听活跃猫咪切换事件，实现实时同步
+    window.addEventListener('active-cat-changed', loadStats);
+    window.addEventListener('cat-updated', loadStats);
+    
+    return () => {
+      window.removeEventListener('active-cat-changed', loadStats);
+      window.removeEventListener('cat-updated', loadStats);
+    };
   }, []);
 
   const handleLogout = () => {

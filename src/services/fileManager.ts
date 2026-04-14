@@ -67,6 +67,7 @@ export class FileManager {
       color: metadata?.furColor || '未知',
       avatar: avatarUrl,
       source: metadata?.source === 'created' ? 'created' : 'uploaded',
+      createdAt: Date.now(), // 记录领养时间
       videoPath: finalPaths.idle || finalPaths.petting || Object.values(finalPaths)[0], 
       videoPaths: finalPaths,
       remoteVideoUrl: finalPaths.idle || finalPaths.petting || Object.values(finalPaths)[0],
