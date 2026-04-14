@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send, Clock, ChevronRight, MailOpen, Filter } from "lucide-react";
+import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send, Clock, ChevronRight, MailOpen, Filter, Trash2, AlertCircle } from "lucide-react";
 import { storage, TimeLetter, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
@@ -24,6 +24,7 @@ export default function TimeLetters() {
   const [view, setView] = useState<ViewState>('list');
   const [selectedLetter, setSelectedLetter] = useState<TimeLetter | null>(null);
   const [showToast, setShowToast] = useState<string | null>(null);
+  const [letterToDelete, setLetterToDelete] = useState<TimeLetter | null>(null);
   const [, setTick] = useState(0);
   
   // Write state
@@ -117,6 +118,19 @@ export default function TimeLetters() {
     }
   };
 
+  const handleDeleteClick = (e: React.MouseEvent, letter: TimeLetter) => {
+    e.stopPropagation();
+    setLetterToDelete(letter);
+  };
+
+  const confirmDelete = () => {
+    if (!letterToDelete) return;
+    const updated = storage.deleteTimeLetter(letterToDelete.id);
+    setLetters(updated);
+    setLetterToDelete(null);
+    triggerToast("信件已永久删除");
+  };
+
   const filteredLetters = useMemo(() => {
     if (filterCatId === "all") return letters;
     return letters.filter(l => l.catId === filterCatId);
@@ -190,73 +204,116 @@ export default function TimeLetters() {
             <p className="text-sm text-on-surface-variant max-w-[200px]">写一封信给未来的自己，让时光见证温暖</p>
           </motion.div>
         ) : (
-          filteredLetters.map((letter, index) => {
-            const now = Date.now();
-            const isUnlocked = now >= letter.unlockAt;
-            
-            const unlockDateStr = new Date(letter.unlockAt).toLocaleDateString('zh-CN', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit'
-            }).replace(/\//g, '/');
+          <AnimatePresence mode="popLayout">
+            {filteredLetters.map((letter, index) => {
+              const now = Date.now();
+              const isUnlocked = now >= letter.unlockAt;
+              const targetCat = myCats.find(c => c.id === letter.catId);
 
-            const targetCat = myCats.find(c => c.id === letter.catId);
-
-            return (
-              <div 
-                key={letter.id}
-                onClick={() => handleLetterClick(letter)}
-                className={`miao-card flex gap-4 group active:scale-[0.98] transition-all p-3`}
-              >
-                {/* 核心视觉：猫咪头像 */}
-                <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 shadow-sm">
-                  <img 
-                    src={letter.catAvatar || "https://picsum.photos/seed/cat/200/200"} 
-                    className={`w-full h-full object-cover transition-all duration-500 ${!isUnlocked ? 'blur-md scale-110 brightness-75' : ''}`}
-                    alt="" 
-                    referrerPolicy="no-referrer"
-                  />
-                  {!isUnlocked ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                      <Lock size={24} className="text-white drop-shadow-lg" />
-                    </div>
-                  ) : (
-                    <div className="absolute top-1 right-1 bg-green-500 text-white p-1 rounded-full shadow-lg">
-                      <MailOpen size={10} />
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex-grow min-w-0 flex flex-col justify-between py-1">
-                  <div>
-                    <h3 className="text-base font-black text-on-surface truncate mb-1">
-                      {letter.title || "时光回响"}
-                    </h3>
-                    <p className={`text-xs text-on-surface-variant font-medium leading-relaxed ${isUnlocked ? 'line-clamp-2' : 'text-red-500 font-black'}`}>
-                      {isUnlocked
-                        ? letter.content
-                        : `距离解锁还有 ${formatCountdown(letter.unlockAt)}`}
-                    </p>
+              return (
+                <motion.div 
+                  key={letter.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  onClick={() => handleLetterClick(letter)}
+                  className={`miao-card flex gap-4 group active:scale-[0.98] transition-all p-3 relative`}
+                >
+                  {/* 核心视觉：猫咪头像 */}
+                  <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 shadow-sm">
+                    <img 
+                      src={letter.catAvatar || "https://picsum.photos/seed/cat/200/200"} 
+                      className={`w-full h-full object-cover transition-all duration-500 ${!isUnlocked ? 'blur-md scale-110 brightness-75' : ''}`}
+                      alt="" 
+                      referrerPolicy="no-referrer"
+                    />
+                    {!isUnlocked ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <Lock size={24} className="text-white drop-shadow-lg" />
+                      </div>
+                    ) : (
+                      <div className="absolute top-1 right-1 bg-green-500 text-white p-1 rounded-full shadow-lg">
+                        <MailOpen size={10} />
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-[10px] text-on-surface-variant/40 font-bold">
-                      收信喵：{targetCat?.name || "已离开的小猫"}
-                    </p>
-                    <span className="text-[10px] font-black text-on-surface-variant/20 uppercase tracking-widest">
-                      {new Date(letter.createdAt).toLocaleDateString()}
-                    </span>
+                  <div className="flex-grow min-w-0 flex flex-col justify-between py-1">
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="text-base font-black text-on-surface truncate flex-1">
+                          {letter.title || "时光回响"}
+                        </h3>
+                        <button 
+                          onClick={(e) => handleDeleteClick(e, letter)}
+                          className="p-1.5 text-on-surface-variant/20 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                      <p className={`text-xs text-on-surface-variant font-medium leading-relaxed ${isUnlocked ? 'line-clamp-2' : 'text-red-500 font-black'}`}>
+                        {isUnlocked
+                          ? letter.content
+                          : `距离解锁还有 ${formatCountdown(letter.unlockAt)}`}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-[10px] text-on-surface-variant/40 font-bold">
+                        收信喵：{targetCat?.name || "已离开的小猫"}
+                      </p>
+                      <span className="text-[10px] font-black text-on-surface-variant/20 uppercase tracking-widest">
+                        {new Date(letter.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <ChevronRight size={16} className="text-on-surface-variant/20 group-hover:text-primary transition-colors" />
-                </div>
-              </div>
-            );
-          })
+                  
+                  <div className="flex items-center">
+                    <ChevronRight size={16} className="text-on-surface-variant/20 group-hover:text-primary transition-colors" />
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         )}
       </div>
+
+      {/* 删除确认弹窗 */}
+      <AnimatePresence>
+        {letterToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[40px] p-8 w-full max-w-xs shadow-2xl text-center"
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-black text-gray-900 mb-2">确认删除信件</h3>
+              <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+                您确定要永久删除这封写给 <span className="text-red-500 font-bold">{myCats.find(c => c.id === letterToDelete.catId)?.name || "小猫"}</span> 的时光信件吗？此操作不可撤销。
+              </p>
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={confirmDelete}
+                  className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-500/20 active:scale-95 transition-transform"
+                >
+                  确认删除
+                </button>
+                <button 
+                  onClick={() => setLetterToDelete(null)}
+                  className="w-full py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold active:scale-95 transition-transform"
+                >
+                  取消
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 

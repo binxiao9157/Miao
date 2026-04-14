@@ -672,6 +672,13 @@ export const storage = {
     storage.setItem(getUserKey(USER_DATA_KEYS.TIME_LETTERS), JSON.stringify(trimmed));
   },
 
+  deleteTimeLetter: (id: string): TimeLetter[] => {
+    const letters = storage.getTimeLetters();
+    const updated = letters.filter(l => l.id !== id);
+    storage.saveTimeLetters(updated);
+    return updated;
+  },
+
   clearMediaCache: () => {
     const diaries = storage.getDiaries();
     const cleaned = diaries.map(d => ({ ...d, media: undefined }));
