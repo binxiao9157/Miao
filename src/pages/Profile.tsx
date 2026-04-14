@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, PawPrint, QrCode, ScanQrCode } from "lucide-react";
+import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, QrCode, ScanQrCode } from "lucide-react";
+import PawIcon from "../components/PawIcon";
 import { useAuthContext } from "../context/AuthContext";
 import { storage, CatInfo } from "../services/storage";
 import { useState, useEffect } from "react";

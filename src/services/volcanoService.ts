@@ -6,35 +6,18 @@ import axios from 'axios';
 export const VolcanoConfig = {
   get MOCK_MODE() { return import.meta.env.DEV && localStorage.getItem('VOLC_MOCK_MODE') === 'true'; },
   get ModelId() {
-    return localStorage.getItem('VOLC_MODEL_ID') || import.meta.env.VITE_VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215";
+    return localStorage.getItem('VOLC_MODEL_ID') || "doubao-seedance-1-5-pro-251215";
   },
   get T2IModelId() {
-    return localStorage.getItem('VOLC_T2I_MODEL_ID') || import.meta.env.VITE_VOLC_T2I_MODEL_ID || "doubao-t2i-v2";
+    return localStorage.getItem('VOLC_T2I_MODEL_ID') || "doubao-t2i-v2";
   },
-  get ApiKey() {
-    return localStorage.getItem('VOLC_API_KEY') || import.meta.env.VITE_VOLC_API_KEY;
-  },
-  get SecretKey() {
-    return localStorage.getItem('VOLC_SECRET_KEY') || '';
-  },
-  get AccessKey() {
-    return localStorage.getItem('VOLC_ACCESS_KEY') || '';
-  },
-  BaseUrl: import.meta.env.VITE_VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks",
 };
 
-/** 请求头：根据方舟 Ark v3 规范构建鉴权头 */
+/** 请求头 */
 function buildHeaders() {
-  const headers: Record<string, string> = { 
+  return { 
     'Content-Type': 'application/json' 
   };
-  
-  const apiKey = VolcanoConfig.ApiKey;
-  if (apiKey) {
-    headers['Authorization'] = `Bearer ${apiKey}`;
-  }
-  
-  return headers;
 }
 
 /**
@@ -80,12 +63,6 @@ export class VolcanoService {
             resolution: "480p",
             duration: 5,
             audio: false
-          },
-          // 传递调试参数
-          debug_config: {
-            api_key: VolcanoConfig.ApiKey,
-            secret_key: VolcanoConfig.SecretKey,
-            access_key: VolcanoConfig.AccessKey
           }
         }, {
           timeout: 120000, // 2 minutes for browser to wait
@@ -155,9 +132,6 @@ export class VolcanoService {
 
     try {
       const response = await axios.get(`/api/video-status/${taskId}`, {
-        params: {
-          api_key: VolcanoConfig.ApiKey
-        },
         timeout: 60000, // Added 60 seconds timeout
         headers: buildHeaders()
       });
@@ -190,13 +164,7 @@ export class VolcanoService {
     try {
       const response = await axios.post("/api/generate-image", {
         prompt,
-        model: VolcanoConfig.T2IModelId,
-        // 传递调试参数
-        debug_config: {
-          api_key: VolcanoConfig.ApiKey,
-          secret_key: VolcanoConfig.SecretKey,
-          access_key: VolcanoConfig.AccessKey
-        }
+        model: VolcanoConfig.T2IModelId
       }, {
         timeout: 60000,
         headers: buildHeaders()
@@ -245,9 +213,6 @@ export class VolcanoService {
       let result: any;
       try {
         const response = await axios.get(`/api/image-status/${taskId}`, {
-          params: {
-            api_key: VolcanoConfig.ApiKey
-          },
           headers: buildHeaders(),
           signal
         });

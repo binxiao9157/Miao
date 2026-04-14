@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Camera, ArrowRight, Upload, PawPrint, ArrowLeft, Eye, EyeOff, Save, RotateCcw, X, AlertCircle } from "lucide-react";
+import { Camera, ArrowRight, Upload, ArrowLeft, Eye, EyeOff, Save, RotateCcw, X, AlertCircle } from "lucide-react";
+import PawIcon from "../components/PawIcon";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";
 import { storage } from "../services/storage";
@@ -79,7 +80,7 @@ export default function Welcome() {
       </button>
 
       <div className={`flex items-center gap-2 mb-12 group mt-12`}>
-        <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={32} />
+        <PawIcon className="text-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={32} fill="#5D4037" />
         <span className="text-2xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">Miao</span>
       </div>
 
@@ -116,7 +117,7 @@ export default function Welcome() {
         >
           <div className="flex items-start justify-between mb-6">
             <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-              <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12" size={28} />
+              <PawIcon className="text-[#5D4037] -rotate-12" size={28} fill="#5D4037" />
             </div>
             <ArrowRight className="text-on-surface-variant/30 group-hover:text-primary transition-colors" />
           </div>

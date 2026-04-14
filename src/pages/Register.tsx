@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthContext } from "../context/AuthContext";
-import { ArrowLeft, User, Lock, ShieldCheck, PawPrint, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, User, Lock, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import PawIcon from "../components/PawIcon";
 import { storage } from "../services/storage";
 import { motion } from "motion/react";
 
@@ -66,7 +67,7 @@ export default function Register() {
         </button>
         
         <div className="flex items-center gap-2 mb-8 group">
-          <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={32} />
+          <PawIcon className="text-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={32} fill="#5D4037" />
           <h1 className="text-4xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">加入 Miao</h1>
         </div>
         <p className="text-on-surface-variant text-sm opacity-60 leading-relaxed">开启您与宠物的精致陪伴之旅，记录每一个温暖瞬间。</p>

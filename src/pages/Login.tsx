@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthContext } from "../context/AuthContext";
-import { PawPrint, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import PawIcon from "../components/PawIcon";
 import { storage } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -70,7 +71,7 @@ export default function Login() {
       <div className="w-full flex-1 flex flex-col items-center justify-center py-4 relative z-10">
         {/* Logo Section */}
         <div className="flex items-center gap-2 mb-4 group">
-          <PawPrint className="text-[#5D4037] fill-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={28} />
+          <PawIcon className="text-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={28} fill="#5D4037" />
           <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter">Miao</span>
         </div>
         

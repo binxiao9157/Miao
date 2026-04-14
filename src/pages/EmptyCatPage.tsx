@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import { PawPrint, Sparkles, ArrowLeft } from "lucide-react";
+import { Sparkles, ArrowLeft } from "lucide-react";
+import PawIcon from "../components/PawIcon";
 import { motion } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";
 
@@ -41,7 +42,7 @@ export default function EmptyCatPage() {
           {/* Icon/Illustration */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative">
-              <PawPrint size={80} className="text-on-surface-variant/10 rotate-12" />
+              <PawIcon size={80} className="text-on-surface-variant/10 rotate-12" fill="currentColor" />
               <motion.div 
                 animate={{ 
                   y: [0, -10, 0],
@@ -54,7 +55,7 @@ export default function EmptyCatPage() {
                 }}
                 className="absolute inset-0 flex items-center justify-center"
               >
-                <PawPrint size={80} className="text-primary/20 -rotate-12" />
+                <PawIcon size={80} className="text-primary/20 -rotate-12" fill="currentColor" />
               </motion.div>
             </div>
           </div>
