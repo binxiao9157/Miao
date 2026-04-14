@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, memo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send, Clock, ChevronRight, MailOpen, Filter, Trash2, AlertCircle } from "lucide-react";
 import { storage, TimeLetter, CatInfo } from "../services/storage";
@@ -6,6 +6,122 @@ import { motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
 
 type ViewState = 'list' | 'write' | 'detail';
+
+// 极轻量的局部倒计时组件，隔离重绘压力
+const CountdownTimer = memo(({ unlockAt }: { unlockAt: number }) => {
+  const [countdown, setCountdown] = useState(() => formatCountdown(unlockAt));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const next = formatCountdown(unlockAt);
+      setCountdown(next);
+      if (next === '已解锁') clearInterval(timer);
+    }, 10000); // 10秒刷新一次即可，平衡性能与实时性
+    return () => clearInterval(timer);
+  }, [unlockAt]);
+
+  return <span className="text-red-500 font-black">{countdown}</span>;
+});
+
+CountdownTimer.displayName = 'CountdownTimer';
+
+// 记忆化信件项组件，防止不必要的重绘
+const TimeLetterItem = memo(({ 
+  letter, 
+  targetCat, 
+  isUnlocked,
+  onDelete, 
+  onClick
+}: { 
+  letter: TimeLetter; 
+  targetCat?: CatInfo; 
+  isUnlocked: boolean;
+  onDelete: (e: React.MouseEvent, l: TimeLetter) => void;
+  onClick: (l: TimeLetter) => void;
+}) => {
+  return (
+    <motion.div 
+      layout="position" // 仅对位置进行布局动画，彻底解决颤动问题
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.1 } }}
+      transition={{ 
+        type: "spring", 
+        stiffness: 400, 
+        damping: 30,
+        opacity: { duration: 0.2 }
+      }}
+      onClick={() => onClick(letter)}
+      className="miao-card flex gap-4 group active:scale-[0.98] p-3 relative overflow-hidden will-change-transform"
+    >
+      {/* 核心视觉：猫咪头像 - 绝对稳定的容器 */}
+      <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 shadow-sm bg-surface-container">
+        <img 
+          src={letter.catAvatar || "https://picsum.photos/seed/cat/200/200"} 
+          className={`w-full h-full object-cover ${!isUnlocked ? 'blur-sm scale-110 brightness-75' : 'blur-0 scale-100 brightness-100'}`}
+          alt="" 
+          referrerPolicy="no-referrer"
+          decoding="async"
+          loading="eager"
+        />
+        
+        {/* 稳定遮罩层 - 使用内联样式避免类名切换导致的重排 */}
+        <div 
+          className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity duration-300"
+          style={{ opacity: isUnlocked ? 0 : 1, pointerEvents: 'none' }}
+        >
+          <Lock size={24} className="text-white drop-shadow-lg" />
+        </div>
+        
+        <div 
+          className="absolute top-1 right-1 bg-green-500 text-white p-1 rounded-full shadow-lg transition-opacity duration-300"
+          style={{ opacity: isUnlocked ? 1 : 0, pointerEvents: 'none' }}
+        >
+          <MailOpen size={10} />
+        </div>
+      </div>
+      
+      <div className="flex-grow min-w-0 flex flex-col justify-between py-1">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-base font-black text-on-surface truncate flex-1">
+              {letter.title || "时光回响"}
+            </h3>
+            <button 
+              onClick={(e) => onDelete(e, letter)}
+              className="p-1.5 text-on-surface-variant/20 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+          
+          <div className="text-xs text-on-surface-variant font-medium leading-relaxed">
+            {isUnlocked ? (
+              <p className="line-clamp-2">{letter.content}</p>
+            ) : (
+              <p>距离解锁还有 <CountdownTimer unlockAt={letter.unlockAt} /></p>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-[10px] text-on-surface-variant/40 font-bold">
+            收信喵：{targetCat?.name || "已离开的小猫"}
+          </p>
+          <span className="text-[10px] font-black text-on-surface-variant/20 uppercase tracking-widest">
+            {new Date(letter.createdAt).toLocaleDateString()}
+          </span>
+        </div>
+      </div>
+      
+      <div className="flex items-center">
+        <ChevronRight size={16} className="text-on-surface-variant/20 group-hover:text-primary transition-colors" />
+      </div>
+    </motion.div>
+  );
+});
+
+TimeLetterItem.displayName = 'TimeLetterItem';
 
 function formatCountdown(unlockAt: number): string {
   const diff = unlockAt - Date.now();
@@ -25,7 +141,6 @@ export default function TimeLetters() {
   const [selectedLetter, setSelectedLetter] = useState<TimeLetter | null>(null);
   const [showToast, setShowToast] = useState<string | null>(null);
   const [letterToDelete, setLetterToDelete] = useState<TimeLetter | null>(null);
-  const [, setTick] = useState(0);
   
   // Write state
   const [title, setTitle] = useState("");
@@ -52,20 +167,12 @@ export default function TimeLetters() {
     }
   }, [location.pathname]);
 
-  // 实时倒计时：每分钟刷新一次，让未解锁信件显示精确剩余时间
-  useEffect(() => {
-    const hasLocked = letters.some(l => Date.now() < l.unlockAt);
-    if (!hasLocked) return;
-    const timer = setInterval(() => setTick(t => t + 1), 60000);
-    return () => clearInterval(timer);
-  }, [letters]);
-
-  const triggerToast = (msg: string) => {
+  const triggerToast = useCallback((msg: string) => {
     setShowToast(msg);
     setTimeout(() => setShowToast(null), 3000);
-  };
+  }, []);
 
-  const handleSaveLetter = () => {
+  const handleSaveLetter = useCallback(() => {
     if (!selectedCatId) {
       triggerToast("请先选择收信的小猫哦");
       return;
@@ -103,9 +210,9 @@ export default function TimeLetters() {
     setDays(1);
     setView('list');
     triggerToast("封存成功！信件已存入本地时光机");
-  };
+  }, [selectedCatId, title, content, days, letters, myCats, triggerToast]);
 
-  const handleLetterClick = (letter: TimeLetter) => {
+  const handleLetterClick = useCallback((letter: TimeLetter) => {
     const isUnlocked = Date.now() >= letter.unlockAt;
     if (isUnlocked) {
       setSelectedLetter(letter);
@@ -116,20 +223,20 @@ export default function TimeLetters() {
       const date = unlockDate.getDate();
       triggerToast(`时光正在酿造这封信，请在 ${month} 月 ${date} 日后再来开启吧～`);
     }
-  };
+  }, [triggerToast]);
 
-  const handleDeleteClick = (e: React.MouseEvent, letter: TimeLetter) => {
+  const handleDeleteClick = useCallback((e: React.MouseEvent, letter: TimeLetter) => {
     e.stopPropagation();
     setLetterToDelete(letter);
-  };
+  }, []);
 
-  const confirmDelete = () => {
+  const confirmDelete = useCallback(() => {
     if (!letterToDelete) return;
     const updated = storage.deleteTimeLetter(letterToDelete.id);
     setLetters(updated);
     setLetterToDelete(null);
     triggerToast("信件已永久删除");
-  };
+  }, [letterToDelete, triggerToast]);
 
   const filteredLetters = useMemo(() => {
     if (filterCatId === "all") return letters;
@@ -190,93 +297,40 @@ export default function TimeLetters() {
         </div>
       )}
 
-      <div className="px-6 space-y-6 pb-24">
-        {filteredLetters.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-32 text-center"
-          >
-            <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
-              <Clock size={40} />
-            </div>
-            <h3 className="text-xl font-black text-on-surface mb-2">还没有信件</h3>
-            <p className="text-sm text-on-surface-variant max-w-[200px]">写一封信给未来的自己，让时光见证温暖</p>
-          </motion.div>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {filteredLetters.map((letter, index) => {
-              const now = Date.now();
-              const isUnlocked = now >= letter.unlockAt;
+      <div className="px-6 pb-24 flex flex-col gap-6 min-h-[500px]">
+        <AnimatePresence mode="popLayout">
+          {filteredLetters.length === 0 ? (
+            <motion.div 
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-32 text-center"
+            >
+              <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
+                <Clock size={40} />
+              </div>
+              <h3 className="text-xl font-black text-on-surface mb-2">还没有信件</h3>
+              <p className="text-sm text-on-surface-variant max-w-[200px]">写一封信给未来的自己，让时光见证温暖</p>
+            </motion.div>
+          ) : (
+            filteredLetters.map((letter) => {
               const targetCat = myCats.find(c => c.id === letter.catId);
+              const isUnlocked = Date.now() >= letter.unlockAt;
 
               return (
-                <motion.div 
+                <TimeLetterItem
                   key={letter.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  onClick={() => handleLetterClick(letter)}
-                  className={`miao-card flex gap-4 group active:scale-[0.98] transition-all p-3 relative`}
-                >
-                  {/* 核心视觉：猫咪头像 */}
-                  <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 shadow-sm">
-                    <img 
-                      src={letter.catAvatar || "https://picsum.photos/seed/cat/200/200"} 
-                      className={`w-full h-full object-cover transition-all duration-500 ${!isUnlocked ? 'blur-md scale-110 brightness-75' : ''}`}
-                      alt="" 
-                      referrerPolicy="no-referrer"
-                    />
-                    {!isUnlocked ? (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                        <Lock size={24} className="text-white drop-shadow-lg" />
-                      </div>
-                    ) : (
-                      <div className="absolute top-1 right-1 bg-green-500 text-white p-1 rounded-full shadow-lg">
-                        <MailOpen size={10} />
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex-grow min-w-0 flex flex-col justify-between py-1">
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-base font-black text-on-surface truncate flex-1">
-                          {letter.title || "时光回响"}
-                        </h3>
-                        <button 
-                          onClick={(e) => handleDeleteClick(e, letter)}
-                          className="p-1.5 text-on-surface-variant/20 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                      <p className={`text-xs text-on-surface-variant font-medium leading-relaxed ${isUnlocked ? 'line-clamp-2' : 'text-red-500 font-black'}`}>
-                        {isUnlocked
-                          ? letter.content
-                          : `距离解锁还有 ${formatCountdown(letter.unlockAt)}`}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-[10px] text-on-surface-variant/40 font-bold">
-                        收信喵：{targetCat?.name || "已离开的小猫"}
-                      </p>
-                      <span className="text-[10px] font-black text-on-surface-variant/20 uppercase tracking-widest">
-                        {new Date(letter.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <ChevronRight size={16} className="text-on-surface-variant/20 group-hover:text-primary transition-colors" />
-                  </div>
-                </motion.div>
+                  letter={letter}
+                  isUnlocked={isUnlocked}
+                  targetCat={targetCat}
+                  onDelete={handleDeleteClick}
+                  onClick={handleLetterClick}
+                />
               );
-            })}
-          </AnimatePresence>
-        )}
+            })
+          )}
+        </AnimatePresence>
       </div>
 
       {/* 删除确认弹窗 */}
