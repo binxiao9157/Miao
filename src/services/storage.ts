@@ -639,7 +639,13 @@ export const storage = {
   saveDiaries: (diaries: DiaryEntry[]): boolean => {
     // 滑动窗口：只保留最近 MAX_DIARIES 条，按时间倒序（新在前）
     const trimmed = diaries.length > MAX_DIARIES ? diaries.slice(0, MAX_DIARIES) : diaries;
-    return storage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(trimmed));
+    const success = storage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(trimmed));
+    
+    if (success && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('diary-updated'));
+    }
+    
+    return success;
   },
 
   deleteDiary: (id: string) => {

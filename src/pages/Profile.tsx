@@ -52,13 +52,15 @@ export default function Profile() {
 
     loadStats();
 
-    // 监听活跃猫咪切换事件，实现实时同步
+    // 监听活跃猫咪切换、猫咪更新以及日记更新事件，实现实时同步
     window.addEventListener('active-cat-changed', loadStats);
     window.addEventListener('cat-updated', loadStats);
+    window.addEventListener('diary-updated', loadStats);
     
     return () => {
       window.removeEventListener('active-cat-changed', loadStats);
       window.removeEventListener('cat-updated', loadStats);
+      window.removeEventListener('diary-updated', loadStats);
     };
   }, []);
 
