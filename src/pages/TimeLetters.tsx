@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send, Clock, ChevronRight } from "lucide-react";
-import { storage, TimeLetter } from "../services/storage";
+import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send, Clock, ChevronRight, MailOpen, Filter } from "lucide-react";
+import { storage, TimeLetter, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
 
@@ -30,6 +30,19 @@ export default function TimeLetters() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [days, setDays] = useState(1);
+  const [selectedCatId, setSelectedCatId] = useState<string>("");
+
+  // List state
+  const [filterCatId, setFilterCatId] = useState<string>("all");
+
+  const myCats = useMemo(() => storage.getCatList(), []);
+  const activeCat = useMemo(() => storage.getActiveCat(), []);
+
+  useEffect(() => {
+    if (activeCat) {
+      setSelectedCatId(activeCat.id);
+    }
+  }, [activeCat]);
 
   // keep-alive：路由激活时静默刷新数据
   useEffect(() => {
@@ -52,11 +65,18 @@ export default function TimeLetters() {
   };
 
   const handleSaveLetter = () => {
+    if (!selectedCatId) {
+      triggerToast("请先选择收信的小猫哦");
+      return;
+    }
     if (!title.trim()) {
       triggerToast("请先输入信件标题哦");
       return;
     }
     if (!content.trim()) return;
+
+    const targetCat = myCats.find(c => c.id === selectedCatId);
+    if (!targetCat) return;
 
     // 归一化日期逻辑：当前日期凌晨 + X天
     const targetDate = new Date();
@@ -65,6 +85,8 @@ export default function TimeLetters() {
 
     const newLetter: TimeLetter = {
       id: 'letter_' + Date.now(),
+      catId: targetCat.id,
+      catAvatar: targetCat.avatar,
       title: title.trim(),
       content: content.trim(),
       createdAt: Date.now(),
@@ -95,6 +117,11 @@ export default function TimeLetters() {
     }
   };
 
+  const filteredLetters = useMemo(() => {
+    if (filterCatId === "all") return letters;
+    return letters.filter(l => l.catId === filterCatId);
+  }, [letters, filterCatId]);
+
   const renderList = () => (
     <div className="flex flex-col overflow-x-hidden">
       <AnimatePresence>
@@ -123,8 +150,34 @@ export default function TimeLetters() {
         }
       />
 
-      <div className="px-6 space-y-6">
-        {letters.length === 0 ? (
+      {/* 过滤器 */}
+      {myCats.length > 0 && (
+        <div className="px-6 mb-6 overflow-x-auto no-scrollbar flex items-center gap-3">
+          <button
+            onClick={() => setFilterCatId("all")}
+            className={`px-4 py-2 rounded-full text-xs font-black transition-all shrink-0 ${
+              filterCatId === "all" ? "bg-primary text-white shadow-md shadow-primary/20" : "bg-surface-container text-on-surface-variant"
+            }`}
+          >
+            全部
+          </button>
+          {myCats.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setFilterCatId(cat.id)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black transition-all shrink-0 ${
+                filterCatId === cat.id ? "bg-primary text-white shadow-md shadow-primary/20" : "bg-surface-container text-on-surface-variant"
+              }`}
+            >
+              <img src={cat.avatar} className="w-5 h-5 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="px-6 space-y-6 pb-24">
+        {filteredLetters.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -137,14 +190,9 @@ export default function TimeLetters() {
             <p className="text-sm text-on-surface-variant max-w-[200px]">写一封信给未来的自己，让时光见证温暖</p>
           </motion.div>
         ) : (
-          letters.map((letter, index) => {
+          filteredLetters.map((letter, index) => {
             const now = Date.now();
             const isUnlocked = now >= letter.unlockAt;
-            
-            // 计算剩余天数：目标日期凌晨 - 当前日期凌晨
-            const targetStart = new Date(letter.unlockAt).setHours(0,0,0,0);
-            const nowStart = new Date(now).setHours(0,0,0,0);
-            const daysLeft = Math.max(0, Math.ceil((targetStart - nowStart) / (1000 * 60 * 60 * 24)));
             
             const unlockDateStr = new Date(letter.unlockAt).toLocaleDateString('zh-CN', {
               year: 'numeric',
@@ -152,38 +200,58 @@ export default function TimeLetters() {
               day: '2-digit'
             }).replace(/\//g, '/');
 
+            const targetCat = myCats.find(c => c.id === letter.catId);
+
             return (
               <div 
                 key={letter.id}
                 onClick={() => handleLetterClick(letter)}
-                className={`miao-card flex items-center gap-6 group active:scale-[0.98] transition-all ${!isUnlocked && 'opacity-70 grayscale-[0.5]'}`}
+                className={`miao-card flex gap-4 group active:scale-[0.98] transition-all p-3`}
               >
-                <div className={`w-16 h-16 rounded-3xl flex items-center justify-center shrink-0 ${isUnlocked ? "bg-primary/10 text-primary" : "bg-surface-container text-on-surface-variant/40"}`}>
-                  {isUnlocked ? <Unlock size={28} /> : <Lock size={28} />}
+                {/* 核心视觉：猫咪头像 */}
+                <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 shadow-sm">
+                  <img 
+                    src={letter.catAvatar || "https://picsum.photos/seed/cat/200/200"} 
+                    className={`w-full h-full object-cover transition-all duration-500 ${!isUnlocked ? 'blur-md scale-110 brightness-75' : ''}`}
+                    alt="" 
+                    referrerPolicy="no-referrer"
+                  />
+                  {!isUnlocked ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <Lock size={24} className="text-white drop-shadow-lg" />
+                    </div>
+                  ) : (
+                    <div className="absolute top-1 right-1 bg-green-500 text-white p-1 rounded-full shadow-lg">
+                      <MailOpen size={10} />
+                    </div>
+                  )}
                 </div>
                 
-                <div className="flex-grow min-w-0">
-                  <div className="flex items-center justify-between mb-1 gap-2">
-                    <h3 className="text-lg font-black text-on-surface truncate flex-1">
-                      {letter.title || (isUnlocked ? "时光回响" : "封存中")}
+                <div className="flex-grow min-w-0 flex flex-col justify-between py-1">
+                  <div>
+                    <h3 className="text-base font-black text-on-surface truncate mb-1">
+                      {letter.title || "时光回响"}
                     </h3>
-                    <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest shrink-0">
-                      {new Date(letter.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <p className={`text-sm text-on-surface-variant font-medium ${isUnlocked ? 'line-clamp-1' : ''}`}>
+                    <p className={`text-xs text-on-surface-variant font-medium leading-relaxed ${isUnlocked ? 'line-clamp-2' : 'text-red-500 font-black'}`}>
                       {isUnlocked
                         ? letter.content
                         : `距离解锁还有 ${formatCountdown(letter.unlockAt)}`}
                     </p>
-                    <p className="text-[10px] text-on-surface-variant/30 font-bold">
-                      解锁日期：{unlockDateStr}
+                  </div>
+                  
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-[10px] text-on-surface-variant/40 font-bold">
+                      收信喵：{targetCat?.name || "已离开的小猫"}
                     </p>
+                    <span className="text-[10px] font-black text-on-surface-variant/20 uppercase tracking-widest">
+                      {new Date(letter.createdAt).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
                 
-                <ChevronRight className="text-on-surface-variant/20 group-hover:text-primary transition-colors shrink-0" />
+                <div className="flex items-center">
+                  <ChevronRight size={16} className="text-on-surface-variant/20 group-hover:text-primary transition-colors" />
+                </div>
               </div>
             );
           })
@@ -202,7 +270,7 @@ export default function TimeLetters() {
       className="fixed inset-0 z-50 bg-background flex flex-col overflow-y-auto"
     >
       <div className="p-8 pb-32" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <header className="flex items-center justify-between mb-12 pt-4">
+        <header className="flex items-center justify-between mb-8 pt-4">
           <button onClick={() => setView('list')} className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant">
             <ArrowLeft size={24} />
           </button>
@@ -213,7 +281,31 @@ export default function TimeLetters() {
           <div className="w-12" />
         </header>
 
-        <div className="space-y-10">
+        <div className="space-y-8">
+          {/* 收信喵选择器 */}
+          <div className="space-y-3">
+            <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-2">收信喵</label>
+            <div className="flex gap-4 overflow-x-auto no-scrollbar px-2 py-1">
+              {myCats.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCatId(cat.id)}
+                  className={`relative shrink-0 transition-all ${selectedCatId === cat.id ? 'scale-110' : 'opacity-40 scale-90'}`}
+                >
+                  <div className={`w-16 h-16 rounded-2xl overflow-hidden border-4 transition-all ${selectedCatId === cat.id ? 'border-primary shadow-xl shadow-primary/20' : 'border-transparent'}`}>
+                    <img src={cat.avatar} className="w-full h-full object-cover" alt={cat.name} referrerPolicy="no-referrer" />
+                  </div>
+                  {selectedCatId === cat.id && (
+                    <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-full shadow-lg">
+                      <Plus size={10} className="rotate-45" />
+                    </div>
+                  )}
+                  <p className={`text-[10px] font-black mt-1 text-center ${selectedCatId === cat.id ? 'text-primary' : 'text-on-surface-variant'}`}>{cat.name}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-2">信件标题</label>
@@ -222,7 +314,7 @@ export default function TimeLetters() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="给未来的信起个题目吧..."
-                className="w-full p-6 bg-surface-container rounded-3xl border-none outline-none text-xl font-black text-on-surface placeholder:text-on-surface-variant/30"
+                className="w-full p-6 bg-surface-container rounded-3xl border-none outline-none text-lg font-black text-on-surface placeholder:text-on-surface-variant/30"
               />
             </div>
 
@@ -256,17 +348,6 @@ export default function TimeLetters() {
                 </button>
               ))}
             </div>
-            
-            <div className="px-2">
-              <input 
-                type="range" 
-                min="1" 
-                max="365" 
-                value={days} 
-                onChange={(e) => setDays(parseInt(e.target.value))}
-                className="w-full h-2 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary"
-              />
-            </div>
           </div>
         </div>
 
@@ -283,63 +364,83 @@ export default function TimeLetters() {
     </motion.div>
   );
 
-  const renderDetail = () => (
-    <motion.div 
-      key="detail"
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-50 bg-on-primary-container p-8 pb-32 flex flex-col overflow-y-auto"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
-      <header className="flex items-center justify-between mb-12 pt-4">
-        <button onClick={() => setView('list')} className="w-12 h-12 bg-white/10 backdrop-blur-xl rounded-2xl flex items-center justify-center text-white/80">
-          <ArrowLeft size={24} />
-        </button>
-        <div className="text-center">
-          <h1 className="text-xl font-black text-white">时光回响</h1>
-          <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Echo from past</p>
-        </div>
-        <div className="w-12" />
-      </header>
+  const renderDetail = () => {
+    const targetCat = myCats.find(c => c.id === selectedLetter?.catId);
+    
+    return (
+      <motion.div 
+        key="detail"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className="fixed inset-0 z-50 bg-on-primary-container flex flex-col overflow-y-auto"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        {/* 猫咪 Banner */}
+        <div className="relative h-64 shrink-0">
+          <img 
+            src={selectedLetter?.catAvatar || targetCat?.avatar || "https://picsum.photos/seed/cat/800/600"} 
+            className="w-full h-full object-cover" 
+            alt="" 
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-on-primary-container" />
+          
+          <header className="absolute top-8 left-8 right-8 flex items-center justify-between">
+            <button onClick={() => setView('list')} className="w-12 h-12 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center text-white">
+              <ArrowLeft size={24} />
+            </button>
+            <div className="text-center">
+              <h1 className="text-xl font-black text-white">时光回响</h1>
+              <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest">Echo from past</p>
+            </div>
+            <div className="w-12" />
+          </header>
 
-      <div className="flex-grow bg-background rounded-[56px] p-10 shadow-2xl relative overflow-hidden flex flex-col">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full -mr-24 -mt-24" />
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full -ml-16 -mb-16" />
-        
-        <div className="relative z-10 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-10">
-            <div className="flex items-center gap-3 text-primary/40">
-              <Calendar size={20} />
-              <span className="text-xs font-black tracking-widest uppercase">
-                写于 {new Date(selectedLetter?.createdAt || 0).toLocaleDateString()}
-              </span>
+          <div className="absolute bottom-6 left-10">
+            <p className="text-xs font-black text-white/60 uppercase tracking-widest mb-1">这是写给它的信</p>
+            <h2 className="text-2xl font-black text-white">{targetCat?.name || "已离开的小猫"}</h2>
+          </div>
+        </div>
+
+        <div className="flex-grow bg-background rounded-t-[56px] -mt-10 p-10 shadow-2xl relative overflow-hidden flex flex-col">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full -mr-24 -mt-24" />
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full -ml-16 -mb-16" />
+          
+          <div className="relative z-10 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-10">
+              <div className="flex items-center gap-3 text-primary/40">
+                <Calendar size={20} />
+                <span className="text-xs font-black tracking-widest uppercase">
+                  写于 {new Date(selectedLetter?.createdAt || 0).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-black text-on-surface mb-6 text-center">
+              {selectedLetter?.title || "时光回响"}
+            </h2>
+            
+            <div className="flex-grow overflow-y-auto custom-scrollbar">
+              <p className="text-xl text-on-surface leading-[2] font-serif italic whitespace-pre-wrap">
+                {selectedLetter?.content}
+              </p>
+            </div>
+
+            <div className="mt-12 pt-8 border-t border-outline-variant/30 flex flex-col items-center gap-2">
+              <div className="w-12 h-1 bg-primary/20 rounded-full" />
+              <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-[0.2em]">Miao Sanctuary</p>
             </div>
           </div>
-
-          <h2 className="text-2xl font-black text-on-surface mb-6 text-center">
-            {selectedLetter?.title || "时光回响"}
-          </h2>
-          
-          <div className="flex-grow overflow-y-auto custom-scrollbar">
-            <p className="text-xl text-on-surface leading-[2] font-serif italic whitespace-pre-wrap">
-              {selectedLetter?.content}
-            </p>
-          </div>
-
-          <div className="mt-12 pt-8 border-t border-outline-variant/30 flex flex-col items-center gap-2">
-            <div className="w-12 h-1 bg-primary/20 rounded-full" />
-            <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-[0.2em]">Miao Sanctuary</p>
-          </div>
         </div>
-      </div>
 
-      <div className="mt-12 text-center">
-        <p className="text-white/40 text-xs font-bold leading-relaxed">这封信在时光中沉淀了很久，<br />希望能带给你温暖与力量。</p>
-      </div>
-    </motion.div>
-  );
+        <div className="py-12 text-center bg-background">
+          <p className="text-on-surface-variant/40 text-xs font-bold leading-relaxed">这封信在时光中沉淀了很久，<br />希望能带给你温暖与力量。</p>
+        </div>
+      </motion.div>
+    );
+  };
 
   return (
     <div className="h-full">

@@ -67,6 +67,8 @@ export interface FriendDiaryEntry extends DiaryEntry {
 
 export interface TimeLetter {
   id: string;
+  catId: string; // 关联的猫咪 ID
+  catAvatar: string; // 猫咪头像缩略图 (冗余存储)
   title?: string; // 新增标题字段，可选以兼容旧数据
   content: string;
   unlockAt: number;
