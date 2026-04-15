@@ -30,12 +30,12 @@ async function startServer() {
     });
   });
 
-  const ARK_API_KEY = (process.env.VITE_VOLC_API_KEY || "").trim();
-  const ARK_MODEL_ID = (process.env.VITE_VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215").trim();
-  const ARK_T2I_MODEL_ID = (process.env.VITE_VOLC_T2I_MODEL_ID || "doubao-t2i-v2").trim();
-  
+  const ARK_API_KEY = (process.env.VOLC_API_KEY || process.env.VITE_VOLC_API_KEY || "").trim();
+  const ARK_MODEL_ID = (process.env.VOLC_MODEL_ID || process.env.VITE_VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215").trim();
+  const ARK_T2I_MODEL_ID = (process.env.VOLC_T2I_MODEL_ID || process.env.VITE_VOLC_T2I_MODEL_ID || "doubao-t2i-v2").trim();
+
   // 确保 ARK_BASE_URL 是一个有效的绝对 URL，且移除末尾斜杠
-  let ARK_BASE_URL = (process.env.VITE_VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks").trim().replace(/\/$/, '');
+  let ARK_BASE_URL = (process.env.VOLC_ENDPOINT || process.env.VITE_VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks").trim().replace(/\/$/, '');
   if (!ARK_BASE_URL.startsWith('http')) {
     console.warn(`[Server] Warning: ARK_BASE_URL "${ARK_BASE_URL}" is not a valid URL. Falling back to default.`);
     ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks";
@@ -243,7 +243,7 @@ async function startServer() {
 
     try {
       if (!ARK_API_KEY) {
-        console.error("Missing VITE_VOLC_API_KEY environment variable");
+        console.error("Missing VOLC_API_KEY environment variable");
         return res.status(500).json({ error: "服务器未配置 API Key，请检查环境变量" });
       }
 
@@ -441,7 +441,7 @@ async function startServer() {
 
       // Forward headers
       res.setHeader('Content-Type', response.headers['content-type'] || 'video/mp4');
-      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Origin', 'https://www.mmdd10.tech');
       
       response.data.pipe(res);
     } catch (error: any) {
