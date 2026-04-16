@@ -180,6 +180,12 @@ export default function Login() {
 
       {/* Footer Section */}
       <div className="py-6 text-center space-y-2 relative z-10">
+        <button
+          onClick={() => navigate("/download")}
+          className="text-xs font-bold text-primary hover:underline active:opacity-60 transition-opacity"
+        >
+          扫码下载 App
+        </button>
         <div className="flex items-center justify-center gap-4 text-[12px] font-medium text-on-surface-variant/60">
           <span>隐私政策</span>
           <span className="w-1 h-1 bg-on-surface-variant/20 rounded-full"></span>

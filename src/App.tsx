@@ -28,6 +28,7 @@ const EmptyCatPage = lazy(() => import("./pages/EmptyCatPage"));
 const AccompanyMilestonePage = lazy(() => import("./pages/AccompanyMilestonePage"));
 const AddFriendQR = lazy(() => import("./pages/AddFriendQR"));
 const ScanFriend = lazy(() => import("./pages/ScanFriend"));
+const Download = lazy(() => import("./pages/Download"));
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 
@@ -66,6 +67,7 @@ function AppRoutes() {
           ) : <Register />
         } />
         <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/download" element={<Download />} />
         <Route path="/reset-password" element={
           isAuthenticated ? (
             hasCat ? <Navigate to="/" replace /> : <Navigate to="/empty-cat" replace />
