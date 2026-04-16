@@ -78,7 +78,6 @@ export default function Profile() {
   const menuItems = [
     { icon: UserIcon, label: "个人资料设置", path: "/edit-profile", color: "bg-blue-50 text-blue-500" },
     { icon: Bell, label: "消息通知", path: "/notification-settings", color: "bg-orange-50 text-orange-500" },
-    { icon: Shield, label: "隐私设置", path: "/privacy-settings", color: "bg-green-50 text-green-500" },
   ];
 
   return (
