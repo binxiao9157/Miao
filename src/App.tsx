@@ -28,6 +28,7 @@ const AccompanyMilestonePage = lazy(() => import("./pages/AccompanyMilestonePage
 const AddFriendQR = lazy(() => import("./pages/AddFriendQR"));
 const ScanFriend = lazy(() => import("./pages/ScanFriend"));
 const Download = lazy(() => import("./pages/Download"));
+const Feedback = lazy(() => import("./pages/Feedback"));
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 
@@ -101,6 +102,7 @@ function AppRoutes() {
         <Route path="/switch-companion" element={<ProtectedRoute><SwitchCompanion /></ProtectedRoute>} />
         <Route path="/add-friend-qr" element={<ProtectedRoute><AddFriendQR /></ProtectedRoute>} />
         <Route path="/scan-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />
+        <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
   
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />

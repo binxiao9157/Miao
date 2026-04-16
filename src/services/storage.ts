@@ -137,6 +137,7 @@ const USER_DATA_KEYS = {
   POINTS: 'miao_points',
   FRIENDS: 'miao_friends',
   FRIEND_DIARIES: 'miao_friend_diaries',
+  HAS_SUBMITTED_SURVEY: 'miao_has_submitted_survey',
 };
 
 /** 各类数据的滑动窗口上限 */
@@ -796,5 +797,13 @@ export const storage = {
 
   savePresetCats: (presets: PresetCat[]) => {
     storage.setItem(STORAGE_KEYS.APP_PRESET_CATS, JSON.stringify(presets));
+  },
+
+  setHasSubmittedSurvey: (hasSubmitted: boolean) => {
+    storage.setItem(getUserKey(USER_DATA_KEYS.HAS_SUBMITTED_SURVEY), hasSubmitted.toString());
+  },
+
+  getHasSubmittedSurvey: (): boolean => {
+    return localStorage.getItem(getUserKey(USER_DATA_KEYS.HAS_SUBMITTED_SURVEY)) === 'true';
   },
 };
