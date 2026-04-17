@@ -211,9 +211,11 @@ export default function Home() {
             setTimeout(() => {
               const hasRubbing = cat?.videoPaths?.rubbing && (actionRefs['rubbing'] as React.RefObject<HTMLVideoElement | null>)?.current;
               if (hasRubbing) {
-                const video = (actionRefs['rubbing'] as React.RefObject<HTMLVideoElement | null>).current!;
-                video.currentTime = 0;
-                video.play().catch(e => console.log("Entry video play failed:", e));
+                const video = (actionRefs['rubbing'] as React.RefObject<HTMLVideoElement | null>).current;
+                if (video) {
+                  video.currentTime = 0;
+                  video.play().catch(e => console.log("Entry video play failed:", e));
+                }
               } else if (idleVideoRef.current) {
                 idleVideoRef.current.currentTime = 0;
                 idleVideoRef.current.play().catch(e => console.log("Idle video play failed:", e));
@@ -235,7 +237,7 @@ export default function Home() {
         setBubbleText(null);
       }
     }
-  }, [location.pathname, cat?.id]);
+  }, [location.pathname, cat?.id, cat?.videoPaths]);
 
   const pointToastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const triggerPointToast = (msg: string) => {
@@ -311,7 +313,7 @@ export default function Home() {
     // 同步刷新全局状态 (AuthContext)
     refreshCatStatus();
     
-    if (remainingCats.length > 0) {
+    if (remainingCats && remainingCats.length > 0) {
       // 还有其他猫咪，切换到下一只
       const nextCat = storage.getActiveCat();
       setCat(nextCat);
@@ -324,7 +326,7 @@ export default function Home() {
       setShowRegenerateConfirm(false);
       
       // 提示用户
-      showFloatingBubble(`已送走 ${cat.name}，正在迎接新伙伴...`);
+      showFloatingBubble(`已送走 ${cat?.name || '小猫'}，正在迎接新伙伴...`);
     } else {
       // 没有猫咪了，清理状态并跳转欢迎页
       setCat(null);
@@ -489,7 +491,7 @@ export default function Home() {
         <video
           key={key}
           ref={actionRefs[key]}
-          src={url}
+          src={url as string}
           muted
           playsInline
           preload="metadata"
@@ -497,6 +499,11 @@ export default function Home() {
           onEnded={(e) => {
             const video = e.target as HTMLVideoElement;
             video.pause();
+            setVisibleLayer('idle');
+            if (idleVideoRef.current) {
+              idleVideoRef.current.currentTime = 0;
+              idleVideoRef.current.play().catch(err => console.error("Could not play idle video on end", err));
+            }
           }}
           className={`absolute inset-0 w-full h-full z-20 object-cover pointer-events-none ${visibleLayer === key ? 'opacity-100' : 'opacity-0'}`}
         />
@@ -506,8 +513,9 @@ export default function Home() {
 
   if (!cat || !cat.name) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black">
-        <Loader2 className="w-10 h-10 text-white animate-spin" />
+      <div className="w-full h-full flex flex-col items-center justify-center bg-black gap-4 p-6">
+        <Loader2 className="w-10 h-10 text-white/50 animate-spin" />
+        <span className="text-white/50 text-sm">正在努力唤醒猫咪...</span>
       </div>
     );
   }
@@ -551,7 +559,8 @@ export default function Home() {
           }}
           onEnded={(e) => {
             const video = e.target as HTMLVideoElement;
-            video.pause();
+            video.currentTime = 0;
+            video.play().catch(e => console.error("Idle loop failed", e));
           }}
           onError={handleVideoError}
           className={`absolute inset-0 w-full h-full z-10 object-cover ${visibleLayer === 'idle' ? 'opacity-100' : 'opacity-0'}`}
