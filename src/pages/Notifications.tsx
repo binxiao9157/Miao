@@ -34,7 +34,7 @@ export default function Notifications() {
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold text-on-surface ml-2">消息通知</h1>
+        <h1 className="text-xl font-bold text-on-surface ml-2">通知设置</h1>
       </header>
 
       <div className="space-y-6">
