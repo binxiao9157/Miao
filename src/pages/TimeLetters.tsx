@@ -569,69 +569,88 @@ export default function TimeLetters() {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed inset-0 z-50 bg-on-primary-container flex flex-col overflow-y-auto"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        className="fixed inset-0 z-50 bg-[#1a1c1e] flex flex-col overflow-y-auto no-scrollbar"
       >
-        {/* 猫咪 Banner */}
-        <div className="relative h-64 shrink-0">
+        {/* 固定顶部导航栏 */}
+        <header className="fixed top-0 left-0 right-0 z-50 px-8 flex items-center justify-between pointer-events-none" style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(env(safe-area-inset-top) + 5rem)' }}>
+          <button 
+            onClick={() => setView('list')} 
+            className="w-12 h-12 bg-black/20 backdrop-blur-2xl rounded-2xl flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all pointer-events-auto shadow-xl"
+          >
+            <ArrowLeft size={24} />
+          </button>
+          <div className="text-center">
+            <h1 className="text-xl font-black text-white drop-shadow-lg">时光回响</h1>
+            <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest drop-shadow-sm">Echo from past</p>
+          </div>
+          <div className="w-12" />
+        </header>
+
+        {/* 背景层：猫咪 Banner - Sticky 实现背景跟随但卡片滑动覆盖 */}
+        <div className="sticky top-0 h-[60vh] w-full shrink-0 -z-10 overflow-hidden">
           <img 
             src={selectedLetter?.catAvatar || targetCat?.avatar || "https://picsum.photos/seed/cat/800/600"} 
             className="w-full h-full object-cover" 
             alt="" 
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-on-primary-container" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80" />
           
-          <header className="absolute top-8 left-8 right-8 flex items-center justify-between">
-            <button onClick={() => setView('list')} className="w-12 h-12 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center text-white">
-              <ArrowLeft size={24} />
-            </button>
-            <div className="text-center">
-              <h1 className="text-xl font-black text-white">时光回响</h1>
-              <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest">Echo from past</p>
-            </div>
-            <div className="w-12" />
-          </header>
-
-          <div className="absolute bottom-6 left-10">
-            <p className="text-xs font-black text-white/60 uppercase tracking-widest mb-1">这是写给它的信</p>
-            <h2 className="text-2xl font-black text-white">{targetCat?.name || "已离开的小猫"}</h2>
+          <div className="absolute bottom-32 left-10">
+            <p className="text-xs font-black text-white/60 uppercase tracking-widest mb-1.5 drop-shadow-sm">这是写给它的信</p>
+            <h2 className="text-3xl font-black text-white drop-shadow-md">{targetCat?.name || "已离开的小猫"}</h2>
           </div>
         </div>
 
-        <div className="flex-grow bg-background rounded-t-[56px] -mt-10 p-10 shadow-2xl relative overflow-hidden flex flex-col">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full -mr-24 -mt-24" />
-          <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full -ml-16 -mb-16" />
-          
-          <div className="relative z-10 flex flex-col h-full">
-            <div className="flex items-center justify-between mb-10">
-              <div className="flex items-center gap-3 text-primary/40">
-                <Calendar size={20} />
-                <span className="text-xs font-black tracking-widest uppercase">
-                  写于 {new Date(selectedLetter?.createdAt || 0).toLocaleDateString()}
-                </span>
+        {/* 前景层：白色信件卡片自适应内容高度 */}
+        <div className="relative z-10 w-full">
+          {/* 卡片顶部圆角及主要内容容器 */}
+          <div 
+            className="bg-background rounded-t-[32px] -mt-16 p-10 shadow-[0_-20px_50px_rgba(0,0,0,0.15)] relative overflow-hidden flex flex-col"
+            style={{ 
+              minHeight: '75vh',
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 8rem)' 
+            }}
+          >
+            <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full -mr-24 -mt-24" />
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full -ml-16 -mb-16" />
+            
+            <div className="relative z-10 flex flex-col h-full">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3 text-primary/40">
+                  <Calendar size={18} />
+                  <span className="text-xs font-black tracking-widest uppercase">
+                    写于 {new Date(selectedLetter?.createdAt || 0).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+
+              <h2 className="text-2xl font-black text-on-surface mb-10 text-center leading-tight">
+                {selectedLetter?.title || "时光回响"}
+              </h2>
+              
+              <div className="flex-grow">
+                <p className="text-xl text-on-surface leading-[2.2] font-serif italic whitespace-pre-wrap">
+                  {selectedLetter?.content}
+                </p>
+              </div>
+
+              {/* 页脚描述与平台标识统一归纳在主卡片底部 */}
+              <div className="mt-20 flex flex-col items-center">
+                <div className="w-full h-px bg-outline-variant/10 mb-8" />
+                
+                <p className="text-on-surface-variant/30 text-[10px] font-bold leading-relaxed uppercase tracking-[0.3em] text-center mb-8">
+                  这封信在时光中沉淀了很久<br />
+                  希望能带给你温暖与力量
+                </p>
+
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-12 h-1 bg-primary/20 rounded-full mb-1" />
+                  <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-[0.2em]">Miao Sanctuary</p>
+                </div>
               </div>
             </div>
-
-            <h2 className="text-2xl font-black text-on-surface mb-6 text-center">
-              {selectedLetter?.title || "时光回响"}
-            </h2>
-            
-            <div className="flex-grow overflow-y-auto custom-scrollbar">
-              <p className="text-xl text-on-surface leading-[2] font-serif italic whitespace-pre-wrap">
-                {selectedLetter?.content}
-              </p>
-            </div>
-
-            <div className="mt-12 pt-8 border-t border-outline-variant/30 flex flex-col items-center gap-2">
-              <div className="w-12 h-1 bg-primary/20 rounded-full" />
-              <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-[0.2em]">Miao Sanctuary</p>
-            </div>
           </div>
-        </div>
-
-        <div className="py-12 text-center bg-background">
-          <p className="text-on-surface-variant/40 text-xs font-bold leading-relaxed">这封信在时光中沉淀了很久，<br />希望能带给你温暖与力量。</p>
         </div>
       </motion.div>
     );
