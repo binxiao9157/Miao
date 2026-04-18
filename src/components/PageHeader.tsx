@@ -7,9 +7,10 @@ interface PageHeaderProps {
   action?: React.ReactNode;
   dark?: boolean;
   onBack?: () => void;
+  onTitleClick?: () => void;
 }
 
-export default function PageHeader({ title, subtitle, action, dark, onBack }: PageHeaderProps) {
+export default function PageHeader({ title, subtitle, action, dark, onBack, onTitleClick }: PageHeaderProps) {
   return (
     <header 
       className={`sticky top-0 z-30 backdrop-blur-xl px-6 flex justify-between items-center shrink-0 ${dark ? 'bg-black/40 text-white' : 'bg-background/80 text-on-surface'}`}
@@ -28,7 +29,10 @@ export default function PageHeader({ title, subtitle, action, dark, onBack }: Pa
             <ArrowLeft size={24} />
           </button>
         )}
-        <div className="flex flex-col justify-center">
+        <div 
+          className="flex flex-col justify-center cursor-pointer active:opacity-70 select-none"
+          onClick={onTitleClick}
+        >
           <h1 className={`text-3xl font-black tracking-tight leading-none ${dark ? 'text-white' : 'text-on-surface'}`}>{title}</h1>
           <p className={`text-[10px] font-bold uppercase tracking-widest mt-2 leading-none ${dark ? 'text-white/60' : 'text-on-surface-variant'}`}>{subtitle}</p>
         </div>
