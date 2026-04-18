@@ -1,11 +1,14 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import axios from "axios";
 import https from "https";
 import dotenv from "dotenv";
+import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
@@ -452,13 +455,17 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    // 生产环境下，由于 server.ts 在根目录运行，静态资源始终在 dist 文件夹中
+    const distPath = path.resolve(__dirname, 'dist');
+    console.log(`[Server] Production mode: serving static files from ${distPath}`);
+    
     // Vite 哈希资源（JS/CSS）：强缓存1年，浏览器无需重新验证
     app.use('/assets', express.static(path.join(distPath, 'assets'), {
       maxAge: '1y',

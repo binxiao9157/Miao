@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, QrCode, ScanQrCode } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { storage, CatInfo } from "../services/storage";
+import { computeNotifications } from "./NotificationList";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import InstallPromptBanner from "../components/InstallPromptBanner";
@@ -63,6 +64,31 @@ export default function Profile() {
     };
   }, []);
 
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    // 逻辑复用：计算未读消息个数
+    const checkNotifications = () => {
+      const allNotifications = computeNotifications();
+      // 过滤出未读的通知
+      const unreadList = allNotifications.filter(n => !n.isRead);
+      setUnreadCount(unreadList.length);
+    };
+
+    checkNotifications();
+    window.addEventListener('active-cat-changed', checkNotifications);
+    window.addEventListener('diary-updated', checkNotifications);
+    window.addEventListener('notifications-read', checkNotifications);
+    window.addEventListener('fast-forward-changed', checkNotifications);
+    
+    return () => {
+      window.removeEventListener('active-cat-changed', checkNotifications);
+      window.removeEventListener('diary-updated', checkNotifications);
+      window.removeEventListener('notifications-read', checkNotifications);
+      window.removeEventListener('fast-forward-changed', checkNotifications);
+    };
+  }, []);
+
   const handleLogout = () => {
     logout(); // AuthContext 中的 logout 已包含内存重置与 storage.clearCurrentUser()
     navigate("/login", { replace: true });
@@ -80,6 +106,10 @@ export default function Profile() {
     { icon: FileText, label: "意见反馈", path: "/feedback", color: "bg-purple-50 text-purple-500" },
   ];
 
+  const handleNotificationClick = () => {
+    navigate("/notifications");
+  };
+
   return (
     <div className="flex flex-col">
       <PageHeader 
@@ -94,10 +124,15 @@ export default function Profile() {
               <ScanQrCode size={24} />
             </button>
             <button 
-              onClick={() => navigate("/notifications")}
-              className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform border border-outline-variant/30"
+              onClick={handleNotificationClick}
+              className="relative w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-on-surface-variant active:scale-90 hover:bg-orange-50/50 transition-all border border-outline-variant/30 group"
             >
-              <Bell size={24} />
+              <Bell size={24} className="group-active:rotate-12 transition-transform" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 bg-red-500 text-white text-[10px] font-black rounded-full border-2 border-white flex items-center justify-center animate-bounce shadow-lg">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </button>
           </div>
         }

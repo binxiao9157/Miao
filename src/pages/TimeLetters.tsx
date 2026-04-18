@@ -189,7 +189,7 @@ export default function TimeLetters() {
   // Debug State
   const [isDebugEnabled, setIsDebugEnabled] = useState(false);
   const [debugClickCount, setDebugClickCount] = useState(0);
-  const [isFastForward, setIsFastForward] = useState(false);
+  const [isFastForward, setIsFastForward] = useState(() => storage.getIsFastForward());
   const [forceUnlockedIds, setForceUnlockedIds] = useState<Set<string>>(new Set());
 
   const handleTitleClick = () => {
@@ -686,7 +686,11 @@ export default function TimeLetters() {
 
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setIsFastForward(!isFastForward)}
+                onClick={() => {
+                  const next = !isFastForward;
+                  setIsFastForward(next);
+                  storage.setIsFastForward(next);
+                }}
                 className={`flex items-center justify-center gap-3 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${
                   isFastForward ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-white/10 text-white/60"
                 }`}
@@ -698,6 +702,7 @@ export default function TimeLetters() {
                 onClick={() => {
                   setForceUnlockedIds(new Set());
                   setIsFastForward(false);
+                  storage.setIsFastForward(false);
                   triggerToast("🔄 调试状态已重置");
                 }}
                 className="flex items-center justify-center gap-3 py-3 rounded-2xl bg-white/10 text-white/60 font-black text-[10px] uppercase"

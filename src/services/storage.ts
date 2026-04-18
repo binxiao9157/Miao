@@ -118,6 +118,8 @@ const STORAGE_KEYS = {
   LAST_CAT_BREED: 'miao_last_cat_breed', // 全局最后一次使用的猫咪品种
   LAST_USERNAME: 'miao_last_username', // 记住上次登录的用户名
   APP_PRESET_CATS: 'app_preset_cats', // 预设猫咪底图
+  LAST_READ_NOTIFICATION_TIME: 'miao_last_read_notifications', // 上次阅读通知时间
+  READ_NOTIFICATION_IDS: 'miao_read_notification_ids', // 已读通知 ID 列表
 };
 
 const DEFAULT_PRESET_CATS: PresetCat[] = [
@@ -138,6 +140,7 @@ const USER_DATA_KEYS = {
   FRIENDS: 'miao_friends',
   FRIEND_DIARIES: 'miao_friend_diaries',
   HAS_SUBMITTED_SURVEY: 'miao_has_submitted_survey',
+  IS_FAST_FORWARD: 'miao_debug_fast_forward', // 调试加速模式
 };
 
 /** 各类数据的滑动窗口上限 */
@@ -805,5 +808,43 @@ export const storage = {
 
   getHasSubmittedSurvey: (): boolean => {
     return localStorage.getItem(getUserKey(USER_DATA_KEYS.HAS_SUBMITTED_SURVEY)) === 'true';
+  },
+
+  setIsFastForward: (enabled: boolean) => {
+    storage.setItem(getUserKey(USER_DATA_KEYS.IS_FAST_FORWARD), enabled.toString());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fast-forward-changed', { detail: { enabled } }));
+    }
+  },
+
+  getIsFastForward: (): boolean => {
+    return localStorage.getItem(getUserKey(USER_DATA_KEYS.IS_FAST_FORWARD)) === 'true';
+  },
+
+  getLastReadNotificationTime: (): number => {
+    const val = localStorage.getItem(getUserKey(STORAGE_KEYS.LAST_READ_NOTIFICATION_TIME));
+    return val ? parseInt(val, 10) : 0;
+  },
+
+  markNotificationsAsRead: () => {
+    storage.setItem(getUserKey(STORAGE_KEYS.LAST_READ_NOTIFICATION_TIME), Date.now().toString());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('notifications-read'));
+    }
+  },
+  
+  getReadNotificationIds: (): string[] => {
+    return storage.safeParse<string[]>(getUserKey(STORAGE_KEYS.READ_NOTIFICATION_IDS), []);
+  },
+
+  markNotificationAsRead: (id: string) => {
+    const ids = storage.getReadNotificationIds();
+    if (!ids.includes(id)) {
+      ids.push(id);
+      storage.setItem(getUserKey(STORAGE_KEYS.READ_NOTIFICATION_IDS), JSON.stringify(ids));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('notifications-read', { detail: { id } }));
+      }
+    }
   },
 };

@@ -227,6 +227,15 @@ export default function Home() {
       }
 
       showGreetingOnce();
+
+      // 新增：处理从通知中心跳转过来的逻辑
+      if (location.state?.fromNotification && location.state?.notificationType === 'system') {
+        setTimeout(() => {
+          showFloatingBubble("猫咪感受到了你的关心 ❤️");
+          // 清除 state，防止刷新页面再次触发
+          navigate(location.pathname, { replace: true, state: {} });
+        }, 800);
+      }
     } else {
       if (idleVideoRef.current) idleVideoRef.current.pause();
       (Object.values(actionRefs) as React.RefObject<HTMLVideoElement | null>[]).forEach(ref => ref.current?.pause());
