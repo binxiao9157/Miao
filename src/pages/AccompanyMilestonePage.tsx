@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import PawIcon from "../components/PawIcon";
+import PawLogo from "../components/PawLogo";
 import { motion } from "motion/react";
 
 export default function AccompanyMilestonePage() {
@@ -13,7 +13,7 @@ export default function AccompanyMilestonePage() {
     const daysInMonth = 30;
     return Array.from({ length: daysInMonth }).map((_, i) => (
       <div key={i} className="w-8 h-8 flex items-center justify-center bg-surface-container rounded-lg text-[10px] font-bold text-on-surface-variant">
-        {i < days ? <PawIcon size={12} className="text-primary" fill="currentColor" /> : i + 1}
+        {i < days ? <PawLogo size={12} /> : i + 1}
       </div>
     ));
   };

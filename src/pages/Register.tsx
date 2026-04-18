@@ -1,91 +1,51 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthContext } from "../context/AuthContext";
-import { ArrowLeft, Phone, ShieldCheck, User, Lock, Eye, EyeOff } from "lucide-react";
-import PawIcon from "../components/PawIcon";
+import { ArrowLeft, User, Lock, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import PawLogo from "../components/PawLogo";
 import { storage } from "../services/storage";
 import { motion } from "motion/react";
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register, sendCode } = useAuthContext();
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
-  const [nickname, setNickname] = useState("");
+  const { register } = useAuthContext();
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [isAgreed, setIsAgreed] = useState(false);
   const [shake, setShake] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (countdown > 0) {
-      timerRef.current = setTimeout(() => setCountdown(countdown - 1), 1000);
-    } else if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [countdown]);
-
-  const handleGetCode = async () => {
-    if (!/^1[3-9]\d{9}$/.test(phone)) {
-      setError("请输入正确的11位手机号");
-      return;
-    }
-    setError("");
-    const result = await sendCode(phone);
-    if (result.success) {
-      setCountdown(60);
-      if (result.mockCode) {
-        setCode(result.mockCode);
-      }
-    } else {
-      setError(result.error || "获取验证码失败");
-    }
-  };
-
-  const handleRegister = async () => {
+  const handleRegister = () => {
     if (!isAgreed) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
-      setError("请先阅读并勾选同意服务条款与隐私政策");
+      alert("请先阅读并勾选同意服务条款与隐私政策");
       return;
     }
-    if (!phone || !code || !nickname) {
-      setError("请填写手机号、验证码和昵称");
+    if (!username || !password || !confirmPassword) {
+      setError("请填写完整信息");
       return;
     }
-    if (!/^1[3-9]\d{9}$/.test(phone)) {
-      setError("手机号格式不正确");
+    if (password !== confirmPassword) {
+      setError("两次输入的密码不一致");
       return;
     }
-    if (code.length < 4) {
-      setError("请输入完整的验证码");
-      return;
-    }
-
-    setIsLoading(true);
-    setError("");
     
-    const result = await register(phone, code, nickname, password || undefined);
+    register({
+      username,
+      password,
+      nickname: username, // 默认昵称为用户名
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
+    });
     
-    setIsLoading(false);
-
-    if (result.success) {
-      const hasCat = storage.getCatList().length > 0;
-      if (hasCat) {
-        navigate("/", { replace: true });
-      } else {
-        navigate("/empty-cat", { replace: true });
-      }
+    const hasCat = storage.getCatList().length > 0;
+    if (hasCat) {
+      navigate("/", { replace: true });
     } else {
-      setError(result.error || "注册失败");
+      navigate("/empty-cat", { replace: true });
     }
   };
 
@@ -107,7 +67,7 @@ export default function Register() {
         </button>
         
         <div className="flex items-center gap-2 mb-8 group">
-          <PawIcon className="text-[#5D4037] -rotate-12 transition-transform group-hover:-rotate-6" size={32} fill="#5D4037" />
+          <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={32} />
           <h1 className="text-4xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">加入 Miao</h1>
         </div>
         <p className="text-on-surface-variant text-sm opacity-60 leading-relaxed">开启您与宠物的精致陪伴之旅，记录每一个温暖瞬间。</p>
@@ -115,70 +75,27 @@ export default function Register() {
 
       <div className="space-y-6 relative z-10 flex-grow">
         <div className="space-y-5">
-          {/* Phone Input */}
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant ml-1 opacity-40">手机号码</label>
-            <div className="relative">
-              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
-              <input 
-                type="tel" 
-                inputMode="numeric"
-                placeholder="请输入11位手机号" 
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                className="miao-input pl-12" 
-              />
-            </div>
-          </div>
-
-          {/* Verification Code */}
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant ml-1 opacity-40">验证码</label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
-                <input 
-                  type="tel" 
-                  inputMode="numeric"
-                  placeholder="请输入验证码" 
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="miao-input pl-12" 
-                />
-              </div>
-              <button 
-                type="button"
-                onClick={handleGetCode}
-                disabled={countdown > 0}
-                className="px-4 rounded-2xl bg-primary/10 text-primary font-black text-xs transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-              >
-                {countdown > 0 ? `${countdown}s` : "获取验证码"}
-              </button>
-            </div>
-          </div>
-
-          {/* Nickname */}
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant ml-1 opacity-40">昵称</label>
+            <label className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant ml-1 opacity-40">用户名</label>
             <div className="relative">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
               <input 
                 type="text" 
-                placeholder="起一个好听的名字吧" 
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
+                placeholder="请输入您的用户名" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="miao-input pl-12" 
               />
             </div>
           </div>
           
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant ml-1 opacity-40">设置密码 (可选)</label>
+            <label className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant ml-1 opacity-40">设置密码</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
               <input 
                 type={showPassword ? "text" : "password"} 
-                placeholder="设置密码以便下次登录" 
+                placeholder="请输入您的密码" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="miao-input pl-12 pr-12" 
@@ -189,6 +106,27 @@ export default function Register() {
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30 hover:opacity-60 transition-opacity"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant ml-1 opacity-40">确认密码</label>
+            <div className="relative">
+              <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30" size={18} />
+              <input 
+                type={showConfirmPassword ? "text" : "password"} 
+                placeholder="请再次输入您的密码" 
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="miao-input pl-12 pr-12" 
+              />
+              <button 
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-30 hover:opacity-60 transition-opacity"
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
@@ -207,33 +145,37 @@ export default function Register() {
         >
           <input
             type="checkbox"
-            id="agree-checkbox"
             checked={isAgreed}
             onChange={(e) => setIsAgreed(e.target.checked)}
-            className="w-4 h-4 mt-1 accent-primary rounded cursor-pointer"
+            className="w-4 h-4 mt-1 text-orange-500 rounded focus:ring-orange-500 border-gray-300"
           />
-          <label htmlFor="agree-checkbox" className="text-sm text-gray-500 cursor-pointer">
+          <span className="text-sm text-gray-500">
             我已阅读并同意
-            <Link to="/terms" className="text-primary hover:underline mx-1">《Miao 服务条款》</Link>
+            <Link to="/terms" className="text-orange-500 hover:underline mx-1">《Miao 服务条款》</Link>
             和
-            <Link to="/privacy-policy" className="text-primary hover:underline ml-1">《隐私政策》</Link>
-          </label>
+            <Link to="/privacy-policy" className="text-orange-500 hover:underline ml-1">《隐私政策》</Link>
+          </span>
         </motion.div>
 
         <button 
           onClick={handleRegister}
-          disabled={isLoading}
-          className="miao-btn-primary w-full py-5 text-lg font-black shadow-2xl mt-4 disabled:opacity-70"
+          className="miao-btn-primary w-full py-5 text-lg font-black shadow-2xl mt-4"
         >
-          {isLoading ? "正在注册..." : "立即注册"}
+          立即注册
         </button>
         
-        <div className="text-center mt-6 pb-8">
+        <div className="text-center mt-6">
           <p className="text-xs text-on-surface-variant opacity-60">
             已有账号？ <button onClick={() => navigate("/login")} className="text-primary font-black ml-1">登入</button>
           </p>
         </div>
       </div>
+
+      <footer className="mt-auto pt-8 text-center relative z-10">
+        <p className="text-[10px] text-on-surface-variant opacity-40 leading-relaxed">
+          注册即代表您同意 <span className="underline font-bold">用户协议</span> 与 <span className="underline font-bold">隐私政策</span>
+        </p>
+      </footer>
     </div>
   );
 }

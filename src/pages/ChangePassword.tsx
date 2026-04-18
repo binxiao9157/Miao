@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, ShieldCheck, Lock } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { storage } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function ChangePassword() {
@@ -21,11 +22,15 @@ export default function ChangePassword() {
     setTimeout(() => setShowToast(null), 3000);
   };
 
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       setError("请填写完整信息");
+      return;
+    }
+    // 通过 storage.findUser 从持久层校验密码，避免仅依赖内存中可能过期的 user 对象
+    const savedUser = user?.username ? storage.findUser(user.username) : null;
+    if (!savedUser || currentPassword !== savedUser.password) {
+      setError("当前密码错误");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -36,38 +41,10 @@ export default function ChangePassword() {
       setError("新密码长度不能少于6位");
       return;
     }
-    if (!user?.phone) {
-      setError("无法获取当前用户信息");
-      return;
-    }
 
-    setIsLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/auth/change-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone: user.phone,
-          currentPassword,
-          newPassword
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        triggerToast("密码修改成功喵～");
-        setTimeout(() => navigate(-1), 1500);
-      } else {
-        setError(data.error || "修改失败");
-      }
-    } catch (e) {
-      setError("网络连接失败，请稍后重试");
-    } finally {
-      setIsLoading(false);
-    }
+    updateProfile({ password: newPassword });
+    triggerToast("密码修改成功喵～");
+    setTimeout(() => navigate(-1), 1500);
   };
 
   return (
@@ -182,17 +159,16 @@ export default function ChangePassword() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-500 p-3 rounded-xl text-xs font-bold text-center animate-shake">
+          <div className="bg-red-50 text-red-500 p-3 rounded-xl text-xs font-bold text-center">
             {error}
           </div>
         )}
 
         <button 
           onClick={handleSave}
-          disabled={isLoading}
-          className="miao-btn-primary w-full py-5 text-lg font-black shadow-2xl mt-4 disabled:opacity-50"
+          className="miao-btn-primary w-full py-5 text-lg font-black shadow-2xl mt-4"
         >
-          {isLoading ? "提交中..." : "保存修改"}
+          保存修改
         </button>
       </div>
       

@@ -24,29 +24,24 @@ class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("致命错误:", error, errorInfo);
-    if (process.env.NODE_ENV !== 'production') {
-      console.group("Error Details");
-      console.error("Message:", error.message);
-      console.error("Stack:", error.stack);
-      console.groupEnd();
-    }
+    console.error("Uncaught error:", error, errorInfo);
   }
 
   private handleReset = () => {
-    // 强制跳转首页，不再原地刷新
-    window.location.replace("/");
+    // 先尝试就地恢复，不刷新页面
+    this.setState({ hasError: false, error: null });
   };
 
   private handleGoHome = () => {
-    window.location.replace("/");
+    this.setState({ hasError: false, error: null });
+    window.location.href = "/";
   };
 
   public render() {
     const { hasError, error } = this.state;
     if (hasError) {
       return (
-        <div className="min-h-screen bg-[#FDF8F6] flex flex-col items-center justify-center p-6">
+        <div className="min-h-screen bg-[#FDF8F6] flex items-center justify-center p-6">
           <div className="w-full max-w-md bg-white rounded-[2.5rem] p-8 shadow-xl border-2 border-orange-100 text-center">
             <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertCircle className="w-10 h-10 text-orange-500" />
@@ -57,7 +52,15 @@ class ErrorBoundary extends React.Component<Props, State> {
               猫咪可能在玩耍时不小心碰断了线，或者发生了一些意料之外的情况。
             </p>
 
-            <div className="flex flex-col gap-3 mb-8">
+            {import.meta.env.DEV && (
+              <div className="mb-8 p-4 bg-red-50 rounded-2xl text-left overflow-auto max-h-40">
+                <p className="text-xs font-mono text-red-600 whitespace-pre-wrap">
+                  {error?.stack}
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3">
               <button
                 onClick={this.handleReset}
                 className="w-full py-4 bg-[#FF9D76] text-white rounded-2xl font-bold shadow-lg shadow-orange-200 flex items-center justify-center gap-2 active:scale-95 transition-transform"
@@ -74,19 +77,6 @@ class ErrorBoundary extends React.Component<Props, State> {
                 返回首页
               </button>
             </div>
-
-            {/* ERROR DETAILS */}
-            {process.env.NODE_ENV !== 'production' && error && (
-              <details className="mt-4 p-4 bg-red-50 rounded-lg text-left overflow-auto max-h-60 border border-red-200">
-                <summary className="text-sm font-bold text-red-800 cursor-pointer mb-2">查看错误详情 (Developer Only)</summary>
-                <div className="text-xs font-mono text-red-600 whitespace-pre-wrap break-all">
-                  <strong>{error.toString()}</strong>
-                  <br/><br/>
-                  {error.stack}
-                </div>
-              </details>
-            )}
-
           </div>
         </div>
       );

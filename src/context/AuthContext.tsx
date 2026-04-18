@@ -7,10 +7,9 @@ interface AuthContextType {
   isInitializing: boolean;
   hasCat: boolean;
   catCount: number;
-  login: (phone: string, code?: string, password?: string) => Promise<{ success: boolean; error?: string; migrated?: boolean }>;
-  register: (phone: string, code: string, nickname: string, password?: string) => Promise<{ success: boolean; error?: string; migrated?: boolean }>;
+  login: (username: string, password: string) => boolean;
+  register: (info: UserInfo) => void;
   logout: () => void;
-  sendCode: (phone: string) => Promise<{ success: boolean; error?: string; mockCode?: string }>;
   updateProfile: (updates: Partial<UserInfo>) => void;
   refreshCatStatus: () => void;
 }
@@ -21,7 +20,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // 移除免登录逻辑，每次打开 App 均需重新登录
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [catCount, setCatCount] = useState(0);
 
   const hasCat = useMemo(() => catCount > 0, [catCount]);
@@ -31,177 +30,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // 安全解析的用户凭证
-    let savedUser = storage.getUserInfo();
-    if (!savedUser) {
-      try {
-        const raw = localStorage.getItem('miao_current_user');
-        if (raw && raw !== 'undefined') {
-          savedUser = JSON.parse(raw);
-        }
-      } catch (e) {
-        console.error("[Auth] 强制读取 user 失败:", e);
-      }
-    }
-    
-    const savedToken = storage.getToken() || localStorage.getItem('miao_token') || localStorage.getItem('miao_auth_token') || 'fallback_token_123';
-    
-    const loginTime = storage.getLoginTime();
-    const now = Date.now();
-    
-    let isDirectAuthed = false;
-
-    // 极端宽容：只要有 user 就放行，不要困死用户
-    if ((loginTime && (now - loginTime < 15000)) || savedUser) {
-      console.log("[Auth] 凭证校验通过，正在恢复会话...");
-      if (savedUser) {
-        setUser(savedUser);
-        setIsAuthenticated(true);
-        isDirectAuthed = true;
-        
-        // 关键：如果登录了但没猫，触发最后一次全量搜救
-        const currentCats = storage.getCatList();
-        if (currentCats.length === 0) {
-          console.log("[Auth] 发现猫咪缺失，启动自动补全搜救...");
-          storage.rescueMyCat();
-        }
-      }
-    } else {
-      console.log("[Auth] 未发现有效凭证，清理残留状态");
-      storage.clearCurrentUser();
-    }
-    
+    // 初始挂载时清除旧会话，确保“每次打开都需要登录”
+    storage.clearCurrentUser();
     refreshCatStatus();
-    
-    // 如果已登录，立即解除阻塞，实现秒进
-    if (isDirectAuthed) {
-      setIsInitializing(false);
-    } else {
-      setTimeout(() => setIsInitializing(false), 300);
-    }
   }, [refreshCatStatus]);
 
-  const login = async (id: string, code?: string, password?: string): Promise<{ success: boolean; error?: string; migrated?: boolean }> => {
-    try {
-      // 这里的 id 可能是 phone，也可能是 username (旧账号专用)
-      const isUsername = !id.match(/^\d{11}$/);
-      const payload = isUsername ? { username: id, password } : { phone: id, code, password };
-
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+  const login = (username: string, password: string): boolean => {
+    const users = storage.getAllUsers();
+    const savedUser = users.find(u => u.username === username && u.password === password);
+    
+    if (savedUser) {
+      // 1. 设置当前用户
+      storage.saveUserInfo(savedUser);
+      storage.saveToken('mock_token_' + Date.now());
+      storage.saveLoginTime(Date.now()); // 记录登录时间
+      storage.saveLastActiveTime(Date.now()); // 记录最后活跃时间
       
-      const data = await response.json();
+      // 2. 更新内存状态
+      setIsAuthenticated(true);
+      setUser(savedUser);
       
-      if (response.ok) {
-        // 1. 设置当前用户
-        const userInfo: UserInfo = {
-          id: data.user.id,
-          phone: data.user.phone,
-          nickname: data.user.nickname,
-          avatar: data.user.avatar,
-          username: data.user.username // 如果是旧账号登录，这里会是 "admin"
-        };
-        storage.saveUserInfo(userInfo);
-        storage.saveToken(data.token);
-        storage.saveLoginTime(Date.now());
-        storage.saveLastActiveTime(Date.now());
-        
-        // 3. 阻塞式地毯式搜救
-        const migrationResult = storage.rescueMyCat();
-        let migrated = false;
-        
-        if (migrationResult.count !== -1) {
-          console.log(`[RESCUE] 成功定位到旧数据源: ${migrationResult.source}，已为您找回 ${migrationResult.count} 只猫咪伙伴！`);
-          const catList = storage.getCatList();
-          if (catList.length > 0) {
-            storage.setActiveCatId(catList[0].id);
-          }
-          migrated = true;
-        }
-        
-        // 2. 更新内存状态
-        setIsAuthenticated(true);
-        setUser(userInfo);
-        refreshCatStatus();
-        
-        return { success: true, migrated };
-      } else {
-        return { success: false, error: data.error || "登录失败" };
-      }
-    } catch (e) {
-      console.error("Login error:", e);
-      return { success: false, error: "网络连接失败，请稍后重试" };
+      refreshCatStatus();
+      return true;
     }
+    return false;
   };
 
-  const register = async (phone: string, code: string, nickname: string, password?: string): Promise<{ success: boolean; error?: string; migrated?: boolean }> => {
-    try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code, nickname, password })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        const userInfo: UserInfo = {
-          id: data.user.id,
-          phone: data.user.phone,
-          nickname: data.user.nickname,
-          avatar: data.user.avatar,
-          username: data.user.username
-        };
-        storage.saveUserInfo(userInfo);
-        storage.saveToken(data.token);
-        storage.saveLoginTime(Date.now());
-        storage.saveLastActiveTime(Date.now());
+  const register = (info: UserInfo): void => {
+    // 1. 保存用户信息并设为当前用户
+    storage.saveUserInfo(info);
+    storage.saveToken('mock_token_' + Date.now());
+    storage.saveLoginTime(Date.now());
+    storage.saveLastActiveTime(Date.now());
 
-        // 3. 阻塞式全量迁移
-        const migrationResult = storage.rescueMyCat();
-        let migrated = false;
-        if (migrationResult.count !== -1) {
-          console.log(`[RESCUE] 成功定位到旧数据源: ${migrationResult.source}，已为您找回 ${migrationResult.count} 只猫咪伙伴！`);
-          const catList = storage.getCatList();
-          if (catList.length > 0) {
-            storage.setActiveCatId(catList[0].id);
-          }
-          migrated = true;
-        }
-
-        // 2. 更新内存状态
-        setUser(userInfo);
-        setIsAuthenticated(true);
-        refreshCatStatus();
-        return { success: true, migrated };
-      } else {
-        return { success: false, error: data.error || "注册失败" };
-      }
-    } catch (e) {
-      console.error("Register error:", e);
-      return { success: false, error: "网络连接失败，请稍后重试" };
-    }
-  };
-
-  const sendCode = async (phone: string): Promise<{ success: boolean; error?: string; mockCode?: string }> => {
-    try {
-      const response = await fetch("/api/auth/send-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        return { success: true, mockCode: data.mockCode };
-      } else {
-        return { success: false, error: data.error || "验证码发送失败" };
-      }
-    } catch (e) {
-      return { success: false, error: "网络繁忙，请稍后再试" };
-    }
+    // 2. 更新内存状态
+    setUser(info);
+    setIsAuthenticated(true);
+    refreshCatStatus(); // 新账号此时 catList 必为空
   };
 
   const logout = () => {
@@ -226,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const contextValue = useMemo(() => ({
-    user, isAuthenticated, isInitializing, hasCat, catCount, login, register, logout, updateProfile, refreshCatStatus, sendCode
+    user, isAuthenticated, isInitializing, hasCat, catCount, login, register, logout, updateProfile, refreshCatStatus
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [user, isAuthenticated, isInitializing, hasCat, catCount]);
 

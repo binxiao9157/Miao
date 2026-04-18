@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import { Download, Smartphone, Share, Plus, MoreVertical, ArrowRight } from "lucide-react";
-import PawIcon from "../components/PawIcon";
+import PawLogo from "../components/PawLogo";
 import { motion } from "motion/react";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -68,7 +68,7 @@ export default function DownloadPage() {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-2 mb-6 group"
         >
-          <PawIcon className="text-[#5D4037] -rotate-12" size={32} fill="#5D4037" />
+          <PawLogo className="-rotate-12" size={32} />
           <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter">
             Miao
           </span>

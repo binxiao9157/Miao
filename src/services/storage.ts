@@ -5,9 +5,7 @@ import { mediaStorage } from "./mediaStorage";
  */
 
 export interface UserInfo {
-  id?: string;
-  phone: string;
-  username?: string;
+  username: string;
   nickname: string;
   avatar: string;
   password?: string; // 仅用于演示模拟校验
@@ -118,7 +116,7 @@ const STORAGE_KEYS = {
   USER_AVATAR: 'user_avatar_key', // 保持兼容性
   LAST_CAT_IMAGE: 'miao_last_cat_image', // 全局最后一次使用的猫咪图片
   LAST_CAT_BREED: 'miao_last_cat_breed', // 全局最后一次使用的猫咪品种
-  LAST_PHONE: 'miao_last_phone', // 记住上次登录的手机号
+  LAST_USERNAME: 'miao_last_username', // 记住上次登录的用户名
   APP_PRESET_CATS: 'app_preset_cats', // 预设猫咪底图
 };
 
@@ -206,22 +204,20 @@ function invalidateCache(storageKey: string) {
 // 刷新用户前缀缓存
 const refreshUserPrefix = () => {
   const currentUserRaw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+  if (currentUserRaw === cachedCurrentUserRaw) return; // 无变化，跳过 JSON.parse
   cachedCurrentUserRaw = currentUserRaw;
 
   if (!currentUserRaw) {
-    cachedUserPrefix = 'guest_';
+    cachedUserPrefix = 'guest';
     return;
   }
 
   try {
     const user = JSON.parse(currentUserRaw) as UserInfo;
-    // 优先级: phone > username > unknown
-    // 最终 key 格式: u_{identifier}_miao_cat_list（getUserKey 负责拼 _）
-    const identifier = user.phone || user.username || 'unknown';
-    cachedUserPrefix = `u_${identifier}`;
+    cachedUserPrefix = `u_${user.username}`;
   } catch (e) {
     console.error("Error parsing current user in refreshUserPrefix:", e);
-    cachedUserPrefix = 'guest_';
+    cachedUserPrefix = 'guest';
   }
 };
 
@@ -333,15 +329,15 @@ export const storage = {
     // 1. 保存到当前登录用户
     storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(info));
     invalidateCache(STORAGE_KEYS.CURRENT_USER);
-    storage.setItem(STORAGE_KEYS.LAST_PHONE, info.phone);
+    storage.setItem(STORAGE_KEYS.LAST_USERNAME, info.username);
 
     // 刷新前缀缓存
     refreshUserPrefix();
 
     
-    // 2. 保存到用户列表（模拟数据库，仅保留本地离线支持）
+    // 2. 保存到用户列表（模拟数据库）
     const users = storage.safeParse<UserInfo[]>(STORAGE_KEYS.USERS, []);
-    const index = users.findIndex(u => u.phone === info.phone);
+    const index = users.findIndex(u => u.username === info.username);
     if (index >= 0) {
       users[index] = info;
     } else {
@@ -370,21 +366,21 @@ export const storage = {
     return storage.safeParse<UserInfo[]>(STORAGE_KEYS.USERS, []);
   },
   
-  findUserByPhone: (phone: string): UserInfo | null => {
+  findUser: (username: string): UserInfo | null => {
     const users = storage.getAllUsers();
-    return users.find(u => u.phone === phone) || null;
+    return users.find(u => u.username === username) || null;
   },
 
-  updatePassword: (phone: string, newPassword: string): boolean => {
+  updatePassword: (username: string, newPassword: string): boolean => {
     const users = storage.getAllUsers();
-    const index = users.findIndex(u => u.phone === phone);
+    const index = users.findIndex(u => u.username === username);
     if (index >= 0) {
       users[index].password = newPassword;
       storage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
       
       // 如果是当前用户，也更新当前用户缓存
       const currentUser = storage.getUserInfo();
-      if (currentUser && currentUser.phone === phone) {
+      if (currentUser && currentUser.username === username) {
         currentUser.password = newPassword;
         storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
       }
@@ -433,10 +429,6 @@ export const storage = {
     storage.removeItem(STORAGE_KEYS.TOKEN);
     localStorage.removeItem('miao_login_time');
     localStorage.removeItem('miao_last_active_time');
-    
-    // 内存清理
-    memCache.clear();
-    cachedCurrentUserRaw = null;
     refreshUserPrefix();
   },
   
@@ -444,175 +436,30 @@ export const storage = {
     // 彻底清除当前用户的所有数据（注销账号用）
     const user = storage.getUserInfo();
     if (user) {
-      const prefix = `u_${user.phone || user.username}_`;
+      const prefix = `u_${user.username}_`;
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith(prefix)) {
           localStorage.removeItem(key);
         }
       });
       // 从用户列表中移除
-      const users = storage.getAllUsers().filter(u => u.phone !== user.phone);
+      const users = storage.getAllUsers().filter(u => u.username !== user.username);
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
     }
     storage.clearCurrentUser();
   },
 
-  getLastPhone: (): string => {
+  getLastUsername: (): string => {
     try {
-      return localStorage.getItem(STORAGE_KEYS.LAST_PHONE) || "";
+      return localStorage.getItem(STORAGE_KEYS.LAST_USERNAME) || "";
     } catch (e) {
       return "";
     }
   },
 
-  rescueMyCat: (): { count: number; source: string | null } => {
-    refreshUserPrefix();
-    const currentPrefix = `${cachedUserPrefix}_`;
-
-    // 获取当前用户的 username（用于旧账号精准匹配）
-    const currentUser = storage.getUserInfo();
-    const currentUsername = currentUser?.username;
-
-    console.log(`[RESCUE] 开启数据搜救，当前前缀: ${currentPrefix}, username: ${currentUsername || '无'}`);
-
-    // 收集所有候选数据源
-    interface CandidateSource {
-      prefix: string;
-      identifier: string;
-      catCount: number;
-      isUsernameMatch: boolean; // 是否与当前用户 username 匹配
-    }
-    const candidates: CandidateSource[] = [];
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key) continue;
-
-      // 模式1: u_{name}_miao_cat_list
-      const catListSuffix = `_${USER_DATA_KEYS.CAT_LIST}`;
-      const isPattern1 = key.startsWith('u_') && key.endsWith(catListSuffix);
-      // 模式2: miao_cats_{name}（极早期格式）
-      const isPattern2 = key.startsWith('miao_cats_');
-
-      if (!isPattern1 && !isPattern2) continue;
-      if (key.startsWith(currentPrefix)) continue; // 排除当前账号
-
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-
-      try {
-        const list = JSON.parse(raw) as any[];
-        if (!Array.isArray(list) || list.length === 0) continue;
-
-        let prefix = "";
-        let identifier = "";
-
-        if (isPattern1) {
-          // key = "u_admin_miao_cat_list" → identifier = "admin", prefix = "u_admin_"
-          // catListSuffix = "_miao_cat_list" (含前导 _)
-          identifier = key.slice(2, key.length - catListSuffix.length);
-          prefix = `u_${identifier}_`;
-        } else {
-          // key = "miao_cats_admin" → identifier = "admin", prefix = "miao_cats_"
-          identifier = key.slice('miao_cats_'.length);
-          prefix = "miao_cats_";
-        }
-
-        const isUsernameMatch = !!(currentUsername && identifier === currentUsername);
-        candidates.push({ prefix, identifier, catCount: list.length, isUsernameMatch });
-        console.log(`[RESCUE] 发现数据源: "${identifier}", 猫咪数: ${list.length}, username匹配: ${isUsernameMatch}`);
-      } catch (e) { /* skip */ }
-    }
-
-    if (candidates.length === 0) {
-      return { count: -1, source: null };
-    }
-
-    // 选择最佳数据源：优先 username 精准匹配，其次猫咪数最多
-    candidates.sort((a, b) => {
-      if (a.isUsernameMatch !== b.isUsernameMatch) return a.isUsernameMatch ? -1 : 1;
-      return b.catCount - a.catCount;
-    });
-    const best = candidates[0];
-
-    console.log(`[RESCUE] 选定数据源: [${best.identifier}], 猫咪数: ${best.catCount}`);
-
-    // 检查是否已经迁移过（防止重复搬运）
-    const migratedFlag = `${currentPrefix}__migrated_from_${best.identifier}`;
-    if (localStorage.getItem(migratedFlag)) {
-      console.log(`[RESCUE] 已从 [${best.identifier}] 迁移过，跳过`);
-      return { count: 0, source: best.identifier };
-    }
-
-    // 清理缓存
-    memCache.clear();
-    cachedCurrentUserRaw = null;
-
-    // 严格前缀匹配搬迁
-    const migratedOldKeys: string[] = [];
-    const keys = Object.keys(localStorage);
-    keys.forEach(oldKey => {
-      if (!oldKey.startsWith(best.prefix)) return;
-      if (oldKey.startsWith(currentPrefix)) return;
-
-      const value = localStorage.getItem(oldKey);
-      if (value === null) return;
-
-      const newKey = oldKey.replace(best.prefix, currentPrefix);
-      console.log(`[RESCUE] 搬运: ${oldKey} -> ${newKey}`);
-      localStorage.setItem(newKey, value);
-      migratedOldKeys.push(oldKey);
-    });
-
-    // 标记已迁移，防止下次登录重复搬运
-    localStorage.setItem(migratedFlag, Date.now().toString());
-
-    // 删除旧 key（搬迁完成后清理）
-    migratedOldKeys.forEach(oldKey => {
-      console.log(`[RESCUE] 清理旧 key: ${oldKey}`);
-      localStorage.removeItem(oldKey);
-    });
-
-    // 重刷缓存
-    memCache.clear();
-    cachedCurrentUserRaw = null;
-    refreshUserPrefix();
-
-    const catList = storage.getCatList();
-    const finalCount = catList.length;
-
-    if (finalCount > 0) {
-      storage.setActiveCatId(catList[0].id);
-    }
-
-    console.log(`[RESCUE] 迁移完成，最终猫咪数: ${finalCount}`);
-    return { count: finalCount, source: best.identifier };
-  },
-
   // Cat Management
   getCatList: (): CatInfo[] => {
-    const rawList = cachedRead<CatInfo[]>(getUserKey(USER_DATA_KEYS.CAT_LIST), []);
-    if (!Array.isArray(rawList)) return [];
-    // cachedRead 已做 safeClone，无需再次深拷贝；仅补全 videoPaths 结构
-    return rawList.map(cat => {
-      if (!cat.videoPaths || typeof cat.videoPaths !== 'object') {
-        cat.videoPaths = {
-          idle: cat.videoPath || '',
-          rubbing: '', petting: '', teasing: '', feeding: '', tail: '', blink: ''
-        };
-      } else {
-        cat.videoPaths = {
-          idle: cat.videoPaths.idle || cat.videoPath || '',
-          rubbing: cat.videoPaths.rubbing || '',
-          petting: cat.videoPaths.petting || '',
-          teasing: cat.videoPaths.teasing || '',
-          feeding: cat.videoPaths.feeding || '',
-          tail: cat.videoPaths.tail || '',
-          blink: cat.videoPaths.blink || ''
-        };
-      }
-      return cat;
-    });
+    return cachedRead<CatInfo[]>(getUserKey(USER_DATA_KEYS.CAT_LIST), []);
   },
 
   getCatById: (id: string): CatInfo | null => {
@@ -658,14 +505,6 @@ export const storage = {
     const list = storage.getCatList();
     const activeId = storage.getActiveCatId();
     const active = list.find(c => c.id === activeId) || list[0] || null;
-    
-    // 强制补全
-    if (active && (!active.videoPaths || typeof active.videoPaths !== 'object')) {
-      active.videoPaths = {
-        idle: active.videoPath || active.remoteVideoUrl || '',
-        rubbing: '', petting: '', teasing: '', feeding: '', tail: '', blink: ''
-      };
-    }
     return active;
   },
 
@@ -677,36 +516,22 @@ export const storage = {
   // 获取全局最后一次使用的猫咪图片
   getLastCatImage: (): string | null => {
     try {
-      // 策略1: 通过上次登录的手机号精准查找
-      const lastPhone = storage.getLastPhone();
-      if (lastPhone) {
-        const listKey = `u_${lastPhone}_${USER_DATA_KEYS.CAT_LIST}`;
-        const activeIdKey = `u_${lastPhone}_${USER_DATA_KEYS.ACTIVE_CAT_ID}`;
-
+      const lastUsername = storage.getLastUsername();
+      if (lastUsername) {
+        const listKey = `u_${lastUsername}_${USER_DATA_KEYS.CAT_LIST}`;
+        const activeIdKey = `u_${lastUsername}_${USER_DATA_KEYS.ACTIVE_CAT_ID}`;
+        
         const listData = localStorage.getItem(listKey);
         const activeId = localStorage.getItem(activeIdKey);
-
+        
         if (listData) {
           const list = JSON.parse(listData) as CatInfo[];
           const active = list.find(c => c.id === activeId) || list[0];
-          if (active) return active.avatar;
+          if (active) {
+            return active.avatar;
+          }
         }
       }
-
-      // 策略2: 遍历所有 u_*_miao_cat_list（兼容旧 username 账号）
-      const catListSuffix = `_${USER_DATA_KEYS.CAT_LIST}`;
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (!key || !key.startsWith('u_') || !key.endsWith(catListSuffix)) continue;
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-        try {
-          const list = JSON.parse(raw) as CatInfo[];
-          if (list.length > 0) return list[0].avatar;
-        } catch { /* skip */ }
-      }
-
-      // 策略3: 旧的全局缓存 fallback
       return localStorage.getItem(STORAGE_KEYS.LAST_CAT_IMAGE);
     } catch (e) {
       return null;
@@ -805,41 +630,6 @@ export const storage = {
       pushNotifications: true,
       timeLetterReminder: true
     });
-  },
-
-  // 绑定手机号并迁移数据
-  bindPhoneAndMigrateData: (phone: string): boolean => {
-    const user = storage.getUserInfo();
-    if (!user) return false;
-    if (user.phone === phone) return true;
-
-    const oldPrefix = cachedUserPrefix;
-    user.phone = phone;
-    storage.saveUserInfo(user);
-    
-    // 迁移数据
-    const newPrefix = cachedUserPrefix;
-    console.log(`[MIGRATE] 账号升级搬迁: ${oldPrefix} -> ${newPrefix}`);
-    
-    memCache.clear();
-    cachedCurrentUserRaw = null;
-    
-    const keys = Object.keys(localStorage);
-    keys.forEach(oldKey => {
-      if (oldKey.startsWith(oldPrefix)) {
-        const value = localStorage.getItem(oldKey);
-        if (value !== null) {
-          const newKey = oldKey.replace(oldPrefix, newPrefix);
-          localStorage.setItem(newKey, value);
-          // 既然是“搬家”，成功复制后删除旧 Key
-          if (newKey !== oldKey) {
-            localStorage.removeItem(oldKey);
-          }
-        }
-      }
-    });
-    
-    return true;
   },
 
   // Diary storage
