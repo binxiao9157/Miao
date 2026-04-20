@@ -60,14 +60,14 @@ export default function Points() {
   const effectivePoints = isDebugMode ? Math.max(points, REDEEM_THRESHOLD) : points;
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
       <PageHeader 
         title="积分中心" 
         subtitle="Points Center" 
       />
 
       <div 
-        className="px-6 pb-32"
+        className="px-6 pb-32 shrink-0 overflow-visible"
         style={{ paddingBottom: 'calc(120px + env(safe-area-inset-bottom))' }}
       >
         <div 

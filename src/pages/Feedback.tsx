@@ -165,14 +165,14 @@ export default function Feedback() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
       <PageHeader 
         title="意见反馈"
         subtitle={hasSubmitted ? "倾听您的每一次吐槽与建议" : "告诉我们您的真实感受～"}
         onBack={() => navigate(-1)}
       />
 
-      <main className="flex-grow overflow-y-auto px-6 pb-12">
+      <main className="px-6 pb-12 shrink-0 overflow-visible">
         <AnimatePresence mode="wait">
           {!hasSubmitted ? (
             <motion.div 

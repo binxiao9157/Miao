@@ -301,7 +301,7 @@ export default function AddFriendQR() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-y-auto">
+    <div className="flex flex-col h-full overflow-y-auto no-scrollbar bg-background">
       <PageHeader 
         title="面对面添加" 
         subtitle="Face-to-Face" 
@@ -315,7 +315,7 @@ export default function AddFriendQR() {
         }
       />
 
-      <div className="flex-grow flex flex-col items-center justify-evenly px-6 py-2">
+      <div className="flex-grow flex flex-col items-center justify-evenly px-6 py-2 shrink-0 overflow-visible">
         {/* 名片卡片区 */}
         <motion.div 
           ref={qrCardRef}

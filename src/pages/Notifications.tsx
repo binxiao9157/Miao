@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Bell, Sun, Mail } from "lucide-react";
+import { Bell, Sun, Mail } from "lucide-react";
 import { storage, AppSettings } from "../services/storage";
+import PageHeader from "../components/PageHeader";
 
 export default function Notifications() {
   const navigate = useNavigate();
@@ -26,18 +27,13 @@ export default function Notifications() {
   };
 
   return (
-    <div 
-      className="min-h-screen bg-background px-6 pb-6"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
-    >
-      <header className="flex items-center mb-8">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant">
-          <ArrowLeft size={24} />
-        </button>
-        <h1 className="text-xl font-bold text-on-surface ml-2">通知设置</h1>
-      </header>
+    <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
+      <PageHeader 
+        title="通知设置" 
+        subtitle="Notifications" 
+      />
 
-      <div className="space-y-6">
+      <div className="px-6 pb-24 space-y-6 shrink-0 overflow-visible">
         <section className="bg-white rounded-3xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">

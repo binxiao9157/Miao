@@ -13,10 +13,10 @@ interface PageHeaderProps {
 export default function PageHeader({ title, subtitle, action, dark, onBack, onTitleClick }: PageHeaderProps) {
   return (
     <header 
-      className={`sticky top-0 z-30 backdrop-blur-xl px-6 flex justify-between items-center shrink-0 ${dark ? 'bg-black/40 text-white' : 'bg-background/80 text-on-surface'}`}
+      className={`relative z-30 px-6 flex justify-between items-center shrink-0 ${dark ? 'bg-black/40 text-white' : 'bg-background text-on-surface'}`}
       style={{ 
         paddingTop: 'env(safe-area-inset-top)',
-        height: 'calc(env(safe-area-inset-top) + 5.5rem)' 
+        height: 'calc(env(safe-area-inset-top) + 6rem)' 
       }}
     >
       <div className="flex items-center gap-3 mt-2">

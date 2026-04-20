@@ -152,7 +152,7 @@ export default function NotificationList() {
 
   return (
     <div 
-      className="bg-background pb-24 font-sans overflow-x-hidden"
+      className="bg-background font-sans h-full overflow-y-auto no-scrollbar flex flex-col"
     >
       <PageHeader 
         title="消息中心" 
@@ -168,7 +168,7 @@ export default function NotificationList() {
         }
       />
 
-      <div className="px-6 space-y-4">
+      <div className="px-6 space-y-4 pb-24 shrink-0 overflow-visible">
         {notifications.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0 }}

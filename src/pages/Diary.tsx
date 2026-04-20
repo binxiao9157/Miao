@@ -372,7 +372,7 @@ export default function Diary() {
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
       <PageHeader 
         title="日常记录" 
         subtitle="Daily Moments" 
@@ -394,41 +394,42 @@ export default function Diary() {
         }
       />
 
-      <div className="px-6 mb-8">
-        <div className="bg-[#FF9D76]/10 p-1.5 rounded-full flex relative overflow-hidden">
-          <LayoutGroup id="diary-tabs">
-            <button 
-              onClick={() => setActiveTab('mine')}
-              className={`flex-1 py-3 rounded-full text-sm font-black transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-[#5D4037]/60 hover:bg-black/5'}`}
-            >
-              我的记录
-              {activeTab === 'mine' && (
-                <motion.div 
-                  layoutId="tab-bg"
-                  className="absolute inset-0 bg-[#FF9D76] rounded-full -z-10 shadow-sm"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-            </button>
-            <button 
-              onClick={() => setActiveTab('friends')}
-              className={`flex-1 py-3 rounded-full text-sm font-black transition-all relative z-10 ${activeTab === 'friends' ? 'text-white' : 'text-[#5D4037]/60 hover:bg-black/5'}`}
-            >
-              好友动态
-              {activeTab === 'friends' && (
-                <motion.div 
-                  layoutId="tab-bg"
-                  className="absolute inset-0 bg-[#FF9D76] rounded-full -z-10 shadow-sm"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-            </button>
-          </LayoutGroup>
+      <div className="shrink-0 overflow-visible">
+        <div className="px-6 mb-8">
+          <div className="bg-[#FF9D76]/10 p-1.5 rounded-full flex relative overflow-hidden">
+            <LayoutGroup id="diary-tabs">
+              <button 
+                onClick={() => setActiveTab('mine')}
+                className={`flex-1 py-3 rounded-full text-sm font-black transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-[#5D4037]/60 hover:bg-black/5'}`}
+              >
+                我的记录
+                {activeTab === 'mine' && (
+                  <motion.div 
+                    layoutId="tab-bg"
+                    className="absolute inset-0 bg-[#FF9D76] rounded-full -z-10 shadow-sm"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+              </button>
+              <button 
+                onClick={() => setActiveTab('friends')}
+                className={`flex-1 py-3 rounded-full text-sm font-black transition-all relative z-10 ${activeTab === 'friends' ? 'text-white' : 'text-[#5D4037]/60 hover:bg-black/5'}`}
+              >
+                好友动态
+                {activeTab === 'friends' && (
+                  <motion.div 
+                    layoutId="tab-bg"
+                    className="absolute inset-0 bg-[#FF9D76] rounded-full -z-10 shadow-sm"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+              </button>
+            </LayoutGroup>
+          </div>
         </div>
-      </div>
 
-      <div className="px-6 space-y-8">
-        {activeTab === 'mine' ? (
+        <div className="px-6 space-y-8 pb-24">
+          {activeTab === 'mine' ? (
           diaries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 text-center">
               <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
@@ -500,6 +501,7 @@ export default function Diary() {
             ))
           )
         )}
+      </div>
       </div>
 
       {createPortal(

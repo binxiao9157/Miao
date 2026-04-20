@@ -111,7 +111,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
       <PageHeader 
         title="Miao" 
         subtitle="Miao Sanctuary" 
@@ -138,7 +138,7 @@ export default function Profile() {
         }
       />
 
-      <div className="px-6 pb-6 flex flex-col">
+      <div className="px-6 pb-6 flex flex-col shrink-0 overflow-visible">
         <div className="flex-grow">
           <InstallPromptBanner />
         <section className="flex flex-col items-center mb-10">

@@ -325,7 +325,7 @@ export default function TimeLetters() {
   }, [letters, filterCatId]);
 
   const renderList = () => (
-    <div className="flex flex-col overflow-x-hidden">
+    <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
       <AnimatePresence>
         {showToast && (
           <motion.div 
@@ -346,75 +346,77 @@ export default function TimeLetters() {
         action={
           <button 
             onClick={() => setView('write')}
-            className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all"
+            className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all font-black"
           >
             <Plus size={28} />
           </button>
         }
       />
 
-      {/* 过滤器 */}
-      {myCats.length > 0 && (
-        <div className="px-6 mb-6 overflow-x-auto no-scrollbar flex items-center gap-3">
-          <button
-            onClick={() => setFilterCatId("all")}
-            className={`px-4 py-2 rounded-full text-xs font-black transition-all shrink-0 ${
-              filterCatId === "all" ? "bg-primary text-white shadow-md shadow-primary/20" : "bg-surface-container text-on-surface-variant"
-            }`}
-          >
-            全部
-          </button>
-          {myCats.map(cat => (
+      <div className="flex flex-col shrink-0 overflow-visible">
+        {/* 过滤器 */}
+        {myCats.length > 0 && (
+          <div className="px-6 mb-6 flex items-center gap-3 overflow-x-auto no-scrollbar">
             <button
-              key={cat.id}
-              onClick={() => setFilterCatId(cat.id)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black transition-all shrink-0 ${
-                filterCatId === cat.id ? "bg-primary text-white shadow-md shadow-primary/20" : "bg-surface-container text-on-surface-variant"
+              onClick={() => setFilterCatId("all")}
+              className={`px-4 py-2 rounded-full text-xs font-black transition-all shrink-0 ${
+                filterCatId === "all" ? "bg-primary text-white shadow-md shadow-primary/20" : "bg-surface-container text-on-surface-variant"
               }`}
             >
-              <img src={cat.avatar} className="w-5 h-5 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
-              {cat.name}
+              全部
             </button>
-          ))}
+            {myCats.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setFilterCatId(cat.id)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black transition-all shrink-0 ${
+                  filterCatId === cat.id ? "bg-primary text-white shadow-md shadow-primary/20" : "bg-surface-container text-on-surface-variant"
+                }`}
+              >
+                <img src={cat.avatar} className="w-5 h-5 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="px-6 pb-24 flex flex-col gap-6">
+          <AnimatePresence mode="popLayout">
+            {filteredLetters.length === 0 ? (
+              <motion.div 
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-32 text-center"
+              >
+                <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
+                  <Clock size={40} />
+                </div>
+                <h3 className="text-xl font-black text-on-surface mb-2">还没有信件</h3>
+                <p className="text-sm text-on-surface-variant max-w-[200px]">写一封信给未来的自己，让时光见证温暖</p>
+              </motion.div>
+            ) : (
+              filteredLetters.map((letter) => {
+                const targetCat = myCats.find(c => c.id === letter.catId);
+                const isUnlocked = isLetterUnlocked(letter);
+
+                return (
+                  <TimeLetterItem
+                    key={letter.id}
+                    letter={letter}
+                    isUnlocked={isUnlocked}
+                    isFastForward={isFastForward}
+                    targetCat={targetCat}
+                    onDelete={handleDeleteClick}
+                    onClick={handleLetterClick}
+                    onLongPress={handleForceUnlock}
+                  />
+                );
+              })
+            )}
+          </AnimatePresence>
         </div>
-      )}
-
-      <div className="px-6 pb-24 flex flex-col gap-6 min-h-[500px]">
-        <AnimatePresence mode="popLayout">
-          {filteredLetters.length === 0 ? (
-            <motion.div 
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center py-32 text-center"
-            >
-              <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
-                <Clock size={40} />
-              </div>
-              <h3 className="text-xl font-black text-on-surface mb-2">还没有信件</h3>
-              <p className="text-sm text-on-surface-variant max-w-[200px]">写一封信给未来的自己，让时光见证温暖</p>
-            </motion.div>
-          ) : (
-            filteredLetters.map((letter) => {
-              const targetCat = myCats.find(c => c.id === letter.catId);
-              const isUnlocked = isLetterUnlocked(letter);
-
-              return (
-                <TimeLetterItem
-                  key={letter.id}
-                  letter={letter}
-                  isUnlocked={isUnlocked}
-                  isFastForward={isFastForward}
-                  targetCat={targetCat}
-                  onDelete={handleDeleteClick}
-                  onClick={handleLetterClick}
-                  onLongPress={handleForceUnlock}
-                />
-              );
-            })
-          )}
-        </AnimatePresence>
       </div>
 
       {/* 删除确认弹窗 */}
@@ -571,11 +573,22 @@ export default function TimeLetters() {
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
         className="fixed inset-0 z-50 bg-[#1a1c1e] flex flex-col overflow-y-auto no-scrollbar"
       >
-        {/* 固定顶部导航栏 */}
-        <header className="fixed top-0 left-0 right-0 z-50 px-8 flex items-center justify-between pointer-events-none" style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(env(safe-area-inset-top) + 5rem)' }}>
+        {/* 背景层：猫咪 Banner - 这一层通过 absolute 保持在顶部背景位置，并与后面内容自然叠加 */}
+        <div className="absolute top-0 h-[60vh] w-full shrink-0 -z-10 overflow-hidden">
+          <img 
+            src={selectedLetter?.catAvatar || targetCat?.avatar || "https://picsum.photos/seed/cat/800/600"} 
+            className="w-full h-full object-cover" 
+            alt="" 
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80" />
+        </div>
+
+        {/* 顶部导航栏 - 现在放在滚动视图内部作为第一个元素 */}
+        <header className="px-8 flex items-center justify-between shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(env(safe-area-inset-top) + 6rem)' }}>
           <button 
             onClick={() => setView('list')} 
-            className="w-12 h-12 bg-black/20 backdrop-blur-2xl rounded-2xl flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all pointer-events-auto shadow-xl"
+            className="w-12 h-12 bg-black/20 backdrop-blur-2xl rounded-2xl flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all shadow-xl"
           >
             <ArrowLeft size={24} />
           </button>
@@ -586,29 +599,19 @@ export default function TimeLetters() {
           <div className="w-12" />
         </header>
 
-        {/* 背景层：猫咪 Banner - Sticky 实现背景跟随但卡片滑动覆盖 */}
-        <div className="sticky top-0 h-[60vh] w-full shrink-0 -z-10 overflow-hidden">
-          <img 
-            src={selectedLetter?.catAvatar || targetCat?.avatar || "https://picsum.photos/seed/cat/800/600"} 
-            className="w-full h-full object-cover" 
-            alt="" 
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80" />
-          
-          <div className="absolute bottom-32 left-10">
-            <p className="text-xs font-black text-white/60 uppercase tracking-widest mb-1.5 drop-shadow-sm">这是写给它的信</p>
-            <h2 className="text-3xl font-black text-white drop-shadow-md">{targetCat?.name || "已离开的小猫"}</h2>
-          </div>
+        {/* 横向引导文字层 */}
+        <div className="h-[25vh] flex flex-col justify-end px-10 pb-12 shrink-0">
+          <p className="text-xs font-black text-white/60 uppercase tracking-widest mb-1.5 drop-shadow-sm">这是写给它的信</p>
+          <h2 className="text-3xl font-black text-white drop-shadow-md">{targetCat?.name || "已离开的小猫"}</h2>
         </div>
 
-        {/* 前景层：白色信件卡片自适应内容高度 */}
-        <div className="relative z-10 w-full">
+        {/* 前景层：白色信件卡片 */}
+        <div className="relative z-10 w-full flex-grow">
           {/* 卡片顶部圆角及主要内容容器 */}
           <div 
-            className="bg-background rounded-t-[32px] -mt-16 p-10 shadow-[0_-20px_50px_rgba(0,0,0,0.15)] relative overflow-hidden flex flex-col"
+            className="bg-background rounded-t-[32px] p-10 shadow-[0_-20px_50px_rgba(0,0,0,0.15)] relative overflow-hidden flex flex-col"
             style={{ 
-              minHeight: '75vh',
+              minHeight: '65vh',
               paddingBottom: 'calc(env(safe-area-inset-bottom) + 8rem)' 
             }}
           >
