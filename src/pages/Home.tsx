@@ -4,6 +4,7 @@ import { Coins, RefreshCw, Loader2, AlertCircle } from "lucide-react";
 import { storage, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuthContext } from "../context/AuthContext";
+import { FrostedGlassBubble } from "../components/FrostedGlassBubble";
 
 // 不再依赖外部 CDN 兜底视频，离线场景下显示猫咪头像
 
@@ -624,34 +625,10 @@ export default function Home() {
         }}
       />
 
-      {/* 统一对话气泡 - 仿对话框样式与左侧滑入动画 */}
+      {/* 统一对话气泡 - 升级为毛玻璃效果 (Frosted Glass) */}
       <AnimatePresence mode="wait">
         {bubbleText && (
-          <motion.div 
-            key={bubbleId}
-            initial={{ opacity: 0, x: -100 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50, transition: { duration: 0.3 } }}
-            transition={{ 
-              type: "spring", 
-              damping: 15, 
-              stiffness: 100,
-              restDelta: 0.001
-            }}
-            className="absolute top-[22%] left-8 z-40 pointer-events-none"
-          >
-            <div className="relative">
-              {/* 装饰线条 - 增强手绘感 */}
-              <div className="absolute -top-4 -left-2 w-8 h-4 border-t-2 border-white/30 rounded-[50%] -rotate-[25deg]" />
-              <div className="absolute -bottom-2 -right-3 w-8 h-4 border-b-2 border-white/30 rounded-[50%] -rotate-[15deg]" />
-              
-              <div className="relative bg-white/90 backdrop-blur-xl px-10 py-5 rounded-[2.5rem_2rem_3rem_2.5rem] border-2 border-white/40 shadow-2xl min-w-[120px]">
-                <p className="text-sm font-black text-[#5D4037] tracking-wide text-center">{bubbleText}</p>
-                {/* 气泡小尾巴 */}
-                <div className="absolute -bottom-2 left-6 w-4 h-4 bg-white/90 border-r-2 border-b-2 border-white/40 rotate-45" />
-              </div>
-            </div>
-          </motion.div>
+          <FrostedGlassBubble text={bubbleText} bubbleId={bubbleId} />
         )}
       </AnimatePresence>
 
