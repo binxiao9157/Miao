@@ -16,6 +16,7 @@ export default function Login() {
   const [catImage, setCatImage] = useState<string | null>(null);
   const [isAgreed, setIsAgreed] = useState(false);
   const [shake, setShake] = useState(false);
+  const [showAgreedDialog, setShowAgreedDialog] = useState(false);
 
   // Default cat image fallback — 使用本地内联 SVG 占位，避免离线时依赖外部 CDN
   const DEFAULT_CAT_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%23FEF6F0' width='200' height='200'/%3E%3Ctext x='100' y='115' text-anchor='middle' font-size='80'%3E🐱%3C/text%3E%3C/svg%3E";
@@ -35,18 +36,12 @@ export default function Login() {
     }
   }, []);
 
-  const handleLogin = () => {
-    if (!isAgreed) {
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      alert("请先阅读并勾选同意服务条款与隐私政策");
-      return;
-    }
-    if (!username || !password) {
+  const performLogin = (u = username, p = password) => {
+    if (!u || !p) {
       setError("请输入用户名和密码");
       return;
     }
-    const success = login(username, password);
+    const success = login(u, p);
     if (success) {
       const hasCat = storage.getCatList().length > 0;
       if (hasCat) {
@@ -57,6 +52,21 @@ export default function Login() {
     } else {
       setError("用户名或密码错误");
     }
+  };
+
+  const handleLogin = () => {
+    if (!isAgreed) {
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      setShowAgreedDialog(true);
+      return;
+    }
+    performLogin();
+  };
+
+  const handleAgreeAndContinue = () => {
+    setIsAgreed(true);
+    setShowAgreedDialog(false);
   };
 
   return (
@@ -187,14 +197,59 @@ export default function Login() {
           扫码下载 App
         </button>
         <div className="flex items-center justify-center gap-4 text-[12px] font-medium text-on-surface-variant/60">
-          <span>隐私政策</span>
+          <Link to="/privacy-policy" className="hover:text-primary">隐私政策</Link>
           <span className="w-1 h-1 bg-on-surface-variant/20 rounded-full"></span>
-          <span>服务条款</span>
+          <Link to="/terms" className="hover:text-primary">服务条款</Link>
         </div>
         <p className="text-[10px] text-on-surface-variant/40 font-bold tracking-[0.2em] uppercase">
           © 2026 MIAO SANCTUARY
         </p>
       </div>
+
+      {/* Privacy Agreement Dialog */}
+      <AnimatePresence>
+        {showAgreedDialog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowAgreedDialog(false)}
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[40px] p-8 pt-10 shadow-2xl overflow-hidden"
+            >
+              <div className="mb-6">
+                <h3 className="text-xl font-black text-on-surface mb-2">服务条款与隐私政策</h3>
+                <p className="text-sm text-on-surface-variant leading-relaxed">
+                  为了保障您的账号安全及提供更好的服务，请在使用前阅读并同意
+                  <span className="text-primary font-bold">《Miao 服务条款》</span>与
+                  <span className="text-primary font-bold">《隐私政策》</span>。
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleAgreeAndContinue}
+                  className="miao-btn-primary py-4 font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
+                >
+                  同意并继续
+                </button>
+                <button 
+                  onClick={() => setShowAgreedDialog(false)}
+                  className="py-4 text-sm font-bold text-on-surface-variant hover:bg-surface-container rounded-2xl transition-colors"
+                >
+                  取消
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
