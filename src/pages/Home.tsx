@@ -237,6 +237,15 @@ export default function Home() {
           navigate(location.pathname, { replace: true, state: {} });
         }, 800);
       }
+
+      // 新增：处理从任务页面跳转过来的互动引导逻辑
+      if (location.state?.triggerInteraction === 'feather') {
+        setTimeout(() => {
+          triggerInteraction('逗猫棒玩耍', '小羽毛，抓不到～', 'blink');
+          // 清除 state，防止刷新页面再次触发
+          navigate(location.pathname, { replace: true, state: {} });
+        }, 1200);
+      }
     } else {
       if (idleVideoRef.current) idleVideoRef.current.pause();
       (Object.values(actionRefs) as React.RefObject<HTMLVideoElement | null>[]).forEach(ref => ref.current?.pause());
