@@ -96,7 +96,7 @@ export default function EmptyCatPage() {
 
       <div className="absolute bottom-12 text-center">
         <p className="text-[10px] text-on-surface-variant/30 font-bold tracking-[0.3em] uppercase">
-          MIAO VERSION 1.0.0 · Pure Companionship
+          Miao Sanctuary · Pure Companionship
         </p>
       </div>
     </div>
