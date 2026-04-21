@@ -114,7 +114,7 @@ export default function Profile() {
     <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
       <PageHeader 
         title="Miao" 
-        subtitle="Miao Sanctuary" 
+        subtitle="MIAO VERSION 1.0.0" 
         action={
           <div className="flex gap-2">
             <button 

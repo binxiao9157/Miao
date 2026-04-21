@@ -220,7 +220,7 @@ export default function DownloadPage() {
             <ArrowRight size={16} />
           </button>
           <p className="text-[10px] text-on-surface-variant/40 font-bold tracking-[0.2em] uppercase mt-4">
-            © 2026 MIAO SANCTUARY
+            © 2026 MIAO VERSION 1.0.0
           </p>
         </motion.div>
       </div>

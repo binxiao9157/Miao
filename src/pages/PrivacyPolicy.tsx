@@ -104,7 +104,7 @@ export default function PrivacyPolicy() {
             <ShieldCheck size={32} />
           </div>
           <h2 className="text-2xl font-black text-on-surface">合规与隐私保护</h2>
-          <p className="text-[10px] font-bold text-on-surface-variant opacity-40 uppercase tracking-widest mt-2">Miao Sanctuary Compliance Policy V2.0</p>
+          <p className="text-[10px] font-bold text-on-surface-variant opacity-40 uppercase tracking-widest mt-2">MIAO VERSION 1.0.0 Compliance Policy V2.0</p>
         </motion.div>
 
         <div className="bg-white/50 backdrop-blur-sm rounded-[32px] p-6 border border-outline-variant/30 space-y-12">

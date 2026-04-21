@@ -135,7 +135,7 @@ const TermsOfService: React.FC = () => {
             点击“同意”或继续使用本应用，即表示您已充分阅读、理解并接受上述所有条款。
           </p>
           <p className="text-[10px] font-bold text-on-surface-variant/20 uppercase tracking-[0.3em] mt-8">
-            © 2026 MIAO SANCTUARY · LAST UPDATE: 04.16
+            © 2026 MIAO VERSION 1.0.0 · LAST UPDATE: 04.16
           </p>
         </div>
       </main>

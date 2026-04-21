@@ -649,7 +649,7 @@ export default function TimeLetters() {
 
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-12 h-1 bg-primary/20 rounded-full mb-1" />
-                  <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-[0.2em]">Miao Sanctuary</p>
+                  <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-[0.2em]">MIAO VERSION 1.0.0</p>
                 </div>
               </div>
             </div>

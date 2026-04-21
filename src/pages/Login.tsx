@@ -202,7 +202,7 @@ export default function Login() {
           <Link to="/terms" className="hover:text-primary">服务条款</Link>
         </div>
         <p className="text-[10px] text-on-surface-variant/40 font-bold tracking-[0.2em] uppercase">
-          © 2026 MIAO SANCTUARY
+          © 2026 MIAO VERSION 1.0.0
         </p>
       </div>
 
