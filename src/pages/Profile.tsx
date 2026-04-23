@@ -339,6 +339,14 @@ export default function Profile() {
           <Heart size={8} className="text-secondary fill-current" />
           <Heart size={8} className="text-primary fill-current" />
         </div>
+        <a 
+          href="https://beian.miit.gov.cn/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-[10px] text-on-surface-variant/30 tracking-wider mt-2 hover:opacity-100 transition-opacity inline-block"
+        >
+          浙ICP备2026026483号-1
+        </a>
       </footer>
 
       {/* Admin Panel Modal */}

@@ -6,10 +6,8 @@ interface PawLogoProps {
   id?: string;
 }
 
-export default function PawLogo({ size = 48, className = "", id = "paw-watercolor" }: PawLogoProps) {
-  const filterId = `${id}-filter`;
-  const gradientId = `${id}-gradient`;
-  const strokeFilterId = `${id}-stroke-filter`;
+export default function PawLogo({ size = 48, className = "" }: PawLogoProps) {
+  const pawColor = "#4B3621";
 
   return (
     <svg
@@ -20,90 +18,75 @@ export default function PawLogo({ size = 48, className = "", id = "paw-watercolo
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        {/* 水彩晕染滤镜：模拟笔触边缘的粗糙感 */}
-        <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" xChannelSelector="R" yChannelSelector="G" />
+        {/* Paper/Felt texture filter matching the organic look of the image */}
+        <filter id="felt-texture-refined" x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" result="noise" />
+          <feDiffuseLighting in="noise" lightingColor="white" surfaceScale="0.8">
+            <feDistantLight azimuth="45" elevation="55" />
+          </feDiffuseLighting>
+          <feComposite operator="in" in2="SourceGraphic" />
+          <feBlend in="SourceGraphic" mode="multiply" />
         </filter>
 
-        {/* 描边滤镜：让黑边更有手绘的厚重不规则感 */}
-        <filter id={strokeFilterId} x="-10%" y="-10%" width="120%" height="120%">
-          <feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="2" result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.5" />
+        {/* Subtle edge softening to mimic the stamp/felt look in the image */}
+        <filter id="edge-soften">
+          <feGaussianBlur stdDeviation="0.4" />
         </filter>
-
-        {/* 水彩橙色渐变 */}
-        <radialGradient id={gradientId} cx="50%" cy="50%" r="50%" fx="45%" fy="45%">
-          <stop offset="0%" stopColor="#F49D60" />
-          <stop offset="60%" stopColor="#E87A3B" />
-          <stop offset="100%" stopColor="#D46927" />
-        </radialGradient>
       </defs>
+      
+      <g filter="url(#felt-texture-refined)">
+        <g filter="url(#edge-soften)">
+          {/* Main Pad (Metacarpal Pad): 3-lobed organic shape based on attachment */}
+          <path
+            d="M 50,88 
+               C 32,88 20,78 20,62 
+               C 20,55 24,52 30,54 
+               C 35,46 45,44 50,46 
+               C 55,44 65,46 70,54 
+               C 76,52 80,55 80,62 
+               C 80,78 68,88 50,88 Z"
+            fill={pawColor}
+          />
 
-      <g filter={`url(#${filterId})`}>
-        {/* 大肉垫 - 使用路径模拟手绘不规则性 */}
-        <path
-          d="M50,85 C35,85 22,75 22,58 C22,45 35,42 50,42 C65,42 78,45 78,58 C78,75 65,85 50,85 Z"
-          fill={`url(#${gradientId})`}
-          stroke="#2C2C2C"
-          strokeWidth="3.5"
-          strokeLinejoin="round"
-          filter={`url(#${strokeFilterId})`}
-        />
-
-        {/* 4个脚趾肉垫 */}
-        {/* 左一 */}
-        <ellipse
-          cx="24"
-          cy="42"
-          rx="10"
-          ry="14"
-          transform="rotate(-25 24 42)"
-          fill={`url(#${gradientId})`}
-          stroke="#2C2C2C"
-          strokeWidth="3.5"
-          filter={`url(#${strokeFilterId})`}
-        />
-        {/* 左二 */}
-        <ellipse
-          cx="40"
-          cy="28"
-          rx="11"
-          ry="16"
-          transform="rotate(-5 40 28)"
-          fill={`url(#${gradientId})`}
-          stroke="#2C2C2C"
-          strokeWidth="3.5"
-          filter={`url(#${strokeFilterId})`}
-        />
-        {/* 右二 */}
-        <ellipse
-          cx="62"
-          cy="28"
-          rx="11"
-          ry="16"
-          transform="rotate(8 62 28)"
-          fill={`url(#${gradientId})`}
-          stroke="#2C2C2C"
-          strokeWidth="3.5"
-          filter={`url(#${strokeFilterId})`}
-        />
-        {/* 右一 */}
-        <ellipse
-          cx="78"
-          cy="42"
-          rx="10"
-          ry="14"
-          transform="rotate(28 78 42)"
-          fill={`url(#${gradientId})`}
-          stroke="#2C2C2C"
-          strokeWidth="3.5"
-          filter={`url(#${strokeFilterId})`}
-        />
+          {/* Four Toe Pads (Digital Pads): Organic ovals based on attachment */}
+          {/* Leftmost toe - tilted outwards */}
+          <ellipse
+            cx="18"
+            cy="45"
+            rx="9"
+            ry="11"
+            transform="rotate(-28 18 45)"
+            fill={pawColor}
+          />
+          {/* Center-left toe - tall, large oval */}
+          <ellipse
+            cx="38"
+            cy="24"
+            rx="11"
+            ry="15"
+            transform="rotate(-5 38 24)"
+            fill={pawColor}
+          />
+          {/* Center-right toe - tall, large oval */}
+          <ellipse
+            cx="64"
+            cy="24"
+            rx="11"
+            ry="15"
+            transform="rotate(6 64 24)"
+            fill={pawColor}
+          />
+          {/* Rightmost toe - tilted outwards */}
+          <ellipse
+            cx="84"
+            cy="42"
+            rx="9.5"
+            ry="11.5"
+            transform="rotate(28 84 42)"
+            fill={pawColor}
+          />
+        </g>
       </g>
-
-      {/* 额外的纹理噪点，模拟水彩纸质感 */}
-      <rect width="100" height="100" fill="transparent" style={{ mixBlendMode: 'overlay' }} opacity="0.3" pointerEvents="none" />
     </svg>
   );
 }
