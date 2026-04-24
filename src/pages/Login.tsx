@@ -80,9 +80,9 @@ export default function Login() {
 
       <div className="w-full flex-1 flex flex-col items-center justify-center py-4 relative z-10">
         {/* Logo Section */}
-        <div className="flex items-center gap-2 mb-4 group">
+        <div className="flex items-center gap-0 mb-4 group">
           <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={48} />
-          <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter">Miao</span>
+          <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter ml-[-6px]">Miao</span>
         </div>
         
         {/* Title Section */}

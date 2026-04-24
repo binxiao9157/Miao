@@ -79,9 +79,9 @@ export default function Welcome() {
         <ArrowLeft size={20} />
       </button>
 
-      <div className={`flex items-center gap-2 mb-12 group mt-12`}>
+      <div className={`flex items-center gap-0 mb-12 group mt-12`}>
         <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={44} />
-        <span className="text-2xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">Miao</span>
+        <span className="text-2xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight ml-[-4px]">Miao</span>
       </div>
 
       <h1 className="text-4xl font-black text-on-surface mb-3 leading-tight">

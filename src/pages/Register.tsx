@@ -66,9 +66,9 @@ export default function Register() {
           <ArrowLeft size={20} />
         </button>
         
-        <div className="flex items-center gap-2 mb-8 group">
+        <div className="flex items-center gap-0 mb-8 group">
           <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={56} />
-          <h1 className="text-4xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight">加入 Miao</h1>
+          <h1 className="text-4xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight ml-[-8px]">加入 Miao</h1>
         </div>
         <p className="text-on-surface-variant text-sm opacity-60 leading-relaxed">开启您与宠物的精致陪伴之旅，记录每一个温暖瞬间。</p>
       </header>

@@ -66,10 +66,10 @@ export default function DownloadPage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2 mb-6 group"
+          className="flex items-center gap-0 mb-6 group"
         >
           <PawLogo className="-rotate-12" size={48} />
-          <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter">
+          <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter ml-[-6px]">
             Miao
           </span>
         </motion.div>
