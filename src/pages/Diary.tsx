@@ -11,6 +11,7 @@ import PageHeader from "../components/PageHeader";
 import { mediaStorage } from "../services/mediaStorage";
 import { mockFriendService } from "../services/mockFriendService";
 import { PrivateMessageShare } from "../components/PrivateMessageShare";
+import CommentInput from "../components/CommentInput";
 
 export default function Diary() {
   const { user } = useAuthContext();
@@ -867,6 +868,16 @@ export default function Diary() {
         onSend={onSendPrivateMessage}
       />
 
+      {/* 评论输入组件 */}
+      <CommentInput
+        isOpen={!!commentingId}
+        value={commentText}
+        onChange={setCommentText}
+        onSend={() => handleComment(commentingId!)}
+        onClose={() => setCommentingId(null)}
+        maxLength={MAX_COMMENT_LENGTH}
+      />
+
       {/* 微信分享引导 */}
           <AnimatePresence>
             {showWeChatGuide && (
@@ -904,67 +915,7 @@ export default function Diary() {
             )}
           </AnimatePresence>
 
-          {/* 评论弹窗 */}
-          <AnimatePresence>
-            {commentingId && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="backdrop-overlay !z-[400] !bg-black/40 !backdrop-blur-sm flex items-end justify-center p-4"
-                onClick={() => setCommentingId(null)}
-              >
-            <motion.div 
-              initial={{ y: 100 }}
-              animate={{ y: 0 }}
-              exit={{ y: 100 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-primary-container/90 backdrop-blur-xl w-full max-w-lg rounded-[32px] p-2 pl-6 flex items-center gap-3 shadow-2xl border border-primary/10"
-              style={{ 
-                marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : 'env(safe-area-inset-bottom)',
-                transition: 'margin-bottom 0.2s ease-out'
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex-grow relative flex items-end">
-                <textarea 
-                  autoFocus
-                  rows={1}
-                  value={commentText}
-                  onChange={e => {
-                    setCommentText(e.target.value.slice(0, MAX_COMMENT_LENGTH));
-                    // 简单的自动高度调整
-                    e.target.style.height = 'auto';
-                    e.target.style.height = e.target.scrollHeight + 'px';
-                  }}
-                  placeholder="发表你的温暖评论..."
-                  className="w-full py-4 bg-transparent border-none outline-none text-on-primary-container font-bold placeholder:text-on-primary-container/30 pr-12 resize-none max-h-32 custom-scrollbar"
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleComment(commentingId);
-                    }
-                  }}
-                />
-                <span className={`absolute right-0 bottom-4 text-[10px] font-black transition-colors ${
-                  commentText.length >= MAX_COMMENT_LENGTH ? 'text-red-500' : 'text-on-primary-container/30'
-                }`}>
-                  {commentText.length}/{MAX_COMMENT_LENGTH}
-                </span>
-              </div>
-              <button 
-                onClick={() => handleComment(commentingId)}
-                disabled={!commentText.trim() || commentText.length > MAX_COMMENT_LENGTH}
-                className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center active:scale-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-30"
-              >
-                <Send size={20} />
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 删除确认弹窗 */}
+          {/* 删除确认弹窗 */}
       <AnimatePresence>
         {deletingId && (
           <motion.div 

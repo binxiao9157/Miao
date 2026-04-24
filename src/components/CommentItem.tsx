@@ -62,7 +62,7 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
   return (
     <div
       ref={itemRef}
-      className={`relative p-2 rounded-lg transition-colors ${isMenuOpen ? 'bg-[#F2F2F2]' : ''}`}
+      className={`relative px-2 py-0.5 rounded-lg transition-colors ${isMenuOpen ? 'bg-[#F2F2F2]' : ''}`}
       style={{ touchAction: 'pan-y' }}
       onMouseDown={handleLongPress}
       onMouseUp={clearTimer}
@@ -72,8 +72,8 @@ export default function CommentItem({ comment, diaryId, onDelete }: CommentItemP
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="flex items-start gap-2">
-        <span className="text-xs font-black text-primary shrink-0 mt-0.5">我:</span>
-        <p className="flex-1 text-xs text-on-surface-variant font-medium leading-relaxed break-words whitespace-pre-wrap">{comment.content}</p>
+        <span className="text-[13px] font-black text-[#633E1D] shrink-0">我:</span>
+        <p className="flex-1 text-[13px] text-on-surface-variant font-medium leading-relaxed break-words whitespace-pre-wrap">{comment.content}</p>
       </div>
 
       {isMenuOpen && (
