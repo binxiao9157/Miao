@@ -92,10 +92,14 @@
   }
 
   .backdrop-overlay {
-    @apply fixed inset-0 z-[300] bg-black/80 backdrop-blur-md;
-    /* 极致覆盖安全区域：向上偏移并增加高度 */
-    top: -20vh !important;
-    height: 140vh !important;
+    @apply fixed z-[300] bg-black/80 backdrop-blur-md flex;
+    /* 通过负值延伸覆盖范围到视口外（如 iOS 状态栏区） */
+    top: -100px;
+    bottom: -100px;
+    left: -100px;
+    right: -100px;
+    /* 通过内边距补偿，使内部 flex 布局依然对齐于视口边界 */
+    padding: 100px;
   }
 
   /* 隐藏原生视频控件 */

@@ -513,7 +513,7 @@ export default function Diary() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="backdrop-overlay flex items-end sm:items-center justify-center sm:p-6"
+                className="backdrop-overlay !z-[450] flex items-end sm:items-center justify-center sm:p-6"
                 onClick={closePostingModal}
               >
                 <motion.div 
@@ -639,7 +639,7 @@ export default function Diary() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="backdrop-overlay !z-[150] !bg-black/60 flex items-end justify-center sm:p-6"
+            className="backdrop-overlay !z-[110] !bg-black/60 flex items-end justify-center sm:p-6 pb-[10vh]"
             onClick={() => {
               setShowAddFriendMenu(false);
               setAddFriendStep(1);
@@ -743,7 +743,7 @@ export default function Diary() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="backdrop-overlay !z-[110] !bg-black/60 flex items-end justify-center p-4"
+            className="backdrop-overlay !z-[420] !bg-black/60 flex items-end justify-center p-4 pb-[10vh]"
             onClick={() => setSharingEntry(null)}
           >
             <motion.div 
@@ -793,51 +793,53 @@ export default function Diary() {
         )}
       </AnimatePresence>
 
-      {/* 微信分享引导 */}
-      <AnimatePresence>
-        {showWeChatGuide && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-end p-8"
-            onClick={() => setShowWeChatGuide(false)}
-          >
-            <div className="flex flex-col items-end text-white">
-              <motion.div
-                animate={{ y: [0, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 1.5 }}
-                className="mb-4"
-              >
-                <ArrowUpRight size={64} className="text-primary" />
-              </motion.div>
-              <h3 className="text-2xl font-black mb-2">点击右上角分享</h3>
-              <p className="text-lg opacity-80">点击右上角的三个点 <span className="font-bold">···</span></p>
-              <p className="text-lg opacity-80">选择分享给好友或朋友圈</p>
-            </div>
-            
-            <div className="mt-auto w-full text-center">
-              <button 
+          {/* 微信分享引导 */}
+          <AnimatePresence>
+            {showWeChatGuide && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="backdrop-overlay !z-[500] !bg-black/90 flex flex-col items-end p-8"
                 onClick={() => setShowWeChatGuide(false)}
-                className="px-12 py-4 bg-white/10 border border-white/20 rounded-full text-white font-black backdrop-blur-md active:scale-95 transition-all"
               >
-                我知道了
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <div className="flex flex-col items-end text-white mt-[10vh]">
+                  <motion.div
+                    animate={{ y: [0, -15, 0] }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                    className="mb-6 mr-4"
+                  >
+                    <ArrowUpRight size={80} className="text-primary filter drop-shadow(0 0 20px rgba(232, 159, 113, 0.4))" />
+                  </motion.div>
+                  <div className="text-right space-y-2">
+                    <h3 className="text-3xl font-black">点击右上角分享</h3>
+                    <p className="text-xl opacity-80">点击右上角的三个点 <span className="inline-block px-2 py-0.5 bg-white/20 rounded-md font-bold">···</span></p>
+                    <p className="text-xl opacity-80">选择分享给好友或朋友圈</p>
+                  </div>
+                </div>
+                
+                <div className="mt-auto w-full text-center pb-8">
+                  <button 
+                    onClick={() => setShowWeChatGuide(false)}
+                    className="px-16 py-5 bg-primary text-white rounded-full font-black shadow-2xl active:scale-95 transition-all text-xl"
+                  >
+                    我知道了
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      {/* 评论弹窗 */}
-      <AnimatePresence>
-        {commentingId && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/20 backdrop-blur-[2px] flex items-end justify-center p-4"
-            onClick={() => setCommentingId(null)}
-          >
+          {/* 评论弹窗 */}
+          <AnimatePresence>
+            {commentingId && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="backdrop-overlay !z-[400] !bg-black/40 !backdrop-blur-sm flex items-end justify-center p-4"
+                onClick={() => setCommentingId(null)}
+              >
             <motion.div 
               initial={{ y: 100 }}
               animate={{ y: 0 }}
