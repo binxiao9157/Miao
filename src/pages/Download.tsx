@@ -68,7 +68,7 @@ export default function DownloadPage() {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-2 mb-6 group"
         >
-          <PawLogo className="-rotate-12" size={32} />
+          <PawLogo className="-rotate-12" size={48} />
           <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter">
             Miao
           </span>
@@ -220,7 +220,7 @@ export default function DownloadPage() {
             <ArrowRight size={16} />
           </button>
           <p className="text-[10px] text-on-surface-variant/40 font-bold tracking-[0.2em] uppercase mt-4">
-            © 2026 MIAO VERSION 1.0.0
+            © 2026 MIAO SANCTUARY
           </p>
         </motion.div>
       </div>

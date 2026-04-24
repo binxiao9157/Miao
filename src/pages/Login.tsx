@@ -81,7 +81,7 @@ export default function Login() {
       <div className="w-full flex-1 flex flex-col items-center justify-center py-4 relative z-10">
         {/* Logo Section */}
         <div className="flex items-center gap-2 mb-4 group">
-          <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={28} />
+          <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={48} />
           <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter">Miao</span>
         </div>
         
@@ -202,7 +202,7 @@ export default function Login() {
           <Link to="/terms" className="hover:text-primary">服务条款</Link>
         </div>
         <p className="text-[10px] text-on-surface-variant/40 font-bold tracking-[0.2em] uppercase">
-          © 2026 MIAO VERSION 1.0.0
+          © 2026 MIAO SANCTUARY
         </p>
       </div>
 

@@ -332,7 +332,7 @@ export default function Profile() {
           }}
           className="text-[10px] font-bold text-on-surface-variant opacity-30 uppercase tracking-widest cursor-pointer select-none"
         >
-          Miao Version 1.0.0
+          MIAO SANCTUARY
         </p>
         <div className="flex justify-center gap-1 mt-1">
           <Heart size={8} className="text-primary fill-current" />
