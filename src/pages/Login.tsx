@@ -82,7 +82,7 @@ export default function Login() {
         {/* Logo Section */}
         <div className="flex items-center gap-0 mb-4 group">
           <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={48} />
-          <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter ml-[-6px]">Miao</span>
+          <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter ml-[-10px]">Miao</span>
         </div>
         
         {/* Title Section */}

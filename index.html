@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#FFF9F5" />
+
+    <!-- 关键资源预加载：启动屏图片在 HTML 解析阶段即开始下载 -->
+    <link rel="preload" as="image" type="image/webp" href="/splash.webp" />
+    <link rel="preload" as="image" href="/logo.png" />
+
     <!-- Google Fonts 异步加载：先用系统字体渲染，字体到达后无缝替换 -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -32,24 +37,43 @@
     <meta itemprop="image" content="/og-image.jpg" />
     
     <title>Miao - 遇见你的数字猫咪</title>
+    <style>
+      #splash-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.6s ease-out;
+      }
+      #splash-screen.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #splash-screen img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    </style>
   </head>
   <body style="background-color: #FFF5F0;">
     <!-- WeChat Share Image Fallback (Hidden) -->
     <div style="display:none;">
       <img src="/og-image.jpg" alt="share" />
     </div>
-    <div id="root">
-      <div style="position: fixed; inset: 0; background-color: #FFF5F0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999;">
-        <div style="width: 96px; height: 96px; background-color: white; border-radius: 50%; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-          <span style="font-size: 24px; font-weight: 900; color: #FF9D76; font-family: system-ui, -apple-system, sans-serif;">Miao</span>
-        </div>
-        <div style="display: flex; gap: 4px;">
-          <div style="width: 8px; height: 8px; background-color: #FF9D76; border-radius: 50%;"></div>
-          <div style="width: 8px; height: 8px; background-color: #FF9D76; border-radius: 50%;"></div>
-          <div style="width: 8px; height: 8px; background-color: #FF9D76; border-radius: 50%;"></div>
-        </div>
-      </div>
+
+    <!-- 启动屏：纯 HTML/CSS，不依赖 JS 框架，首帧即渲染 -->
+    <div id="splash-screen">
+      <picture>
+        <source srcset="/splash.webp" type="image/webp" />
+        <img src="/splash.png" alt="Miao" />
+      </picture>
     </div>
+
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

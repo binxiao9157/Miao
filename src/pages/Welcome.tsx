@@ -81,7 +81,7 @@ export default function Welcome() {
 
       <div className={`flex items-center gap-0 mb-12 group mt-12`}>
         <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={44} />
-        <span className="text-2xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight ml-[-4px]">Miao</span>
+        <span className="text-2xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tight ml-[-8px]">Miao</span>
       </div>
 
       <h1 className="text-4xl font-black text-on-surface mb-3 leading-tight">

@@ -69,7 +69,7 @@ export default function DownloadPage() {
           className="flex items-center gap-0 mb-6 group"
         >
           <PawLogo className="-rotate-12" size={48} />
-          <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter ml-[-6px]">
+          <span className="text-3xl font-black bg-gradient-to-r from-[#5D4037] to-primary bg-clip-text text-transparent tracking-tighter ml-[-10px]">
             Miao
           </span>
         </motion.div>

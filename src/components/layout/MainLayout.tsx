@@ -67,9 +67,9 @@ export default function MainLayout() {
         transition={{ duration: 0.2, ease: "easeOut" }}
         className={`fixed inset-0 ${isActive ? '' : 'pointer-events-none'}`}
       >
-        <div className="w-full h-full overflow-y-auto no-scrollbar bg-background">
+        <div className={`w-full h-full overflow-y-auto no-scrollbar bg-transparent`}>
           <div 
-            className="min-h-full flex flex-col"
+            className="flex flex-col"
             style={{ 
               paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)',
               paddingLeft: 'env(safe-area-inset-left)',
@@ -87,7 +87,7 @@ export default function MainLayout() {
   };
 
   return (
-    <div className={`w-full h-full relative overflow-hidden ${isHome ? 'bg-black' : 'bg-background'}`}>
+    <div className={`w-full h-full relative overflow-hidden ${isHome ? 'bg-black' : (location.pathname === '/profile' ? 'bg-gradient-to-b from-[#FFF5F0] to-[#FFE8D6]' : 'bg-background')}`}>
       {/* Keep Home alive */}
       <motion.div 
         initial={false}
@@ -119,7 +119,7 @@ export default function MainLayout() {
       
       {/* Other routes will render here - 适配安全区 */}
       {!isHome && !isPersistentTab && (
-        <div className="relative z-10 w-full h-full flex flex-col overflow-y-auto no-scrollbar bg-background">
+        <div className="relative z-10 w-full h-full flex flex-col overflow-y-auto no-scrollbar bg-transparent">
           <div 
             className="min-h-full flex flex-col"
             style={{ 
