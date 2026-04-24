@@ -513,7 +513,7 @@ export default function Diary() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-6"
+                className="backdrop-overlay flex items-end sm:items-center justify-center sm:p-6"
                 onClick={closePostingModal}
               >
                 <motion.div 
@@ -639,7 +639,7 @@ export default function Diary() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md flex items-end justify-center sm:p-6"
+            className="backdrop-overlay !z-[150] !bg-black/60 flex items-end justify-center sm:p-6"
             onClick={() => {
               setShowAddFriendMenu(false);
               setAddFriendStep(1);
@@ -743,7 +743,7 @@ export default function Diary() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-end justify-center p-4"
+            className="backdrop-overlay !z-[110] !bg-black/60 flex items-end justify-center p-4"
             onClick={() => setSharingEntry(null)}
           >
             <motion.div 

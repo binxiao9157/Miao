@@ -194,7 +194,7 @@ export default function EditProfile() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowActionSheet(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+              className="backdrop-overlay !bg-black/40 !backdrop-blur-sm"
             />
             <motion.div 
               initial={{ y: "100%" }}

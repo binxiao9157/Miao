@@ -84,14 +84,18 @@
 
   /* 全屏沉浸式组件需要忽略安全区 */
   .edge-to-edge {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 0 !important;
-    margin: 0 !important;
-    z-index: 0;
+    @apply fixed inset-0 z-[1000];
+    top: -100px !important;
+    bottom: -100px !important;
+    padding-top: 100px !important;
+    padding-bottom: 100px !important;
+  }
+
+  .backdrop-overlay {
+    @apply fixed inset-0 z-[300] bg-black/80 backdrop-blur-md;
+    /* 极致覆盖安全区域：向上偏移并增加高度 */
+    top: -20vh !important;
+    height: 140vh !important;
   }
 
   /* 隐藏原生视频控件 */

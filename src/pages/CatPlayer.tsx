@@ -122,7 +122,7 @@ export default function CatPlayer() {
       {/* 错误提示 */}
       <AnimatePresence>
         {errorDetails && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+          <div className="backdrop-overlay flex items-center justify-center p-6 !bg-black/95">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -159,13 +159,13 @@ export default function CatPlayer() {
       {/* 删除确认弹窗 */}
       <AnimatePresence>
         {showDeleteConfirm && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="backdrop-overlay flex items-center justify-center p-6 !bg-transparent">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowDeleteConfirm(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="backdrop-overlay !bg-black/60 !backdrop-blur-sm"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
