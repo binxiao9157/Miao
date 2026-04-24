@@ -30,8 +30,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // 初始挂载时清除旧会话，确保“每次打开都需要登录”
-    storage.clearCurrentUser();
+    // 初始挂载时从本地存储同步状态，而不是暴力清除
+    const currentUser = storage.getUserInfo();
+    if (currentUser) {
+      setUser(currentUser);
+      setIsAuthenticated(true);
+    }
     refreshCatStatus();
   }, [refreshCatStatus]);
 

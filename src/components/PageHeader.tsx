@@ -14,12 +14,9 @@ export default function PageHeader({ title, subtitle, action, dark, onBack, onTi
   return (
     <header 
       className={`relative px-6 flex justify-between items-center shrink-0 !bg-transparent ${dark ? 'text-white' : 'text-on-surface'}`}
-      style={{ 
-        paddingTop: 'env(safe-area-inset-top)',
-        height: 'calc(env(safe-area-inset-top) + 6rem)' 
-      }}
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="flex items-center gap-3 mt-2">
+      <div className="flex items-center gap-3 mt-4 mb-4">
         {onBack && (
           <button 
             onClick={onBack}

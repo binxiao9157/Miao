@@ -65,29 +65,26 @@ export default function MainLayout() {
           scale: isActive ? 1 : 0.98
         }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className={`fixed inset-0 ${isActive ? '' : 'pointer-events-none'}`}
+        className={`absolute inset-0 ${isActive ? 'overflow-y-auto' : 'pointer-events-none overflow-hidden'}`}
       >
-        <div className={`w-full h-full overflow-y-auto no-scrollbar bg-transparent`}>
-          <div 
-            className="flex flex-col"
-            style={{ 
-              paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)',
-              paddingLeft: 'env(safe-area-inset-left)',
-              paddingRight: 'env(safe-area-inset-right)'
-            }}
-          >
-            {/* 每个 tab 独立 Suspense，fallback 为空：chunk 未就绪时保持空白而非全屏 spinner */}
-            <Suspense fallback={null}>
-              <Component />
-            </Suspense>
-          </div>
+        <div 
+          className="w-full flex-grow flex flex-col min-h-full"
+          style={{ 
+            paddingBottom: 'calc(env(safe-area-inset-bottom) + 6rem)',
+            paddingLeft: 'env(safe-area-inset-left)',
+            paddingRight: 'env(safe-area-inset-right)'
+          }}
+        >
+          <Suspense fallback={null}>
+            <Component />
+          </Suspense>
         </div>
       </motion.div>
     );
   };
 
   return (
-    <div className={`w-full h-full relative overflow-hidden ${isHome ? 'bg-black' : (location.pathname === '/profile' ? 'bg-gradient-to-b from-[#FFF5F0] to-[#FFE8D6]' : 'bg-background')}`}>
+    <div className={`fixed inset-0 overflow-hidden ${isHome ? 'bg-black' : 'bg-background'}`}>
       {/* Keep Home alive */}
       <motion.div 
         initial={false}
@@ -97,7 +94,7 @@ export default function MainLayout() {
           scale: isHome ? 1 : 0.98
         }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className={`fixed inset-0 ${isHome ? '' : 'pointer-events-none'}`}
+        className={`absolute inset-0 ${isHome ? 'overflow-y-auto' : 'pointer-events-none overflow-hidden'}`}
       >
         {hasCat && <Suspense fallback={null}><HomePage /></Suspense>}
       </motion.div>
@@ -117,13 +114,13 @@ export default function MainLayout() {
       {/* Keep Profile alive */}
       {hasCat && renderPersistentTab("/profile", ProfilePage)}
       
-      {/* Other routes will render here - 适配安全区 */}
+      {/* Other routes will render here */}
       {!isHome && !isPersistentTab && (
-        <div className="relative z-10 w-full h-full flex flex-col overflow-y-auto no-scrollbar bg-transparent">
+        <div className="absolute inset-0 z-10 w-full flex flex-col overflow-y-auto">
           <div 
-            className="min-h-full flex flex-col"
+            className="flex flex-col min-h-full"
             style={{ 
-              paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)', // 为底部导航栏留出足够空间
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 6rem)',
               paddingLeft: 'env(safe-area-inset-left)',
               paddingRight: 'env(safe-area-inset-right)'
             }}
