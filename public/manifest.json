@@ -4,7 +4,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFF5F0",
-  "theme_color": "#FF9D76",
+  "theme_color": "#FFF5F0",
   "description": "遇见你的数字猫咪",
   "icons": [
     {
