@@ -134,7 +134,7 @@ export default function CreateCompanion() {
       </div>
 
       {/* 底部固定按钮区域 */}
-      <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[#FFF5F0] via-[#FFF5F0] to-transparent pt-12 z-50">
+      <div className="fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[#FFF9F5] via-[#FFF9F5] to-transparent pt-12 z-50">
         <div className="max-w-md mx-auto w-full">
           <button 
             onClick={handleGenerate}

@@ -3,8 +3,8 @@
   "short_name": "Miao",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFF5F0",
-  "theme_color": "#FFF5F0",
+  "background_color": "#FFF9F5",
+  "theme_color": "#FFF9F5",
   "description": "遇见你的数字猫咪",
   "icons": [
     {

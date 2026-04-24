@@ -151,7 +151,7 @@ export default function UploadMaterial() {
 
   return (
     <div 
-      className="min-h-screen bg-[#FFF5F0] px-6 pb-6 flex flex-col font-sans" 
+      className="min-h-screen bg-[#FFF9F5] px-6 pb-6 flex flex-col font-sans" 
       onClick={() => (document.activeElement as HTMLElement)?.blur()}
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
     >

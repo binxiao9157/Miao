@@ -112,7 +112,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="flex flex-col w-full min-h-full bg-gradient-to-b from-[#FFF5F0] to-[#FFE8D6]">
+    <div className="flex flex-col w-full min-h-full bg-gradient-to-b from-[#FFF9F5] to-[#FFE8D6]">
       <PageHeader 
         title="Miao" 
         subtitle="MIAO SANCTUARY" 
