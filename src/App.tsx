@@ -31,6 +31,7 @@ const Download = lazy(() => import("./pages/Download"));
 const Feedback = lazy(() => import("./pages/Feedback"));
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
+import SplashScreen from "./components/SplashScreen";
 
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -114,6 +115,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      <SplashScreen />
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>
