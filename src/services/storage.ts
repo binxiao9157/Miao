@@ -143,6 +143,32 @@ const USER_DATA_KEYS = {
   IS_FAST_FORWARD: 'miao_debug_fast_forward', // 调试加速模式
 };
 
+function getCurrentUsername(): string | null {
+  try {
+    const raw = localStorage.getItem('miao_current_user');
+    if (!raw) return null;
+    return JSON.parse(raw).username || null;
+  } catch { return null; }
+}
+
+function syncCatToServer(userId: string, cat: CatInfo) {
+  fetch('/api/cats', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, cat: { ...cat, placeholderImage: undefined, anchorFrame: undefined } }),
+  }).catch(() => {});
+}
+
+function deleteCatFromServer(userId: string, catId: string) {
+  fetch(`/api/cats/${encodeURIComponent(userId)}/${encodeURIComponent(catId)}`, {
+    method: 'DELETE',
+  }).catch(() => {});
+}
+
+function deleteAllCatsFromServer(userId: string) {
+  fetch(`/api/cats/${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => {});
+}
+
 /** 各类数据的滑动窗口上限 */
 const MAX_DIARIES = 200;
 const MAX_FRIEND_DIARIES = 100;
@@ -491,6 +517,47 @@ export const storage = {
     invalidateCache(key);
   },
 
+  syncFromServer: async (username: string): Promise<void> => {
+    try {
+      const resp = await fetch(`/api/cats/${encodeURIComponent(username)}`);
+      if (!resp.ok) return;
+      const serverCats: CatInfo[] = await resp.json();
+      if (!serverCats.length) {
+        // 服务端无数据，将本地数据上传
+        const local = storage.getCatList();
+        for (const cat of local) syncCatToServer(username, cat);
+        return;
+      }
+
+      const localCats = storage.getCatList();
+      const localMap = new Map(localCats.map(c => [c.id, c]));
+      const serverMap = new Map(serverCats.map(c => [c.id, c]));
+      const merged: CatInfo[] = [];
+
+      // 合并：以较新的为准
+      const allIds = new Set([...localMap.keys(), ...serverMap.keys()]);
+      for (const id of allIds) {
+        const local = localMap.get(id);
+        const server = serverMap.get(id);
+        if (local && server) {
+          merged.push((local.createdAt || 0) >= (server.createdAt || 0) ? local : server);
+        } else if (local) {
+          merged.push(local);
+          syncCatToServer(username, local);
+        } else if (server) {
+          merged.push(server);
+        }
+      }
+
+      storage.saveCatList(merged);
+      if (merged.length > 0 && !storage.getActiveCatId()) {
+        storage.setActiveCatId(merged[0].id);
+      }
+    } catch {
+      // 离线时静默失败
+    }
+  },
+
   saveCatInfo: (cat: CatInfo) => {
     const list = storage.getCatList();
     const index = list.findIndex(c => c.id === cat.id);
@@ -501,6 +568,8 @@ export const storage = {
     }
     storage.saveCatList(list);
     storage.setActiveCatId(cat.id);
+    const userId = getCurrentUsername();
+    if (userId) syncCatToServer(userId, cat);
   },
 
   getActiveCatId: (): string | null => {
@@ -715,7 +784,7 @@ export const storage = {
     const list = storage.getCatList();
     const updated = list.filter(c => c.id !== id);
     storage.saveCatList(updated);
-    
+
     const activeId = storage.getActiveCatId();
     if (activeId === id) {
       if (updated.length > 0) {
@@ -724,12 +793,16 @@ export const storage = {
         storage.removeItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID));
       }
     }
+    const userId = getCurrentUsername();
+    if (userId) deleteCatFromServer(userId, id);
     return updated;
   },
 
   deleteCat: () => {
     storage.removeItem(getUserKey(USER_DATA_KEYS.CAT_LIST));
     storage.removeItem(getUserKey(USER_DATA_KEYS.ACTIVE_CAT_ID));
+    const userId = getCurrentUsername();
+    if (userId) deleteAllCatsFromServer(userId);
   },
 
   // Friend Management

@@ -44,15 +44,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedUser = users.find(u => u.username === username && u.password === password);
     
     if (savedUser) {
-      // 1. 设置当前用户
       storage.saveUserInfo(savedUser);
       storage.saveToken('mock_token_' + Date.now());
-      storage.saveLoginTime(Date.now()); // 记录登录时间
-      storage.saveLastActiveTime(Date.now()); // 记录最后活跃时间
+      storage.saveLoginTime(Date.now());
+      storage.saveLastActiveTime(Date.now());
       
-      // 2. 更新内存状态
       setIsAuthenticated(true);
       setUser(savedUser);
+
+      // 服务端登录 + 同步猫咪数据（异步，不阻塞 UI）
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password: savedUser.password }),
+      }).catch(() => {});
+      storage.syncFromServer(username).then(() => refreshCatStatus());
       
       refreshCatStatus();
       return true;
@@ -61,16 +67,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = (info: UserInfo): void => {
-    // 1. 保存用户信息并设为当前用户
     storage.saveUserInfo(info);
     storage.saveToken('mock_token_' + Date.now());
     storage.saveLoginTime(Date.now());
     storage.saveLastActiveTime(Date.now());
 
-    // 2. 更新内存状态
     setUser(info);
     setIsAuthenticated(true);
-    refreshCatStatus(); // 新账号此时 catList 必为空
+
+    // 服务端注册（异步，不阻塞 UI）
+    fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: info.username, password: info.password, nickname: info.nickname, avatar: info.avatar }),
+    }).catch(() => {});
+
+    refreshCatStatus();
   };
 
   const logout = () => {

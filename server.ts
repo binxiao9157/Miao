@@ -24,6 +24,92 @@ async function startServer() {
     timeout: 60000
   });
 
+  // ── JSON 文件数据库 ──
+  const dataDir = path.resolve(__dirname, 'data');
+  fs.mkdirSync(dataDir, { recursive: true });
+
+  const usersFile = path.join(dataDir, 'users.json');
+  const catsFile = path.join(dataDir, 'cats.json');
+
+  function readJSON<T>(file: string, fallback: T): T {
+    try {
+      if (!fs.existsSync(file)) return fallback;
+      return JSON.parse(fs.readFileSync(file, 'utf-8'));
+    } catch { return fallback; }
+  }
+  function writeJSON(file: string, data: any) {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  interface ServerUser { username: string; nickname: string; avatar: string; password: string; }
+  interface ServerCat {
+    id: string; userId: string; name: string; breed: string; color: string;
+    avatar: string; source: string; createdAt?: number;
+    videoPath?: string; videoPaths?: Record<string, string>; remoteVideoUrl?: string;
+    placeholderImage?: string; anchorFrame?: string; isUnlocking?: boolean;
+  }
+
+  // ── 用户注册/登录 API ──
+  app.post("/api/auth/register", (req, res) => {
+    const { username, password, nickname, avatar } = req.body;
+    if (!username || !password) return res.status(400).json({ error: "Missing username or password" });
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    if (users.find(u => u.username === username)) {
+      return res.status(409).json({ error: "Username already exists" });
+    }
+    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '' };
+    users.push(user);
+    writeJSON(usersFile, users);
+    console.log(`[Auth] Registered user: ${username}`);
+    res.json({ username: user.username, nickname: user.nickname, avatar: user.avatar });
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ error: "Missing username or password" });
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const user = users.find(u => u.username === username && u.password === password);
+    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    console.log(`[Auth] Login: ${username}`);
+    res.json({ username: user.username, nickname: user.nickname, avatar: user.avatar });
+  });
+
+  // ── 猫咪 CRUD API ──
+  app.get("/api/cats/:userId", (req, res) => {
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    const userCats = cats.filter(c => c.userId === req.params.userId);
+    res.json(userCats);
+  });
+
+  app.post("/api/cats", (req, res) => {
+    const { userId, cat } = req.body;
+    if (!userId || !cat?.id) return res.status(400).json({ error: "Missing userId or cat.id" });
+
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    const entry: ServerCat = { ...cat, userId };
+    const idx = cats.findIndex(c => c.userId === userId && c.id === cat.id);
+    if (idx >= 0) cats[idx] = entry; else cats.push(entry);
+    writeJSON(catsFile, cats);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/cats/:userId/:catId", (req, res) => {
+    const { userId, catId } = req.params;
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    const filtered = cats.filter(c => !(c.userId === userId && c.id === catId));
+    writeJSON(catsFile, filtered);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/cats/:userId", (req, res) => {
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    const filtered = cats.filter(c => c.userId !== req.params.userId);
+    writeJSON(catsFile, filtered);
+    res.json({ success: true });
+  });
+
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ 
