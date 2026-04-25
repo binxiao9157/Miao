@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import axios from "axios";
 import https from "https";
 import dotenv from "dotenv";
@@ -452,6 +453,46 @@ async function startServer() {
       res.status(500).send("Failed to proxy video");
     }
   });
+
+  // ── 视频持久化：将临时 URL 下载到服务器本地，返回永久可访问的 URL ──
+  const uploadsDir = path.resolve(__dirname, 'uploads', 'videos');
+  fs.mkdirSync(uploadsDir, { recursive: true });
+
+  app.post("/api/persist-video", async (req, res) => {
+    const { videoUrl, catId, action } = req.body;
+    if (!videoUrl || !catId || !action) {
+      return res.status(400).json({ error: "Missing videoUrl, catId, or action" });
+    }
+
+    try {
+      const response = await axios({
+        method: 'get',
+        url: videoUrl,
+        responseType: 'arraybuffer',
+        httpsAgent,
+        timeout: 120000,
+      });
+
+      const catDir = path.join(uploadsDir, catId);
+      fs.mkdirSync(catDir, { recursive: true });
+
+      const filename = `${action}_${Date.now()}.mp4`;
+      const filePath = path.join(catDir, filename);
+      fs.writeFileSync(filePath, Buffer.from(response.data));
+
+      const permanentUrl = `/uploads/videos/${catId}/${filename}`;
+      console.log(`[Persist] Saved ${action} video for cat ${catId}: ${permanentUrl}`);
+      res.json({ url: permanentUrl });
+    } catch (error: any) {
+      console.error(`[Persist] Failed to download video:`, error.message);
+      res.status(500).json({ error: "Failed to persist video", originalUrl: videoUrl });
+    }
+  });
+
+  app.use('/uploads', express.static(path.resolve(__dirname, 'uploads'), {
+    maxAge: '30d',
+    immutable: true,
+  }));
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

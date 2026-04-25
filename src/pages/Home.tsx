@@ -369,11 +369,18 @@ export default function Home() {
     if (!error) return;
     if (error.code === 1) return; // MEDIA_ERR_ABORTED
 
-    console.error("Fatal Video Error:", {
-      code: error.code,
-      message: error.message,
-      src: videoElement.src
-    });
+    const currentSrc = videoElement.src;
+    console.error("Video Error:", { code: error.code, message: error.message, src: currentSrc });
+
+    // 自动尝试代理 URL 重试（仅对外部 URL 且未使用代理时）
+    if (currentSrc && !currentSrc.includes('/api/proxy-video') && !currentSrc.startsWith(window.location.origin + '/uploads')) {
+      const proxyUrl = `/api/proxy-video?url=${encodeURIComponent(currentSrc)}`;
+      console.log("[VideoRetry] Switching to proxy:", proxyUrl);
+      videoElement.src = proxyUrl;
+      videoElement.load();
+      videoElement.play().catch(() => {});
+      return;
+    }
 
     setLoadError(true);
     setIsInitialized(true);
@@ -596,22 +603,20 @@ export default function Home() {
               <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
                 <AlertCircle className="w-8 h-8 text-red-500" />
               </div>
-              <h3 className="text-lg font-bold text-white">视频加载失败</h3>
-              <p className="text-sm text-white/60">网络波动或视频文件暂时无法访问，请重试。</p>
-              <div className="flex gap-4">
-                <button 
-                  onClick={handleRetryPlay}
-                  className="px-6 py-3 bg-[#FF9D76] text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform"
-                >
-                  重试播放
-                </button>
-                <button 
-                  onClick={() => setShowRegenerateConfirm(true)}
-                  className="px-6 py-3 bg-white/10 text-white rounded-full font-bold active:scale-95 transition-transform"
-                >
-                  重新领养
-                </button>
-              </div>
+              <h3 className="text-lg font-bold text-white">视频暂时无法播放</h3>
+              <p className="text-sm text-white/60">可能是网络波动，请稍后重试。猫咪数据不会丢失。</p>
+              <button
+                onClick={handleRetryPlay}
+                className="px-8 py-3 bg-[#FF9D76] text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform"
+              >
+                重试播放
+              </button>
+              <button
+                onClick={() => setShowRegenerateConfirm(true)}
+                className="text-xs text-white/30 underline mt-2 active:text-white/50"
+              >
+                视频无法恢复？重新生成
+              </button>
             </div>
           </div>
         )}

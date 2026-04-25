@@ -1,5 +1,20 @@
 import { storage, CatInfo } from './storage';
 
+async function persistVideoUrl(url: string, catId: string, action: string): Promise<string> {
+  try {
+    const resp = await fetch('/api/persist-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoUrl: url, catId, action }),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    return data.url || url;
+  } catch {
+    return url;
+  }
+}
+
 /**
  * 压缩 base64 图片为缩略图，降低 localStorage 占用
  * 非 base64 数据（URL 等）原样返回
@@ -48,10 +63,14 @@ export class FileManager {
     metadata?: { breed?: string; furColor?: string; source?: 'upload' | 'created'; placeholderImage?: string; anchorFrame?: string }
   ): Promise<{ [key: string]: string }> {
     const finalPaths: { [key: string]: string } = {};
-    
-    for (const [action, url] of Object.entries(videoUrls)) {
-      finalPaths[action] = url;
-    }
+
+    const entries = Object.entries(videoUrls);
+    const persisted = await Promise.all(
+      entries.map(([action, url]) => persistVideoUrl(url, groupId, action))
+    );
+    entries.forEach(([action], i) => {
+      finalPaths[action] = persisted[i];
+    });
 
     // 压缩大图为缩略图再入库，防止 localStorage 爆容量
     const [compressedPlaceholder, compressedAnchor] = await Promise.all([
@@ -91,11 +110,20 @@ export class FileManager {
     const cat = storage.getCatById(catId);
     if (!cat) return;
 
+    const entries = Object.entries(newVideoUrls);
+    const persisted = await Promise.all(
+      entries.map(([action, url]) => persistVideoUrl(url, catId, action))
+    );
+    const persistedUrls: { [key: string]: string } = {};
+    entries.forEach(([action], i) => {
+      persistedUrls[action] = persisted[i];
+    });
+
     const updatedCat: CatInfo = {
       ...cat,
       videoPaths: {
         ...cat.videoPaths,
-        ...newVideoUrls
+        ...persistedUrls
       },
       isUnlocking
     };

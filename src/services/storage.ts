@@ -262,23 +262,28 @@ export const storage = {
   // Prune storage to free up space
   pruneStorage: () => {
     try {
-      // 先收集所有 key，避免遍历时修改 localStorage 导致跳过元素
       const allKeys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key) allKeys.push(key);
       }
+
+      // 1. 日记：超过 200 条时，对旧日记清理 media 字段释放空间，保留文字
       for (const key of allKeys) {
         if (key.endsWith(USER_DATA_KEYS.DIARIES)) {
           try {
             const data = localStorage.getItem(key);
             if (data) {
               const diaries = JSON.parse(data) as DiaryEntry[];
-              const cleanedDiaries = diaries; // 不再暴力删除旧日记的媒体字段
-              if (diaries.length > 10) {
-                const trimmed = diaries.slice(0, 10);
-                localStorage.setItem(key, JSON.stringify(trimmed));
-                console.log(`Pruned diaries for key ${key} to free space.`);
+              if (diaries.length > 200) {
+                const old = diaries.slice(0, -200);
+                const recent = diaries.slice(-200);
+                for (const d of old) {
+                  delete (d as any).media;
+                  delete (d as any).mediaData;
+                }
+                localStorage.setItem(key, JSON.stringify([...old, ...recent]));
+                console.log(`[Prune] Stripped media from ${old.length} old diaries for key ${key}`);
               }
             }
           } catch (e) {
@@ -287,20 +292,30 @@ export const storage = {
         }
       }
 
-      // 2. Prune cat list (if more than 5 cats, keep only the active one and recent ones)
+      // 2. 猫咪：超过 5 只时，对最早的猫咪清理 base64 大字段，但保留元数据和视频 URL
       const cats = storage.getCatList();
       if (cats.length > 5) {
         const activeId = storage.getActiveCatId();
-        const cleanedCats = cats.filter((c, index) => c.id === activeId || index < 5);
-        if (cleanedCats.length < cats.length) {
-          localStorage.setItem(getUserKey(USER_DATA_KEYS.CAT_LIST), JSON.stringify(cleanedCats));
-          console.log("Pruned cat list to free space.");
+        const sorted = [...cats].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const keep = new Set<string>();
+        if (activeId) keep.add(activeId);
+        for (const c of sorted) {
+          if (keep.size >= 5) break;
+          keep.add(c.id);
+        }
+        let freed = false;
+        for (const c of cats) {
+          if (!keep.has(c.id)) {
+            delete c.placeholderImage;
+            delete c.anchorFrame;
+            freed = true;
+          }
+        }
+        if (freed) {
+          localStorage.setItem(getUserKey(USER_DATA_KEYS.CAT_LIST), JSON.stringify(cats));
+          console.log(`[Prune] Stripped base64 fields from old cats, all ${cats.length} cats preserved.`);
         }
       }
-      
-      // 3. Clear global last cat image if still full (it will be re-synced later)
-      // But we are usually trying to set this, so clearing it might not help much if it's the one we want.
-      
     } catch (e) {
       console.error("Error during storage pruning:", e);
     }
