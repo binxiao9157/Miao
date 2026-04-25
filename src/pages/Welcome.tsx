@@ -68,7 +68,7 @@ export default function Welcome() {
 
   return (
     <div 
-      className="min-h-screen flex flex-col px-8 pb-8 bg-background relative"
+      className="min-h-dvh flex flex-col px-8 pb-8 bg-background relative overflow-y-auto"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
     >
       <button 
@@ -227,7 +227,7 @@ function DebugDialog({ onClose, onSave }: { onClose: () => void, onSave: () => v
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 50, opacity: 0 }}
-        className="bg-white rounded-[32px] w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] shadow-2xl"
+        className="bg-white rounded-[32px] w-full max-w-md overflow-hidden flex flex-col max-h-[90dvh] shadow-2xl"
       >
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-orange-50/50">
           <div>

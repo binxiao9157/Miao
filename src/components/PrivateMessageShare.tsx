@@ -72,7 +72,7 @@ export const PrivateMessageShare: React.FC<PrivateMessageShareProps> = ({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="w-full max-w-lg h-[90vh] bg-background rounded-t-[32px] flex flex-col overflow-hidden text-on-surface font-sans"
+            className="w-full max-w-lg h-[90dvh] bg-background rounded-t-[32px] flex flex-col overflow-hidden text-on-surface font-sans"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}

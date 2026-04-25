@@ -148,7 +148,7 @@ export default function Feedback() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-background flex flex-center items-center justify-center p-6">
+      <div className="min-h-dvh bg-background flex flex-center items-center justify-center p-6">
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}

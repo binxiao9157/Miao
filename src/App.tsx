@@ -54,7 +54,7 @@ function AppRoutes() {
   if (isInitializing) return null;
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#FFF9F5] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
+    <Suspense fallback={<div className="min-h-dvh bg-[#FFF9F5] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
       <Routes location={location}>
         {/* Auth Routes */}
         <Route path="/login" element={

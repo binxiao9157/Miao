@@ -92,7 +92,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-white rounded-[40px] w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden shadow-2xl"
+        className="bg-white rounded-[40px] w-full max-w-lg max-h-[80dvh] flex flex-col overflow-hidden shadow-2xl"
       >
         <div className="p-6 border-b flex items-center justify-between bg-gray-50">
           <div>

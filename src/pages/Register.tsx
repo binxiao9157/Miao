@@ -51,7 +51,7 @@ export default function Register() {
 
   return (
     <div 
-      className="min-h-screen flex flex-col px-8 pb-8 bg-background relative overflow-y-auto"
+      className="min-h-dvh flex flex-col px-8 pb-8 bg-background relative overflow-y-auto"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
     >
       {/* Decorative elements */}

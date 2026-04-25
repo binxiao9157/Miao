@@ -55,7 +55,7 @@ export default function CreateCompanion() {
 
   return (
     <div 
-      className="h-screen bg-background flex flex-col overflow-hidden"
+      className="h-dvh bg-background flex flex-col overflow-hidden"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
     >
       <AnimatePresence>

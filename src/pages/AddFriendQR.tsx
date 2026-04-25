@@ -267,7 +267,7 @@ export default function AddFriendQR() {
 
   if (!user || !cat) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-background">
+      <div className="flex flex-col items-center justify-center min-h-dvh p-6 text-center bg-background">
         <div className="w-20 h-20 bg-surface-container rounded-full flex items-center justify-center mb-6 text-on-surface-variant/20">
           <AlertCircle size={40} />
         </div>
@@ -293,7 +293,7 @@ export default function AddFriendQR() {
 
   if (!cat) {
     return (
-      <div className="flex flex-col h-screen bg-background items-center justify-center">
+      <div className="flex flex-col h-dvh bg-background items-center justify-center">
         <p className="text-on-surface-variant text-sm">暂无猫咪数据，请先创建一只猫咪</p>
         <button onClick={() => navigate("/welcome")} className="mt-4 text-primary font-bold text-sm">去创建</button>
       </div>

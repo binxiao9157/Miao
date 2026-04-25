@@ -151,11 +151,11 @@ export default function UploadMaterial() {
 
   return (
     <div 
-      className="min-h-screen bg-[#FFF9F5] px-6 pb-6 flex flex-col font-sans" 
+      className="min-h-dvh bg-[#FFF9F5] px-6 pb-6 flex flex-col font-sans overflow-y-auto" 
       onClick={() => (document.activeElement as HTMLElement)?.blur()}
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
     >
-      <header className="flex items-center mb-10">
+      <header className="flex items-center mb-6">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-[#5D4037] active:scale-90 transition-transform">
           <ArrowLeft size={24} />
         </button>
@@ -163,7 +163,7 @@ export default function UploadMaterial() {
       </header>
 
       <div className="flex-grow flex flex-col max-w-md mx-auto w-full">
-        <section className="mb-10">
+        <section className="mb-6">
           <h2 className="text-3xl font-black text-[#5D4037] mb-2 tracking-tight">AI 形象生成</h2>
           <p className="text-[#5D4037]/40 text-sm font-bold uppercase tracking-widest">AI Image Generation</p>
           <p className="text-[#5D4037]/60 text-sm mt-3 leading-relaxed">上传一张您家猫咪的照片，AI 将为您生成专属的数字形象。</p>
@@ -229,7 +229,7 @@ export default function UploadMaterial() {
           </div>
         </div>
 
-        <div className="mt-12 pb-8">
+        <div className="mt-8 pb-4">
           <button 
             onClick={handleGenerate}
             className={`w-full py-5 rounded-full font-black text-lg shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 ${

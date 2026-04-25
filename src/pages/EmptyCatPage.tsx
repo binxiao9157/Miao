@@ -14,7 +14,7 @@ export default function EmptyCatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 relative overflow-hidden">
+    <div className="min-h-dvh bg-background flex flex-col items-center justify-center p-8 relative overflow-hidden">
       {/* Logout Button */}
       <button 
         onClick={handleLogout}

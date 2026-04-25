@@ -54,7 +54,7 @@ export default function DownloadPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center px-6 bg-background relative overflow-y-auto"
+      className="min-h-dvh flex flex-col items-center px-6 bg-background relative overflow-y-auto"
       style={{ paddingTop: "calc(env(safe-area-inset-top) + 2rem)" }}
     >
       {/* 装饰背景 */}
