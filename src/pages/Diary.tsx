@@ -12,6 +12,7 @@ import { mediaStorage } from "../services/mediaStorage";
 import { mockFriendService } from "../services/mockFriendService";
 import { PrivateMessageShare } from "../components/PrivateMessageShare";
 import CommentInput from "../components/CommentInput";
+import { ShareSheet } from "../components/ShareSheet";
 
 export default function Diary() {
   const { user } = useAuthContext();
@@ -710,24 +711,9 @@ export default function Diary() {
                     <button 
                       onClick={() => {
                         setShowAddFriendMenu(false);
-                        setAddFriendStep(1);
-                        handleWechatInvite();
-                      }}
-                      className="flex flex-col items-center gap-3 group"
-                    >
-                      <div className="w-16 h-16 bg-[#07C160] rounded-3xl flex items-center justify-center text-white shadow-lg shadow-green-500/20 active:scale-90 transition-all">
-                        <MessageCircle size={32} fill="currentColor" />
-                      </div>
-                      <span className="text-sm font-bold text-on-surface">微信邀请</span>
-                    </button>
-
-                    <button 
-                      onClick={() => {
-                        setShowAddFriendMenu(false);
-                        // 延迟跳转，确保 AnimatePresence 退出动画执行完毕，防止路由切换时的状态机冲突
                         setTimeout(() => {
-                          setAddFriendStep(1);
-                          navigate("/add-friend-qr", { state: { cat: selectedCatForQR } });
+                            setAddFriendStep(1);
+                            navigate("/add-friend-qr", { state: { cat: selectedCatForQR } });
                         }, 300);
                       }}
                       className="flex flex-col items-center gap-3 group"
@@ -752,111 +738,26 @@ export default function Diary() {
         )}
       </AnimatePresence>
 
-      {/* 分享面板 (小红书风格) */}
-      <AnimatePresence>
-        {sharingEntry && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="backdrop-overlay !z-[420] !bg-black/60 flex items-end justify-center"
-            onClick={() => setSharingEntry(null)}
-          >
-            <motion.div 
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="bg-background w-full max-w-lg rounded-t-[32px] sm:rounded-[40px] shadow-2xl flex flex-col overflow-hidden"
-              onClick={e => e.stopPropagation()}
-            >
-              {/* 顶部标题 */}
-              <div className="pt-8 pb-4 text-center shrink-0">
-                <h3 className="text-lg font-black text-on-surface">分享至</h3>
-                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-0.5">Share To</p>
-              </div>
+      {/* 分享面板 (重构为独立组件) */}
+      <ShareSheet 
+        isOpen={!!sharingEntry}
+        onClose={() => setSharingEntry(null)}
+        diaryData={sharingEntry ? {
+            id: sharingEntry.id,
+            title: sharingEntry.content,
+            imageUrl: sharingEntry.media || 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=2643&auto=format&fit=crop',
+            authorName: user?.nickname || '猫咪主人',
+            authorAvatar: user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'
+        } : null}
+        onPrivateShare={handlePrivateShare}
+        onToast={(msg) => {
+            setShareMessage(msg);
+            setShowShareToast(true);
+            setTimeout(() => setShowShareToast(false), 3000);
+        }}
+      />
 
-              {/* 第一排：站内好友 */}
-              <div className="px-2 overflow-x-auto no-scrollbar flex py-4">
-                <div className="flex gap-4 px-4">
-                  {[
-                    { id: '1', name: '小甜甜', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky', heat: 95, isOnline: true },
-                    { id: '2', name: '大橘为重', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kitty', heat: 88, isOnline: false },
-                    { id: '3', name: '猫咪老师', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo', heat: 72, isOnline: true },
-                    { id: '4', name: '雪球', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Snow', heat: 60, isOnline: true },
-                    { id: '5', name: '黑炭', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Midnight', heat: 50, isOnline: false },
-                  ].sort((a,b) => b.heat - a.heat).map(friend => (
-                    <button 
-                      key={friend.id}
-                      onClick={handleShareAction}
-                      className="flex flex-col items-center gap-2 shrink-0 group active:scale-95 transition-transform"
-                    >
-                      <div className="relative">
-                        <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white shadow-sm">
-                          <img src={friend.avatar} alt={friend.name} className="w-full h-full object-cover bg-surface-container" />
-                        </div>
-                        {friend.isOnline && (
-                          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-[#4CAF50] rounded-full border-2 border-background" />
-                        )}
-                      </div>
-                      <span className="text-[11px] font-bold text-on-surface max-w-[56px] truncate">{friend.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 分割线 */}
-              <div className="mx-6 border-t border-outline-variant/10" />
-
-              {/* 第二排：外部社交分享 */}
-              <div className="px-2 overflow-x-auto no-scrollbar flex py-6">
-                <div className="flex gap-6 px-6">
-                  <button 
-                    onClick={handlePrivateShare}
-                    className="flex flex-col items-center gap-2 shrink-0 group active:scale-95 transition-transform"
-                  >
-                    <div className="w-14 h-14 bg-surface-container-high rounded-full flex items-center justify-center text-on-surface shadow-sm group-hover:bg-primary/5">
-                      <Send size={24} />
-                    </div>
-                    <span className="text-[11px] font-bold text-on-surface-variant">私信好友</span>
-                  </button>
-
-                  <button 
-                    onClick={handleShareAction}
-                    className="flex flex-col items-center gap-2 shrink-0 group active:scale-95 transition-transform"
-                  >
-                    <div className="w-14 h-14 bg-[#07C160] rounded-full flex items-center justify-center text-white shadow-lg shadow-green-500/10">
-                      <MessageCircle size={26} fill="white" />
-                    </div>
-                    <span className="text-[11px] font-bold text-on-surface-variant">微信好友</span>
-                  </button>
-
-                  <button 
-                    onClick={handleShareAction}
-                    className="flex flex-col items-center gap-2 shrink-0 group active:scale-95 transition-transform"
-                  >
-                    <div className="w-14 h-14 bg-[#07C160] rounded-full flex items-center justify-center text-white shadow-lg shadow-green-500/10">
-                      <Sparkles size={24} />
-                    </div>
-                    <span className="text-[11px] font-bold text-on-surface-variant">朋友圈</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 取消按钮 */}
-              <button 
-                onClick={() => setSharingEntry(null)}
-                className="w-full py-5 bg-background border-t border-outline-variant/10 text-on-surface font-black text-base active:bg-surface-container transition-colors"
-                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
-              >
-                取消
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-          {/* 站内私信分享二级页面 */}
+      {/* 站内私信分享二级页面 */}
       <PrivateMessageShare 
         isOpen={showPrivateShare}
         onClose={() => setShowPrivateShare(false)}

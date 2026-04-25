@@ -3,10 +3,11 @@ import React from 'react';
 interface PawLogoProps {
   size?: number;
   className?: string;
+  style?: React.CSSProperties;
   id?: string;
 }
 
-export default function PawLogo({ size = 48, className = "", id = "paw-logo" }: PawLogoProps) {
+export default function PawLogo({ size = 48, className = "", style, id = "paw-logo" }: PawLogoProps) {
   return (
     <img
       id={id}
@@ -14,6 +15,7 @@ export default function PawLogo({ size = 48, className = "", id = "paw-logo" }: 
       alt="Miao Logo"
       width={size}
       height={size}
+      style={style}
       className={`${className} object-contain`}
       draggable={false}
     />
