@@ -17,6 +17,7 @@ export default function Login() {
   const [isAgreed, setIsAgreed] = useState(false);
   const [shake, setShake] = useState(false);
   const [showAgreedDialog, setShowAgreedDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Default cat image fallback — 使用本地内联 SVG 占位，避免离线时依赖外部 CDN
   const DEFAULT_CAT_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%23FEF6F0' width='200' height='200'/%3E%3Ctext x='100' y='115' text-anchor='middle' font-size='80'%3E🐱%3C/text%3E%3C/svg%3E";
@@ -36,21 +37,27 @@ export default function Login() {
     }
   }, []);
 
-  const performLogin = (u = username, p = password) => {
+  const performLogin = async (u = username, p = password) => {
     if (!u || !p) {
       setError("请输入用户名和密码");
       return;
     }
-    const success = login(u, p);
-    if (success) {
-      const hasCat = storage.getCatList().length > 0;
-      if (hasCat) {
-        navigate("/", { replace: true });
+    setIsLoading(true);
+    setError("");
+    try {
+      const success = await login(u, p);
+      if (success) {
+        const hasCat = storage.getCatList().length > 0;
+        if (hasCat) {
+          navigate("/", { replace: true });
+        } else {
+          navigate("/empty-cat", { replace: true });
+        }
       } else {
-        navigate("/empty-cat", { replace: true });
+        setError("用户名或密码错误");
       }
-    } else {
-      setError("用户名或密码错误");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -178,8 +185,8 @@ export default function Login() {
           </motion.div>
 
           <div className="pt-4 space-y-3">
-            <button onClick={handleLogin} className="miao-btn-primary py-3">
-              登录
+            <button onClick={handleLogin} disabled={isLoading} className="miao-btn-primary py-3 disabled:opacity-60">
+              {isLoading ? "登录中..." : "登录"}
             </button>
             <button onClick={() => navigate("/register")} className="miao-btn-secondary py-3">
               注册

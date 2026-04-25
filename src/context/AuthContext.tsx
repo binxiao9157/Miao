@@ -7,7 +7,7 @@ interface AuthContextType {
   isInitializing: boolean;
   hasCat: boolean;
   catCount: number;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   register: (info: UserInfo) => void;
   logout: () => void;
   updateProfile: (updates: Partial<UserInfo>) => void;
@@ -39,7 +39,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshCatStatus();
   }, [refreshCatStatus]);
 
-  const login = (username: string, password: string): boolean => {
+  const login = async (username: string, password: string): Promise<boolean> => {
+    // 1. 先查本地 localStorage
     const users = storage.getAllUsers();
     const savedUser = users.find(u => u.username === username && u.password === password);
     
@@ -52,7 +53,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(true);
       setUser(savedUser);
 
-      // 服务端登录 + 同步猫咪数据（异步，不阻塞 UI）
       fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,7 +63,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       refreshCatStatus();
       return true;
     }
-    return false;
+
+    // 2. 本地无此用户 → 回退到服务器验证（解决跨 PWA 实例 localStorage 隔离问题）
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!resp.ok) return false;
+
+      const serverUser = await resp.json();
+      const userInfo: UserInfo = {
+        username: serverUser.username,
+        password,
+        nickname: serverUser.nickname || username,
+        avatar: serverUser.avatar || '',
+      };
+
+      storage.saveUserInfo(userInfo);
+      storage.saveToken('mock_token_' + Date.now());
+      storage.saveLoginTime(Date.now());
+      storage.saveLastActiveTime(Date.now());
+
+      setIsAuthenticated(true);
+      setUser(userInfo);
+
+      storage.syncFromServer(username).then(() => refreshCatStatus());
+      refreshCatStatus();
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const register = (info: UserInfo): void => {
