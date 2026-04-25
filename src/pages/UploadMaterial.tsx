@@ -155,23 +155,23 @@ export default function UploadMaterial() {
       onClick={() => (document.activeElement as HTMLElement)?.blur()}
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
     >
-      <header className="flex items-center mb-6">
+      <header className="flex items-center mb-4 flex-shrink-0">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-[#5D4037] active:scale-90 transition-transform">
           <ArrowLeft size={24} />
         </button>
         <h1 className="text-xl font-black text-[#5D4037] ml-2">上传素材</h1>
       </header>
 
-      <div className="flex-grow flex-shrink-0 flex flex-col max-w-md mx-auto w-full">
-        <section className="mb-6">
+      <div className="flex-shrink-0 flex flex-col max-w-md mx-auto w-full">
+        <section className="mb-4">
           <h2 className="text-3xl font-black text-[#5D4037] mb-2 tracking-tight">AI 形象生成</h2>
           <p className="text-[#5D4037]/40 text-sm font-bold uppercase tracking-widest">AI Image Generation</p>
           <p className="text-[#5D4037]/60 text-sm mt-3 leading-relaxed">上传一张您家猫咪的照片，AI 将为您生成专属的数字形象。</p>
         </section>
 
-        <div className="flex-grow flex flex-col items-center justify-start space-y-8">
+        <div className="flex flex-col items-center justify-start space-y-4">
           {/* 图片预览区 */}
-          <div className="w-full max-h-[45vh] aspect-square relative">
+          <div className="w-full max-h-[40dvh] aspect-square relative">
             {selectedImage ? (
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }}
@@ -229,7 +229,7 @@ export default function UploadMaterial() {
           </div>
         </div>
 
-        <div className="mt-8 pb-4">
+        <div className="mt-4 pb-4">
           <button 
             onClick={handleGenerate}
             className={`w-full py-5 rounded-full font-black text-lg shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 ${
