@@ -71,14 +71,14 @@ export default function Login() {
 
   return (
     <div 
-      className="min-h-dvh overflow-y-auto flex flex-col items-center px-8 bg-background relative"
+      className="h-dvh overflow-y-auto flex flex-col items-center px-8 bg-background relative"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}
     >
       {/* Decorative elements */}
       <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="w-full flex-1 flex flex-col items-center justify-start pt-6 py-4 relative z-10">
+      <div className="w-full flex-shrink-0 flex flex-col items-center justify-start pt-6 py-4 relative z-10">
         {/* Logo Section */}
         <div className="flex items-center gap-0 mb-4 group">
           <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={48} />
@@ -189,7 +189,7 @@ export default function Login() {
       </div>
 
       {/* Footer Section */}
-      <div className="py-6 text-center space-y-2 relative z-10">
+      <div className="mt-auto flex-shrink-0 py-6 text-center space-y-2 relative z-10">
         <button
           onClick={() => navigate("/download")}
           className="text-xs font-bold text-primary hover:underline active:opacity-60 transition-opacity"

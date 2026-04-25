@@ -68,7 +68,7 @@ export default function ResetPassword() {
   const isFormValid = phone.length === 11 && code.length === 4 && newPassword.length >= 6;
 
   return (
-    <div className="min-h-dvh flex flex-col items-center px-8 bg-background pt-12 overflow-y-auto">
+    <div className="h-dvh flex flex-col items-center px-8 bg-background pt-12 overflow-y-auto">
       <header className="w-full flex items-center mb-12">
         <button onClick={() => navigate(-1)} className="p-2 bg-surface-container rounded-full">
           <ArrowLeft size={24} />

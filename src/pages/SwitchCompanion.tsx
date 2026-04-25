@@ -56,7 +56,7 @@ export default function SwitchCompanion() {
   };
 
   return (
-    <div className="min-h-dvh bg-background pb-12 overflow-y-auto">
+    <div className="h-dvh bg-background pb-12 overflow-y-auto">
       <header 
         className="sticky top-0 z-30 bg-background/80 backdrop-blur-md px-6 pb-4 flex items-center border-b border-outline-variant/30"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}

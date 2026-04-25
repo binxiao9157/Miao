@@ -51,14 +51,14 @@ export default function Register() {
 
   return (
     <div 
-      className="min-h-dvh flex flex-col px-8 pb-8 bg-background relative overflow-y-auto"
+      className="h-dvh flex flex-col px-8 pb-8 bg-background relative overflow-y-auto"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
     >
       {/* Decorative elements */}
       <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>
 
-      <header className="relative z-10 mb-6">
+      <header className="relative z-10 mb-6 flex-shrink-0">
         <button 
           onClick={() => navigate(-1)} 
           className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform mb-4"
@@ -73,7 +73,7 @@ export default function Register() {
         <p className="text-on-surface-variant text-sm opacity-60 leading-relaxed">开启您与宠物的精致陪伴之旅，记录每一个温暖瞬间。</p>
       </header>
 
-      <div className="space-y-6 relative z-10 flex-grow">
+      <div className="space-y-6 relative z-10 flex-shrink-0">
         <div className="space-y-5">
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant ml-1 opacity-40">用户名</label>
@@ -171,7 +171,7 @@ export default function Register() {
         </div>
       </div>
 
-      <footer className="mt-auto pt-8 text-center relative z-10">
+      <footer className="mt-auto pt-8 text-center relative z-10 flex-shrink-0">
         <p className="text-[10px] text-on-surface-variant opacity-40 leading-relaxed">
           注册即代表您同意 <span className="underline font-bold">用户协议</span> 与 <span className="underline font-bold">隐私政策</span>
         </p>

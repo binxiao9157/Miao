@@ -5,30 +5,41 @@
 
 import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-// 使用 React.lazy 延迟加载所有页面和布局
-const MainLayout = lazy(() => import("./components/layout/MainLayout"));
-const Login = lazy(() => import("./pages/Login"));
-const Register = lazy(() => import("./pages/Register"));
-const TermsOfService = lazy(() => import("./pages/TermsOfService"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Welcome = lazy(() => import("./pages/Welcome"));
-// Points 和 Profile 由 MainLayout 持久化渲染，无需在路由层 lazy 加载
-const EditProfile = lazy(() => import("./pages/EditProfile"));
-const ChangePassword = lazy(() => import("./pages/ChangePassword"));
-const Notifications = lazy(() => import("./pages/Notifications"));
-const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
-const SwitchCompanion = lazy(() => import("./pages/SwitchCompanion"));
-const UploadMaterial = lazy(() => import("./pages/UploadMaterial"));
-const GenerationProgress = lazy(() => import("./pages/GenerationProgress"));
-const CatPlayer = lazy(() => import("./pages/CatPlayer"));
-const CatHistory = lazy(() => import("./pages/CatHistory"));
-const CreateCompanion = lazy(() => import("./pages/CreateCompanion"));
-const EmptyCatPage = lazy(() => import("./pages/EmptyCatPage"));
-const AccompanyMilestonePage = lazy(() => import("./pages/AccompanyMilestonePage"));
-const AddFriendQR = lazy(() => import("./pages/AddFriendQR"));
-const ScanFriend = lazy(() => import("./pages/ScanFriend"));
-const Download = lazy(() => import("./pages/Download"));
-const Feedback = lazy(() => import("./pages/Feedback"));
+
+function lazyRetry(importFn: () => Promise<{ default: React.ComponentType<any> }>) {
+  return lazy(async () => {
+    try {
+      return await importFn();
+    } catch (error) {
+      console.warn('Chunk load failed, retrying...', error);
+      await new Promise(r => setTimeout(r, 1000));
+      return importFn();
+    }
+  });
+}
+
+const MainLayout = lazyRetry(() => import("./components/layout/MainLayout"));
+const Login = lazyRetry(() => import("./pages/Login"));
+const Register = lazyRetry(() => import("./pages/Register"));
+const TermsOfService = lazyRetry(() => import("./pages/TermsOfService"));
+const ResetPassword = lazyRetry(() => import("./pages/ResetPassword"));
+const Welcome = lazyRetry(() => import("./pages/Welcome"));
+const EditProfile = lazyRetry(() => import("./pages/EditProfile"));
+const ChangePassword = lazyRetry(() => import("./pages/ChangePassword"));
+const Notifications = lazyRetry(() => import("./pages/Notifications"));
+const PrivacyPolicy = lazyRetry(() => import("./pages/PrivacyPolicy"));
+const SwitchCompanion = lazyRetry(() => import("./pages/SwitchCompanion"));
+const UploadMaterial = lazyRetry(() => import("./pages/UploadMaterial"));
+const GenerationProgress = lazyRetry(() => import("./pages/GenerationProgress"));
+const CatPlayer = lazyRetry(() => import("./pages/CatPlayer"));
+const CatHistory = lazyRetry(() => import("./pages/CatHistory"));
+const CreateCompanion = lazyRetry(() => import("./pages/CreateCompanion"));
+const EmptyCatPage = lazyRetry(() => import("./pages/EmptyCatPage"));
+const AccompanyMilestonePage = lazyRetry(() => import("./pages/AccompanyMilestonePage"));
+const AddFriendQR = lazyRetry(() => import("./pages/AddFriendQR"));
+const ScanFriend = lazyRetry(() => import("./pages/ScanFriend"));
+const Download = lazyRetry(() => import("./pages/Download"));
+const Feedback = lazyRetry(() => import("./pages/Feedback"));
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 import SplashScreen from "./components/SplashScreen";

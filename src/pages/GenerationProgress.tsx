@@ -262,7 +262,7 @@ export default function GenerationProgress() {
 
   return (
     <div 
-      className="min-h-dvh bg-[#FFF9F5] flex flex-col items-center justify-center px-8 pb-8 text-center overflow-y-auto"
+      className="h-dvh bg-[#FFF9F5] flex flex-col items-center justify-center px-8 pb-8 text-center overflow-y-auto"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
     >
       <AnimatePresence mode="wait">

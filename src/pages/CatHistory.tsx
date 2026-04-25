@@ -29,7 +29,7 @@ export default function CatHistory() {
   };
 
   return (
-    <div className="min-h-dvh bg-background p-6 pb-32 overflow-y-auto">
+    <div className="h-dvh bg-background p-6 pb-32 overflow-y-auto">
       {/* 删除确认弹窗 */}
       <AnimatePresence>
         {showDeleteConfirm && (

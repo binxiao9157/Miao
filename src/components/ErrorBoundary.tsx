@@ -28,8 +28,15 @@ class ErrorBoundary extends React.Component<Props, State> {
   }
 
   private handleReset = () => {
-    // 先尝试就地恢复，不刷新页面
-    this.setState({ hasError: false, error: null });
+    const isChunkError = this.state.error?.message?.includes('Loading chunk') ||
+      this.state.error?.message?.includes('Failed to fetch') ||
+      this.state.error?.message?.includes('dynamically imported module') ||
+      this.state.error?.name === 'ChunkLoadError';
+    if (isChunkError) {
+      window.location.reload();
+    } else {
+      this.setState({ hasError: false, error: null });
+    }
   };
 
   private handleGoHome = () => {

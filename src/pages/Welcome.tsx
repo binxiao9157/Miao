@@ -68,7 +68,7 @@ export default function Welcome() {
 
   return (
     <div 
-      className="min-h-dvh flex flex-col px-8 pb-8 bg-background relative overflow-y-auto"
+      className="h-dvh flex flex-col px-8 pb-8 bg-background relative overflow-y-auto"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
     >
       <button 

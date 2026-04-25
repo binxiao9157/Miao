@@ -151,7 +151,7 @@ export default function UploadMaterial() {
 
   return (
     <div 
-      className="min-h-dvh bg-[#FFF9F5] px-6 pb-6 flex flex-col font-sans overflow-y-auto" 
+      className="h-dvh bg-[#FFF9F5] px-6 pb-6 flex flex-col font-sans overflow-y-auto" 
       onClick={() => (document.activeElement as HTMLElement)?.blur()}
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
     >
@@ -162,7 +162,7 @@ export default function UploadMaterial() {
         <h1 className="text-xl font-black text-[#5D4037] ml-2">上传素材</h1>
       </header>
 
-      <div className="flex-grow flex flex-col max-w-md mx-auto w-full">
+      <div className="flex-grow flex-shrink-0 flex flex-col max-w-md mx-auto w-full">
         <section className="mb-6">
           <h2 className="text-3xl font-black text-[#5D4037] mb-2 tracking-tight">AI 形象生成</h2>
           <p className="text-[#5D4037]/40 text-sm font-bold uppercase tracking-widest">AI Image Generation</p>

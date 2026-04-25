@@ -19,7 +19,7 @@ export default function AccompanyMilestonePage() {
   };
 
   return (
-    <div className="min-h-dvh bg-background p-6 overflow-y-auto">
+    <div className="h-dvh bg-background p-6 overflow-y-auto">
       <header className="flex items-center mb-8">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-on-surface-variant">
           <ArrowLeft size={24} />
