@@ -78,7 +78,7 @@ export default function Login() {
       <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="w-full flex-1 flex flex-col items-center justify-center py-4 relative z-10">
+      <div className="w-full flex-1 flex flex-col items-center justify-start pt-6 py-4 relative z-10">
         {/* Logo Section */}
         <div className="flex items-center gap-0 mb-4 group">
           <PawLogo className="-rotate-12 transition-transform group-hover:-rotate-6" size={48} />
@@ -86,7 +86,7 @@ export default function Login() {
         </div>
         
         {/* Title Section */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-3">
           <h1 className="text-2xl font-black text-on-surface mb-1 tracking-tight">欢迎来到 Miao</h1>
           <p className="text-on-surface-variant/80 text-sm font-medium">以喵星之名，守护你的每一份温暖</p>
         </div>
@@ -96,7 +96,7 @@ export default function Login() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="relative w-full max-w-[240px] aspect-square mb-8 flex items-center justify-center"
+          className="relative w-full max-w-[180px] aspect-square mb-4 flex items-center justify-center"
         >
           {/* Outer soft glow/border */}
           <div className="absolute inset-0 bg-[#FEF6F0] rounded-[48px] shadow-[0_10px_30px_rgba(232,159,113,0.1)]"></div>

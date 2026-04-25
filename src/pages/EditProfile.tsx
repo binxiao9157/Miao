@@ -91,7 +91,7 @@ export default function EditProfile() {
 
   return (
     <div 
-      className="min-h-screen bg-background px-6 pb-6 relative overflow-hidden"
+      className="min-h-screen bg-background px-6 pb-6 relative overflow-y-auto"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
     >
       <input 

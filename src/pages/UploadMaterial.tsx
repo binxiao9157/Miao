@@ -171,7 +171,7 @@ export default function UploadMaterial() {
 
         <div className="flex-grow flex flex-col items-center justify-start space-y-8">
           {/* 图片预览区 */}
-          <div className="w-full aspect-square relative">
+          <div className="w-full max-h-[45vh] aspect-square relative">
             {selectedImage ? (
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }}

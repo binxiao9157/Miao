@@ -80,7 +80,7 @@ export default function CreateCompanion() {
 
       {/* 滚动内容区域 */}
       <div className="flex-grow overflow-y-auto px-6 no-scrollbar">
-        <div className="pt-4 pb-40 space-y-10">
+        <div className="pt-4 pb-32 space-y-10">
           {/* 名字输入 */}
           <div className="space-y-3">
             <label className="text-xs font-black uppercase tracking-[0.2em] text-[#5D4037]/40 ml-1">猫咪昵称</label>

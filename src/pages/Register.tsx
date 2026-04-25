@@ -51,17 +51,17 @@ export default function Register() {
 
   return (
     <div 
-      className="min-h-screen flex flex-col px-8 pb-8 bg-background relative overflow-y-auto no-scrollbar"
+      className="min-h-screen flex flex-col px-8 pb-8 bg-background relative overflow-y-auto"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
     >
       {/* Decorative elements */}
       <div className="fixed -top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl pointer-events-none"></div>
 
-      <header className="relative z-10 mb-12">
+      <header className="relative z-10 mb-6">
         <button 
           onClick={() => navigate(-1)} 
-          className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform mb-8"
+          className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform mb-4"
         >
           <ArrowLeft size={20} />
         </button>
