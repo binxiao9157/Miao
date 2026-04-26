@@ -7,7 +7,7 @@ import { VolcanoService, ACTION_PROMPTS } from "../services/volcanoService";
 import { FileManager } from "../services/fileManager";
 import { storage } from "../services/storage";
 import { useAuthContext } from "../context/AuthContext";
-import { extractFrameFromUrl } from "../lib/videoUtils";
+// 移除旧的视频帧提取工具，统一使用首帧确认图
 
 export default function GenerationProgress() {
   const location = useLocation();
@@ -120,15 +120,10 @@ export default function GenerationProgress() {
       setIdleVideoUrl(url);
       setProgress(100);
 
-      // 2. 修复数据写入时机：在展示弹窗前正式入库
+      // 废除“从生成视频中提取帧”的旧逻辑，统一使用用户刚才确认的那张 image
       setStatus("正在同步到本地猫窝...");
       
-      let anchorFrame;
-      try {
-        anchorFrame = await extractFrameFromUrl(url, 0.1);
-      } catch (e) {
-        anchorFrame = optimizedImg;
-      }
+      const anchorFrame = optimizedImg; // 直接使用确认过的首帧图
 
       // 物理入库，确保跳转首页时数据已存在
       await FileManager.downloadVideos(
@@ -167,6 +162,14 @@ export default function GenerationProgress() {
   const handleUnlockAll = async () => {
     if (!idleVideoUrl) return;
     
+    // 强制校验：必须有确认的首帧图才能生成后续互动
+    const confirmedFirstFrame = anchorImage || image;
+    if (!confirmedFirstFrame) {
+      console.error("Missing confirmed first frame for batch generation");
+      setError("未识别到确认的首帧图，请返回重试");
+      return;
+    }
+
     // 3. 完善“异步后台生成”逻辑：立即跳转首页
     navigate("/", { replace: true });
 
@@ -176,12 +179,11 @@ export default function GenerationProgress() {
     // 后台静默发起剩余任务
     const secondaryActions = ['tail', 'rubbing', 'blink'] as const;
     try {
-      // 提取锚定帧用于后续生成（如果需要）
-      const currentCat = storage.getCatById(newCatId);
-      const anchorFrame = currentCat?.anchorFrame || anchorImage || image;
+      // 所有互动视频统一基于确认过的首帧图生成，不再从旧视频中抽帧
+      const anchorFrame = anchorImage || image;
 
       const tasks = secondaryActions.map(action => 
-        VolcanoService.submitTask(anchorFrame || "", ACTION_PROMPTS[action])
+        VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS[action])
       );
       const taskResults = await Promise.all(tasks);
       
@@ -232,7 +234,7 @@ export default function GenerationProgress() {
           throw new Error("未获取到猫咪图片，请重新选择或上传");
         }
 
-        setStatus("正在分析图片...");
+        setStatus("正在注入生命力...");
         setProgress(25);
         setAnchorImage(image);
         

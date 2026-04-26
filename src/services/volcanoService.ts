@@ -1,15 +1,21 @@
 import axios from 'axios';
 
 /**
- * 火山引擎配置中心 (方舟 Ark 平台)
+ * 阿里灵积 (DashScope) 配置中心
  */
 export const VolcanoConfig = {
-  get MOCK_MODE() { return import.meta.env.DEV && localStorage.getItem('VOLC_MOCK_MODE') === 'true'; },
+  get MOCK_MODE() { 
+    // 优先从环境变量获取，如果没有则根据是否是开发环境和本地存储判断
+    const envMock = import.meta.env.VITE_DASHSCOPE_MOCK_MODE;
+    if (envMock === 'true') return true;
+    if (envMock === 'false') return false;
+    return import.meta.env.DEV && localStorage.getItem('DASHSCOPE_MOCK_MODE') === 'true'; 
+  },
   get ModelId() {
-    return localStorage.getItem('VOLC_MODEL_ID') || "doubao-seedance-1-5-pro-251215";
+    return localStorage.getItem('DASHSCOPE_VIDEO_MODEL') || "wan2.2-i2v-flash";
   },
   get T2IModelId() {
-    return localStorage.getItem('VOLC_T2I_MODEL_ID') || "doubao-t2i-v2";
+    return localStorage.getItem('DASHSCOPE_IMAGE_MODEL') || "qwen-image-2.0";
   },
 };
 
@@ -39,7 +45,7 @@ export const IMAGE_PROMPTS = {
 };
 
 /**
- * 火山引擎方舟视频生成服务
+ * 阿里灵积 (DashScope) 视频生成服务
  */
 export class VolcanoService {
   /**
@@ -153,9 +159,9 @@ export class VolcanoService {
   }
 
   /**
-   * 提交文生图任务 (Text-to-Image)
+   * 提交文生图任务 (Text-to-Image / Image-to-Image)
    */
-  public static async submitImageTask(prompt: string) {
+  public static async submitImageTask(prompt: string, imageBase64?: string) {
     if (VolcanoConfig.MOCK_MODE) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       return { id: 'mock_img_task_' + Date.now() };
@@ -164,6 +170,7 @@ export class VolcanoService {
     try {
       const response = await axios.post("/api/generate-image", {
         prompt,
+        image_base64: imageBase64,
         model: VolcanoConfig.T2IModelId
       }, {
         timeout: 60000,
@@ -176,7 +183,11 @@ export class VolcanoService {
         throw new Error("文生图任务提交失败，未获取到 ID");
       }
 
-      return { id: taskId };
+      return { 
+        id: taskId, 
+        image_url: response.data?.image_url, 
+        status: response.data?.status 
+      };
     } catch (error: any) {
       let errorMsg = "文生图提交失败";
       if (error.response?.data) {
@@ -194,14 +205,20 @@ export class VolcanoService {
   /**
    * 轮询文生图结果 (指数退避策略)
    */
-  public static async pollImageResult(taskId: string, signal?: AbortSignal): Promise<string> {
+  public static async pollImageResult(taskId: string, initialUrl?: string, signal?: AbortSignal): Promise<string> {
     if (VolcanoConfig.MOCK_MODE) {
       await new Promise(resolve => setTimeout(resolve, 2000));
       return 'https://picsum.photos/seed/cat/800/800';
     }
 
-    let delay = 2000; // 初始 2s
+    if (initialUrl) return initialUrl;
+    if (taskId.startsWith('sync:')) {
+      // In sync mode, the taskId might contain nothing or we might have passed initialUrl
+      // If we don't have initialUrl but have sync: prefix, we need to check if the caller passed it
+      throw new Error("同步任务未提供图片地址");
+    }
     const maxDelay = 10000; // 最大 10s
+    let delay = 2000; // 初始 2s
     const startTime = Date.now();
     const maxWaitTimeMs = 120000; // 2分钟超时
 

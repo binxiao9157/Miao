@@ -116,405 +116,249 @@ async function startServer() {
       status: "ok", 
       timestamp: new Date().toISOString(),
       env: process.env.NODE_ENV,
-      hasApiKey: !!process.env.VOLC_API_KEY
+      hasApiKey: !!process.env.DASHSCOPE_API_KEY
     });
   });
 
-  const ARK_API_KEY = (process.env.VOLC_API_KEY || process.env.VITE_VOLC_API_KEY || "").trim();
-  const ARK_MODEL_ID = (process.env.VOLC_MODEL_ID || process.env.VITE_VOLC_MODEL_ID || "doubao-seedance-1-5-pro-251215").trim();
-  const ARK_T2I_MODEL_ID = (process.env.VOLC_T2I_MODEL_ID || process.env.VITE_VOLC_T2I_MODEL_ID || "doubao-t2i-v2").trim();
+  // ── 阿里灵积 (DashScope) 配置 ──
+  const DASHSCOPE_CONFIG = {
+    API_KEY: (process.env.DASHSCOPE_API_KEY || "").trim(),
+    BASE_URL: (process.env.DASHSCOPE_BASE_URL || "https://dashscope.aliyuncs.com/api/v1").trim().replace(/\/$/, ''),
+    IMAGE_MODEL: (process.env.DASHSCOPE_IMAGE_MODEL || "qwen-image-2.0").trim(),
+    VIDEO_MODEL: (process.env.DASHSCOPE_VIDEO_MODEL || "wan2.2-i2v-flash").trim()
+  };
 
-  // 确保 ARK_BASE_URL 是一个有效的绝对 URL，且移除末尾斜杠
-  let ARK_BASE_URL = (process.env.VOLC_ENDPOINT || process.env.VITE_VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks").trim().replace(/\/$/, '');
-  if (!ARK_BASE_URL.startsWith('http')) {
-    console.warn(`[Server] Warning: ARK_BASE_URL "${ARK_BASE_URL}" is not a valid URL. Falling back to default.`);
-    ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks";
+  const ARK_API_KEY = DASHSCOPE_CONFIG.API_KEY;
+  const ARK_BASE_URL = DASHSCOPE_CONFIG.BASE_URL;
+
+  if (!ARK_API_KEY) {
+    console.warn("⚠️ 警告: DASHSCOPE_API_KEY 环境变量未设置。图片和视频生成功能将无法工作。");
   }
 
-  console.log("Server Config:", {
+  console.log("Server DashScope Config Initialized:", {
     hasApiKey: !!ARK_API_KEY,
-    modelId: ARK_MODEL_ID,
-    t2iModelId: ARK_T2I_MODEL_ID,
-    isEndpointId: ARK_MODEL_ID.startsWith("ep-"),
-    baseUrl: ARK_BASE_URL,
-    nodeEnv: process.env.NODE_ENV
+    imageModel: DASHSCOPE_CONFIG.IMAGE_MODEL,
+    videoModel: DASHSCOPE_CONFIG.VIDEO_MODEL,
+    baseUrl: ARK_BASE_URL
   });
-
-  const ARK_T2I_URL = "https://ark.cn-beijing.volces.com/api/v3/images/generations";
 
   // Helper to send standardized error responses
   const sendError = (res: express.Response, error: any, defaultMessage: string) => {
     const status = error.response?.status || 500;
-    const isProduction = process.env.NODE_ENV === 'production';
     const errorData = error.response?.data;
     
-    // Check for specific Volcengine error codes
-    const errorCode = errorData?.error?.code || errorData?.code;
-    const errorMessage = errorData?.error?.message || errorData?.message || error.message;
+    // DashScope error format: { code: "...", message: "..." } or { request_id: "...", code: "...", message: "..." }
+    const errorCode = errorData?.code;
+    const errorMessage = errorData?.message || error.message;
 
-    if (errorCode === "AccountBalanceInsufficient" || errorMessage?.toLowerCase().includes("balance")) {
+    if (errorCode === "InvalidApiKey" || status === 401) {
+      return res.status(401).json({
+        error: "鉴权失败",
+        message: "API Key 无效或已过期。",
+        code: "INVALID_API_KEY"
+      });
+    }
+
+    if (errorCode === "Arrearage" || errorMessage?.toLowerCase().includes("balance")) {
       return res.status(403).json({ 
-        error: "账户余额不足",
-        message: "您的火山引擎账户余额不足，请及时充值以恢复服务。",
-        code: "BALANCE_INSUFFICIENT"
-      });
-    }
-
-    if (errorCode === "QuotaExceeded" || errorMessage?.toLowerCase().includes("quota")) {
-      return res.status(403).json({ 
-        error: "API 额度已耗尽",
-        message: "您的资源包额度已用完或 QPS 超过限制，请检查火山引擎控制台。",
-        code: "QUOTA_EXCEEDED"
-      });
-    }
-
-    if (errorCode === "AccessDenied" || errorCode === "Forbidden" || status === 403) {
-      return res.status(403).json({
-        error: "访问被拒绝 (403)",
-        message: "鉴权失败。请检查 API Key 是否有效，以及该 Key 是否拥有访问指定推理接入点 (Model ID) 的权限。",
-        code: "ACCESS_DENIED"
-      });
-    }
-
-    if (errorCode === "InvalidParameter") {
-      return res.status(400).json({
-        error: `参数错误: ${errorMessage}`,
-        code: "INVALID_PARAMETER"
-      });
-    }
-
-    if (status === 404) {
-      return res.status(404).json({
-        error: "API 端点未找到 (404)。请检查推理接入点 ID 是否正确。",
-        code: "NOT_FOUND"
+        error: "账户欠费",
+        message: "您的阿里云账户已欠费，请充值后重试。",
+        code: "ARREARAGE"
       });
     }
 
     res.status(status).json({ 
       error: defaultMessage,
       message: errorMessage
-      // detail 字段已移除：生产环境不返回上游错误原始数据
     });
   };
 
-  // API Route for Image Generation (Ark T2I)
+  // API Route for Image Generation (DashScope)
   app.post("/api/generate-image", async (req, res) => {
-    const { prompt } = req.body;
-    
-    // 恢复前置校验，防止空指针
+    const { prompt, image_base64 } = req.body;
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: "缺少必要参数: prompt", code: "INVALID_PARAMETER" });
     }
 
     try {
-      if (!ARK_API_KEY) {
-        return res.status(500).json({ error: "服务器未配置 API Key" });
-      }
+      // DashScope MultiModalConversation REST API endpoint
+      const url = `${ARK_BASE_URL}/services/aigc/multimodal-generation/generation`;
+      
+      const messages = [
+        {
+          role: "user",
+          content: [] as any[]
+        }
+      ];
 
-      const requestBody = {
-        model: req.body.model || ARK_T2I_MODEL_ID,
-        prompt: prompt,
-        size: "1024x1024"
+      // Add reference image if provided
+      if (image_base64) {
+        messages[0].content.push({ image: image_base64 });
+      }
+      // Add text instructions
+      messages[0].content.push({ text: prompt });
+
+      const requestBody: any = {
+        model: req.body.model || DASHSCOPE_CONFIG.IMAGE_MODEL,
+        input: {
+          messages: messages
+        },
+        parameters: {
+          n: 1,
+          result_format: "message",
+          watermark: false
+        }
       };
 
-      console.log("Submitting T2I task to Ark:", {
+      console.log("Submitting Qwen-Image task to DashScope (restful sync):", {
         model: requestBody.model,
-        url: ARK_T2I_URL,
+        url: url,
+        hasRefImage: !!image_base64,
         prompt: prompt.substring(0, 50) + "..."
       });
 
-      let response;
-      let retries = 2;
-      while (retries >= 0) {
-        try {
-          response = await axios.post(ARK_T2I_URL, requestBody, {
-            headers: {
-              'Authorization': `Bearer ${ARK_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            httpsAgent,
-            timeout: 60000
-          });
-          break;
-        } catch (error: any) {
-          if (error.code === 'ECONNRESET' && retries > 0) {
-            console.warn(`Ark T2I Connection Reset, retrying... (${retries} left)`);
-            retries--;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            continue;
-          }
-          throw error;
+      // Try calling synchronously first (removing X-DashScope-Async)
+      const response = await axios.post(url, requestBody, {
+        headers: {
+          'Authorization': `Bearer ${ARK_API_KEY}`,
+          'Content-Type': 'application/json'
+          // Some models like qwen-image-2.0 might prefer sync if they are fast
+        },
+        httpsAgent,
+        timeout: 90000 // Increase to 90s for sync generation
+      });
+
+      console.log("DashScope Response received:", JSON.stringify(response.data).substring(0, 200) + "...");
+
+      const output = response.data?.output;
+      
+      // Check for sync result first
+      if (output?.choices?.[0]?.message?.content) {
+        const content = output.choices[0].message.content;
+        let imageUrl = "";
+        
+        if (Array.isArray(content)) {
+          const imgItem = content.find((c: any) => c.image);
+          if (imgItem) imageUrl = imgItem.image;
+        } else if (typeof content === 'string') {
+          // Sometimes it might return just text or something else
+          console.warn("Content is string:", content);
+        }
+
+        if (imageUrl) {
+          console.log("Qwen-Image Sync Success:", imageUrl.substring(0, 50) + "...");
+          return res.json({ id: `sync:${Date.now()}`, status: 'succeeded', image_url: imageUrl });
         }
       }
 
-      if (!response) {
-        throw new Error("Failed to get response from Ark T2I API after retries");
+      // If no sync result, check if it returned a taskId for async
+      const taskId = output?.task_id;
+      if (taskId) {
+        console.log("Qwen-Image Task Started (Async):", taskId);
+        return res.json({ id: taskId, status: 'pending' });
       }
 
-      const imageUrl = response.data?.data?.[0]?.url;
-      if (imageUrl) {
-        console.log("Ark T2I Success (Sync):", imageUrl.substring(0, 50) + "...");
-        res.json({ id: `url:${imageUrl}`, status: 'succeeded', image_url: imageUrl });
-      } else {
-        throw new Error("未获取到生成的图片地址");
-      }
+      throw new Error("DashScope 未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
     } catch (error: any) {
-      console.error("Ark T2I API Error:", {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      });
+      console.error("DashScope Image API Error:", error.response?.data || error.message);
       sendError(res, error, "生成图片失败");
     }
   });
 
-  // SSRF Protection: Validate taskId format
-  const isValidTaskId = (id: string) => {
-    if (id.startsWith('url:')) {
-      const url = id.substring(4);
-      // 仅允许 HTTPS URL，且必须以 https:// 开头
-      if (!/^https:\/\/[a-zA-Z0-9]/.test(url)) return false;
-      return true;
-    }
-    // 修复正则漏洞：支持下划线并严格限制 128 位长度
-    return /^[a-zA-Z0-9_-]{1,128}$/.test(id);
-  };
-
-  // Image status polling
-  app.get("/api/image-status/:taskId", async (req, res) => {
+  // DashScope task status polling (Unified for both image and video)
+  app.get("/api/:type(image|video)-status/:taskId", async (req, res) => {
     const { taskId } = req.params;
-
-    if (!isValidTaskId(taskId)) {
-      return res.status(400).json({ error: "无效的任务 ID 格式" });
-    }
-    
-    if (taskId.startsWith('url:')) {
-      const url = taskId.substring(4);
-      return res.json({ status: 'succeeded', image_url: url });
-    }
-
     try {
-      let response;
-      let retries = 2;
-      while (retries >= 0) {
-        try {
-          response = await axios.get(`${ARK_BASE_URL}/${taskId}`, {
-            headers: {
-              'Authorization': `Bearer ${ARK_API_KEY}`
-            },
-            httpsAgent
-          });
-          break;
-        } catch (error: any) {
-          if (error.code === 'ECONNRESET' && retries > 0) {
-            console.warn(`Ark Image Status Connection Reset, retrying... (${retries} left)`);
-            retries--;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            continue;
+      const url = `${ARK_BASE_URL}/tasks/${taskId}`;
+      const response = await axios.get(url, {
+        headers: { 'Authorization': `Bearer ${ARK_API_KEY}` },
+        httpsAgent,
+        timeout: 20000
+      });
+
+      const output = response.data?.output;
+      const status = output?.task_status;
+
+      if (status === 'SUCCEEDED') {
+        // Results might be in different locations depending on the model
+        let imageUrl = output?.results?.[0]?.url || output?.image_url;
+        const videoUrl = output?.video_url;
+
+        // If qwen-image-2.0 results (multimodal choices format)
+        if (!imageUrl && output?.choices) {
+          const choice = output.choices[0];
+          if (choice?.message?.content) {
+            const content = choice.message.content;
+            const imgItem = content.find((c: any) => c.image);
+            if (imgItem) imageUrl = imgItem.image;
           }
-          throw error;
         }
+        
+        res.json({ 
+          status: 'succeeded', 
+          image_url: imageUrl,
+          video_url: videoUrl,
+          output: { ...output, image_url: imageUrl, video_url: videoUrl }
+        });
+      } else if (status === 'FAILED') {
+        res.json({ status: 'failed', message: output?.message || "任务生成失败" });
+      } else {
+        res.json({ status: 'running' });
       }
-      if (!response) throw new Error("Failed to get image status after retries");
-      res.json(response.data);
     } catch (error: any) {
-      sendError(res, error, "查询图片状态失败");
+      sendError(res, error, "查询状态失败");
     }
   });
 
-  // API Route for Video Generation (Ark Task API)
+  // API Route for Video Generation (DashScope)
   app.post("/api/generate-video", async (req, res) => {
-    const { prompt, negative_prompt, image_base64, parameters } = req.body;
-    
-    // 恢复 image_base64 非空校验
+    const { prompt, image_base64 } = req.body;
     if (!image_base64) {
       return res.status(400).json({ error: "缺少必要参数: image_base64", code: "INVALID_PARAMETER" });
     }
 
     try {
-      if (!ARK_API_KEY) {
-        console.error("Missing VOLC_API_KEY environment variable");
-        return res.status(500).json({ error: "服务器未配置 API Key，请检查环境变量" });
-      }
-
-      let dataUrl = "";
-      if (image_base64) {
-        let cleanBase64 = image_base64.replace(/\s/g, '');
-        
-        if (cleanBase64.startsWith('http')) {
-          dataUrl = cleanBase64;
-        } else {
-          let mimeType = 'image/png';
-          if (cleanBase64.includes('base64,')) {
-            const parts = cleanBase64.split('base64,');
-            const header = parts[0];
-            cleanBase64 = parts[1];
-            const match = header.match(/data:([^;]+);/);
-            if (match) mimeType = match[1];
-          }
-          dataUrl = `data:${mimeType};base64,${cleanBase64}`;
-        }
-      }
-
-      const contentArray: any[] = [];
-      if (dataUrl) {
-        contentArray.push({
-          type: "image_url",
-          image_url: { url: dataUrl }
-        });
-      }
-      contentArray.push({
-        type: "text",
-        text: prompt || "A high quality video of this cat, cinematic lighting, realistic."
-      });
-
-      const requestBody: any = {
-        model: req.body.model || ARK_MODEL_ID,
-        content: contentArray,
-        parameters: {
-          size: parameters?.resolution === "480p" ? "720x1280" : (parameters?.size || "720x1280"),
-          seed: parameters?.seed || 12345,
-          duration: parameters?.duration || 5,
-          fps: 25,
-          first_frame_constraint: true
+      const url = `${ARK_BASE_URL}/services/aigc/video-generation/video-synthesis`;
+      
+      // DashScope Wan I2V usually requires an image URL or base64
+      // Some DashScope models require img_url
+      const requestBody = {
+        model: req.body.model || DASHSCOPE_CONFIG.VIDEO_MODEL,
+        input: {
+          img_url: image_base64, // DashScope accepts data URLs usually
+          prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic."
         }
       };
-      
-      if (negative_prompt) {
-        requestBody.parameters.negative_prompt = negative_prompt;
-      }
 
-      console.log("Submitting task to Ark:", {
+      console.log("Submitting Video task to DashScope:", {
         model: requestBody.model,
-        url: ARK_BASE_URL,
-        payloadSize: JSON.stringify(requestBody).length
+        url: url
       });
 
-      let response;
-      let retries = 2;
-      while (retries >= 0) {
-        try {
-          response = await axios.post(
-            ARK_BASE_URL,
-            requestBody,
-            {
-              headers: {
-                'Authorization': `Bearer ${ARK_API_KEY}`,
-                'Content-Type': 'application/json'
-              },
-              httpsAgent,
-              maxContentLength: Infinity,
-              maxBodyLength: Infinity,
-              timeout: 120000 // 2 minutes for submission
-            }
-          );
-          break; // Success, exit loop
-        } catch (error: any) {
-          if (error.code === 'ECONNRESET' && retries > 0) {
-            console.warn(`Ark API Connection Reset, retrying... (${retries} left)`);
-            retries--;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            continue;
-          }
-          throw error; // Re-throw if not ECONNRESET or no retries left
-        }
-      }
+      const response = await axios.post(url, requestBody, {
+        headers: {
+          'Authorization': `Bearer ${ARK_API_KEY}`,
+          'Content-Type': 'application/json',
+          'X-DashScope-Async': 'enable'
+        },
+        httpsAgent,
+        timeout: 60000
+      });
 
-      if (!response) {
-        throw new Error("Failed to get response from Ark API after retries");
+      const taskId = response.data?.output?.task_id;
+      if (taskId) {
+        res.json({ id: taskId, status: 'pending' });
+      } else {
+        throw new Error("提交视频任务后未获取到 task_id");
       }
-
-      console.log("Ark Submit Success:", response.data.id || "No ID");
-      res.json(response.data);
     } catch (error: any) {
-      console.error("Ark API Error (Video Submit):", {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      });
-      
-      // 针对 SetLimitExceeded 错误提供友好提示
-      if (error.response?.data?.code === 'SetLimitExceeded') {
-        return res.status(403).json({
-          error: "账号推理限额已达上限",
-          message: "您的火山引擎账号已触发安全限额保护。请前往火山引擎方舟控制台，在『模型接入』页面关闭『安全体验模式』或调高限额。",
-          raw: error.response.data
-        });
-      }
-      
-      sendError(res, error, "提交任务失败");
+      console.error("DashScope Video API Error:", error.response?.data || error.message);
+      sendError(res, error, "提交视频生成失败");
     }
   });
 
-  // Polling endpoint
-  app.get("/api/video-status/:taskId", async (req, res) => {
-    const { taskId } = req.params;
-
-    if (!isValidTaskId(taskId)) {
-      return res.status(400).json({ error: "无效的任务 ID 格式" });
-    }
-
-    try {
-      let response;
-      let retries = 2;
-      while (retries >= 0) {
-        try {
-          response = await axios.get(
-            `${ARK_BASE_URL}/${taskId}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${ARK_API_KEY}`
-              },
-              httpsAgent,
-              timeout: 60000
-            }
-          );
-          break;
-        } catch (error: any) {
-          if (error.code === 'ECONNRESET' && retries > 0) {
-            console.warn(`Ark Video Status Connection Reset, retrying... (${retries} left)`);
-            retries--;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            continue;
-          }
-          throw error;
-        }
-      }
-      
-      if (!response) throw new Error("Failed to get video status after retries");
-      
-      if (response.data.status === 'failed') {
-        console.error(`Ark Task ${taskId} FAILED. Full Response:`, JSON.stringify(response.data, null, 2));
-        const arkError = response.data.error || response.data.message || "Unknown Ark Error";
-        
-        // 针对任务执行过程中的限额错误提供友好提示
-        if (typeof arkError === 'object' && arkError.code === 'SetLimitExceeded') {
-          return res.status(200).json({
-            ...response.data,
-            error: "账号推理限额已达上限。请前往火山引擎方舟控制台，在『模型接入』页面关闭『安全体验模式』或调高限额。"
-          });
-        }
-
-        return res.status(200).json({
-          ...response.data,
-          error: typeof arkError === 'string' ? arkError : JSON.stringify(arkError)
-        });
-      }
-
-      console.log(`Ark Status for ${taskId}:`, response.data.status);
-      res.json(response.data);
-    } catch (error: any) {
-      console.error("Ark Status Error:", {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      });
-      sendError(res, error, "查询状态失败");
-    }
-  });
-
-  // Video proxy to bypass CORS for frame extraction
-  app.get("/api/proxy-video", async (req, res) => {
+  // Generic resource proxy to bypass CORS for assets (images/videos)
+  app.get("/api/proxy-resource", async (req, res) => {
     const { url } = req.query;
     if (!url || typeof url !== 'string') {
       return res.status(400).send("Missing url parameter");
@@ -526,18 +370,25 @@ async function startServer() {
         url: url,
         responseType: 'stream',
         httpsAgent,
-        timeout: 60000 // 增加到 60 秒
+        timeout: 60000
       });
 
-      // Forward headers
-      res.setHeader('Content-Type', response.headers['content-type'] || 'video/mp4');
-      res.setHeader('Access-Control-Allow-Origin', 'https://www.mmdd10.tech');
+      // Forward content type
+      res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
+      res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all origins for the proxy
       
       response.data.pipe(res);
     } catch (error: any) {
-      console.error("Video proxy error:", error.message);
-      res.status(500).send("Failed to proxy video");
+      console.error("Resource proxy error:", error.message);
+      res.status(500).send("Failed to proxy resource");
     }
+  });
+
+  // Keep existing proxy-video for compatibility but reuse logic or just keep it
+  app.get("/api/proxy-video", async (req, res) => {
+    // Redirection to the generic one or just keep it
+    const { url } = req.query;
+    res.redirect(`/api/proxy-resource?url=${encodeURIComponent(url as string)}`);
   });
 
   // ── 视频持久化：将临时 URL 下载到服务器本地，返回永久可访问的 URL ──

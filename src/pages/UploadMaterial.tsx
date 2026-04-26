@@ -1,8 +1,9 @@
 import { useState, useRef, ChangeEvent, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Upload, Sparkles, X, Pencil, Check, Maximize2 } from "lucide-react";
+import { ArrowLeft, Upload, Sparkles, X, Pencil, Check, Maximize2, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Cropper from 'react-easy-crop';
+import { VolcanoService, IMAGE_PROMPTS } from "../services/volcanoService";
 
 export default function UploadMaterial() {
   const navigate = useNavigate();
@@ -137,14 +138,96 @@ export default function UploadMaterial() {
     }
   };
 
-  const handleGenerate = () => {
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [firstFrameUrl, setFirstFrameUrl] = useState<string | null>(null);
+
+  const handleGenerateImage = async () => {
     if (!selectedImage || !nickname.trim()) {
       triggerToast("请输入猫咪名字并上传照片哦～");
       return;
     }
     
-    // 跳转到生成进度页，并传递图片和昵称数据
-    navigate("/generation-progress", { state: { image: selectedImage, name: nickname, isRedemption, isDebugRedemption, redemptionAmount } });
+    setIsDrawing(true);
+    try {
+      // Stage 1: Qwen Image Generation (using VolcanoService)
+      // 使用用户定制的详细中文提示词
+      const prompt = `
+基于输入猫咪照片，将猫咪主体取出重新生成一张照片。猫咪名字叫作：${nickname}。
+主体描述：
+以输入照片中的猫咪为唯一主体，精确提取其外观特征（包括毛色、花纹、体型、眼睛颜色），保持其独特的生物特征不变。
+猫咪呈标准蹲坐姿态，前爪并拢，身体端正，头部微微抬起，双眼圆睁，目光直视镜头，表情平静而专注。
+
+场景与环境：
+背景为一个现代温馨的家庭客厅环境。
+猫咪蹲坐在一块质感柔软的米色短绒地毯中央，地毯上带有简约的几何暗纹。
+背景中可见模糊处理的沙发一角（浅灰色布艺材质）、木质茶几边缘，以及一盆绿植（如龟背竹），营造出舒适的居家氛围。
+环境整洁，无杂物干扰主体。
+
+光线与氛围：
+采用柔和的室内自然光。
+整体色调偏暖，色温约3500K，营造温馨、宁静、治愈的家庭氛围。
+
+构图与技术参数：
+构图：中心构图，猫咪位于画面正中央，占据画面约1/2高度。
+视角：平视视角，摄像头高度与猫咪眼睛齐平。
+镜头：固定摄像头，焦距50mm，模拟人眼视角，无明显畸变。
+画质：超写实风格，细节清晰，毛发纹理、地毯纤维可见。
+分辨率：480P（640x480），保持画面比例协调。
+景深：浅景深，背景适度虚化（f/2.8光圈效果），突出猫咪主体。
+
+风格与限制：
+风格：照片级真实感，避免卡通化、绘画感或艺术化处理。
+禁止添加额外元素（如玩具、食物、其他动物或人物）。
+禁止改变猫咪原始姿态、品种特征或表情。
+保持光影逻辑一致，无违和感。
+`.trim();
+      const task = await VolcanoService.submitImageTask(prompt, selectedImage); 
+      const imageUrl = await VolcanoService.pollImageResult(task.id, task.image_url);
+      setFirstFrameUrl(imageUrl);
+    } catch (e: any) {
+      console.error("Stage 1 Error:", e);
+      triggerToast(e.message || "形象生成失败，请重试");
+    } finally {
+      setIsDrawing(false);
+    }
+  };
+
+  const handleConfirmAndGenerateVideo = () => {
+    if (!firstFrameUrl) return;
+    // Stage 3: Wan Video Generation (handled in GenerationProgress)
+    navigate("/generation-progress", { 
+      state: { 
+        image: firstFrameUrl, 
+        name: nickname, 
+        isRedemption, 
+        isDebugRedemption, 
+        redemptionAmount,
+        originalImage: selectedImage // Keep original for reference
+      } 
+    });
+    setFirstFrameUrl(null);
+  };
+
+  const handleDownloadImage = async () => {
+    if (!firstFrameUrl) return;
+    try {
+      // Use proxy to avoid CORS issues
+      const proxiedUrl = `/api/proxy-resource?url=${encodeURIComponent(firstFrameUrl)}`;
+      const response = await fetch(proxiedUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${nickname}_${Date.now()}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      triggerToast("已尝试下载，或可长按下方预览图保存");
+    } catch (e) {
+      console.error("Save Error:", e);
+      triggerToast("保存失败，请长按图片手动保存");
+    }
   };
 
   const isReady = selectedImage && nickname.trim();
@@ -231,18 +314,99 @@ export default function UploadMaterial() {
 
         <div className="mt-4 pb-4">
           <button 
-            onClick={handleGenerate}
+            onClick={handleGenerateImage}
+            disabled={!isReady || isDrawing}
             className={`w-full py-5 rounded-full font-black text-lg shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 ${
-              isReady 
+              isReady && !isDrawing
                 ? "bg-[#FF9D76] text-white shadow-[#FF9D76]/30" 
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
           >
-            <Sparkles size={20} />
-            开始生成数字形象
+            {isDrawing ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
+            {isDrawing ? "绘制专属形象中..." : "开始生成数字形象"}
           </button>
         </div>
       </div>
+
+      {/* Stage 2: First Frame Confirm Modal */}
+      <AnimatePresence>
+        {firstFrameUrl && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="w-full max-w-sm bg-white rounded-[40px] p-8 shadow-2xl flex flex-col gap-6"
+            >
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-[#5D4037]">专属形象初稿</h3>
+                <p className="text-sm text-[#5D4037]/60">AI 已捕捉到了猫咪的灵魂特征</p>
+              </div>
+
+              {/* 生成图展示 */}
+              <div className="w-full aspect-square rounded-[32px] overflow-hidden shadow-inner bg-gray-100 border-2 border-primary/10">
+                <img src={firstFrameUrl} alt="First Frame" className="w-full h-full object-cover" />
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleConfirmAndGenerateVideo}
+                  className="w-full py-4 bg-[#FF9D76] text-white rounded-2xl font-black shadow-lg shadow-[#FF9D76]/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={18} />
+                  确认并注入生命力
+                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => {
+                      setFirstFrameUrl(null);
+                      handleGenerateImage();
+                    }}
+                    className="py-4 bg-gray-100 text-[#5D4037] rounded-2xl font-bold active:scale-95 transition-all text-sm"
+                  >
+                    重新生成
+                  </button>
+                  <button 
+                    onClick={handleDownloadImage}
+                    className="py-4 bg-gray-100 text-[#5D4037] rounded-2xl font-bold active:scale-95 transition-all text-sm"
+                  >
+                    保存图片
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Stage 1: Loading Overlay */}
+      <AnimatePresence>
+        {isDrawing && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center"
+          >
+            <div className="relative w-40 h-40 mb-8">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 border-4 border-[#FF9D76]/10 border-t-[#FF9D76] rounded-[40px]"
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles size={64} className="text-[#FF9D76] animate-pulse" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-black text-[#5D4037] mb-2 tracking-tight">正在绘制专属形象...</h2>
+            <p className="text-sm text-[#5D4037]/40 font-bold uppercase tracking-widest">Stage 1: Image Capture</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 图片裁剪弹窗 */}
       <AnimatePresence>
@@ -317,17 +481,5 @@ export default function UploadMaterial() {
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-function Loader2({ className, size }: { className?: string, size?: number }) {
-  return (
-    <motion.div
-      animate={{ rotate: 360 }}
-      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-      className={className}
-    >
-      <X size={size || 24} className="opacity-20" />
-    </motion.div>
   );
 }
