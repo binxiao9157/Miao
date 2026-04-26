@@ -30,6 +30,9 @@ async function startServer() {
 
   const usersFile = path.join(dataDir, 'users.json');
   const catsFile = path.join(dataDir, 'cats.json');
+  const diariesFile = path.join(dataDir, 'diaries.json');
+  const lettersFile = path.join(dataDir, 'letters.json');
+  const pointsFile = path.join(dataDir, 'points.json');
 
   function readJSON<T>(file: string, fallback: T): T {
     try {
@@ -111,6 +114,84 @@ async function startServer() {
     const cats = readJSON<ServerCat[]>(catsFile, []);
     const filtered = cats.filter(c => c.userId !== req.params.userId);
     writeJSON(catsFile, filtered);
+    res.json({ success: true });
+  });
+
+  // ── 日记 CRUD API ──
+  interface ServerDiary {
+    id: string; userId: string; catId: string; content: string;
+    media?: string; mediaType?: string; createdAt: number;
+    likes: number; isLiked: boolean; comments: any[];
+  }
+
+  app.get("/api/diaries/:userId", (req, res) => {
+    const all = readJSON<ServerDiary[]>(diariesFile, []);
+    res.json(all.filter(d => d.userId === req.params.userId));
+  });
+
+  app.post("/api/diaries", (req, res) => {
+    const { userId, diary } = req.body;
+    if (!userId || !diary?.id) return res.status(400).json({ error: "Missing userId or diary.id" });
+    const all = readJSON<ServerDiary[]>(diariesFile, []);
+    const entry: ServerDiary = { ...diary, userId };
+    const idx = all.findIndex(d => d.userId === userId && d.id === diary.id);
+    if (idx >= 0) all[idx] = entry; else all.push(entry);
+    writeJSON(diariesFile, all);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/diaries/:userId/:diaryId", (req, res) => {
+    const { userId, diaryId } = req.params;
+    const all = readJSON<ServerDiary[]>(diariesFile, []);
+    writeJSON(diariesFile, all.filter(d => !(d.userId === userId && d.id === diaryId)));
+    res.json({ success: true });
+  });
+
+  // ── 时光信件 CRUD API ──
+  interface ServerLetter {
+    id: string; userId: string; catId: string; catAvatar: string;
+    title?: string; content: string; unlockAt: number; createdAt: number;
+  }
+
+  app.get("/api/letters/:userId", (req, res) => {
+    const all = readJSON<ServerLetter[]>(lettersFile, []);
+    res.json(all.filter(l => l.userId === req.params.userId));
+  });
+
+  app.post("/api/letters", (req, res) => {
+    const { userId, letter } = req.body;
+    if (!userId || !letter?.id) return res.status(400).json({ error: "Missing userId or letter.id" });
+    const all = readJSON<ServerLetter[]>(lettersFile, []);
+    const entry: ServerLetter = { ...letter, userId };
+    const idx = all.findIndex(l => l.userId === userId && l.id === letter.id);
+    if (idx >= 0) all[idx] = entry; else all.push(entry);
+    writeJSON(lettersFile, all);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/letters/:userId/:letterId", (req, res) => {
+    const { userId, letterId } = req.params;
+    const all = readJSON<ServerLetter[]>(lettersFile, []);
+    writeJSON(lettersFile, all.filter(l => !(l.userId === userId && l.id === letterId)));
+    res.json({ success: true });
+  });
+
+  // ── 积分 API ──
+  interface ServerPoints { userId: string; data: any; }
+
+  app.get("/api/points/:userId", (req, res) => {
+    const all = readJSON<ServerPoints[]>(pointsFile, []);
+    const entry = all.find(p => p.userId === req.params.userId);
+    res.json(entry?.data || null);
+  });
+
+  app.post("/api/points", (req, res) => {
+    const { userId, data } = req.body;
+    if (!userId || !data) return res.status(400).json({ error: "Missing userId or data" });
+    const all = readJSON<ServerPoints[]>(pointsFile, []);
+    const idx = all.findIndex(p => p.userId === userId);
+    if (idx >= 0) all[idx].data = data; else all.push({ userId, data });
+    writeJSON(pointsFile, all);
     res.json({ success: true });
   });
 
