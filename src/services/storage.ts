@@ -169,6 +169,45 @@ function deleteAllCatsFromServer(userId: string) {
   fetch(`/api/cats/${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => {});
 }
 
+// ── 日记/信件/积分 双写辅助函数 ──
+function syncDiaryToServer(userId: string, diary: DiaryEntry) {
+  const { media, ...rest } = diary;
+  const payload = media?.startsWith('indexeddb:') ? rest : diary;
+  fetch('/api/diaries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, diary: payload }),
+  }).catch(() => {});
+}
+
+function deleteDiaryFromServer(userId: string, diaryId: string) {
+  fetch(`/api/diaries/${encodeURIComponent(userId)}/${encodeURIComponent(diaryId)}`, {
+    method: 'DELETE',
+  }).catch(() => {});
+}
+
+function syncLetterToServer(userId: string, letter: TimeLetter) {
+  fetch('/api/letters', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, letter }),
+  }).catch(() => {});
+}
+
+function deleteLetterFromServer(userId: string, letterId: string) {
+  fetch(`/api/letters/${encodeURIComponent(userId)}/${encodeURIComponent(letterId)}`, {
+    method: 'DELETE',
+  }).catch(() => {});
+}
+
+function syncPointsToServer(userId: string, data: PointsInfo) {
+  fetch('/api/points', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, data }),
+  }).catch(() => {});
+}
+
 /** 各类数据的滑动窗口上限 */
 const MAX_DIARIES = 200;
 const MAX_FRIEND_DIARIES = 100;
@@ -518,44 +557,102 @@ export const storage = {
   },
 
   syncFromServer: async (username: string): Promise<void> => {
+    const enc = encodeURIComponent(username);
     try {
-      const resp = await fetch(`/api/cats/${encodeURIComponent(username)}`);
-      if (!resp.ok) return;
-      const serverCats: CatInfo[] = await resp.json();
-      if (!serverCats.length) {
-        // 服务端无数据，将本地数据上传
-        const local = storage.getCatList();
-        for (const cat of local) syncCatToServer(username, cat);
-        return;
-      }
-
-      const localCats = storage.getCatList();
-      const localMap = new Map(localCats.map(c => [c.id, c]));
-      const serverMap = new Map(serverCats.map(c => [c.id, c]));
-      const merged: CatInfo[] = [];
-
-      // 合并：以较新的为准
-      const allIds = new Set([...localMap.keys(), ...serverMap.keys()]);
-      for (const id of allIds) {
-        const local = localMap.get(id);
-        const server = serverMap.get(id);
-        if (local && server) {
-          merged.push((local.createdAt || 0) >= (server.createdAt || 0) ? local : server);
-        } else if (local) {
-          merged.push(local);
-          syncCatToServer(username, local);
-        } else if (server) {
-          merged.push(server);
+      // ── 猫咪同步 ──
+      const catResp = await fetch(`/api/cats/${enc}`);
+      if (catResp.ok) {
+        const serverCats: CatInfo[] = await catResp.json();
+        if (!serverCats.length) {
+          const local = storage.getCatList();
+          for (const cat of local) syncCatToServer(username, cat);
+        } else {
+          const localCats = storage.getCatList();
+          const localMap = new Map(localCats.map(c => [c.id, c]));
+          const serverMap = new Map(serverCats.map(c => [c.id, c]));
+          const merged: CatInfo[] = [];
+          const allIds = new Set([...localMap.keys(), ...serverMap.keys()]);
+          for (const id of allIds) {
+            const l = localMap.get(id);
+            const s = serverMap.get(id);
+            if (l && s) merged.push((l.createdAt || 0) >= (s.createdAt || 0) ? l : s);
+            else if (l) { merged.push(l); syncCatToServer(username, l); }
+            else if (s) merged.push(s);
+          }
+          storage.saveCatList(merged);
+          if (merged.length > 0 && !storage.getActiveCatId()) storage.setActiveCatId(merged[0].id);
         }
       }
+    } catch { /* 离线静默 */ }
 
-      storage.saveCatList(merged);
-      if (merged.length > 0 && !storage.getActiveCatId()) {
-        storage.setActiveCatId(merged[0].id);
+    // ── 日记同步 ──
+    try {
+      const resp = await fetch(`/api/diaries/${enc}`);
+      if (resp.ok) {
+        const serverDiaries: DiaryEntry[] = await resp.json();
+        const localDiaries = storage.getDiaries();
+        const localMap = new Map(localDiaries.map(d => [d.id, d]));
+        const serverMap = new Map(serverDiaries.map(d => [d.id, d]));
+        const merged: DiaryEntry[] = [];
+        const allIds = new Set([...localMap.keys(), ...serverMap.keys()]);
+        for (const id of allIds) {
+          const l = localMap.get(id);
+          const s = serverMap.get(id);
+          if (l && s) merged.push((l.createdAt || 0) >= (s.createdAt || 0) ? l : s);
+          else if (l) { merged.push(l); syncDiaryToServer(username, l); }
+          else if (s) merged.push(s);
+        }
+        merged.sort((a, b) => b.createdAt - a.createdAt);
+        const key = getUserKey(USER_DATA_KEYS.DIARIES);
+        storage.setItem(key, JSON.stringify(merged.slice(0, MAX_DIARIES)));
+        invalidateCache(key);
       }
-    } catch {
-      // 离线时静默失败
-    }
+    } catch { /* 离线静默 */ }
+
+    // ── 信件同步 ──
+    try {
+      const resp = await fetch(`/api/letters/${enc}`);
+      if (resp.ok) {
+        const serverLetters: TimeLetter[] = await resp.json();
+        const localLetters = storage.getTimeLetters();
+        const localMap = new Map(localLetters.map(l => [l.id, l]));
+        const serverMap = new Map(serverLetters.map(l => [l.id, l]));
+        const merged: TimeLetter[] = [];
+        const allIds = new Set([...localMap.keys(), ...serverMap.keys()]);
+        for (const id of allIds) {
+          const l = localMap.get(id);
+          const s = serverMap.get(id);
+          if (l && s) merged.push((l.createdAt || 0) >= (s.createdAt || 0) ? l : s);
+          else if (l) { merged.push(l); syncLetterToServer(username, l); }
+          else if (s) merged.push(s);
+        }
+        merged.sort((a, b) => b.createdAt - a.createdAt);
+        const key = getUserKey(USER_DATA_KEYS.TIME_LETTERS);
+        storage.setItem(key, JSON.stringify(merged.slice(0, MAX_TIME_LETTERS)));
+        invalidateCache(key);
+      }
+    } catch { /* 离线静默 */ }
+
+    // ── 积分同步 ──
+    try {
+      const resp = await fetch(`/api/points/${enc}`);
+      if (resp.ok) {
+        const serverPoints = await resp.json();
+        if (serverPoints) {
+          const localPoints = storage.getPoints();
+          // 取 total 较高的一方为准
+          if ((serverPoints.total || 0) > (localPoints.total || 0)) {
+            const key = getUserKey(USER_DATA_KEYS.POINTS);
+            storage.setItem(key, JSON.stringify(serverPoints));
+            invalidateCache(key);
+          } else {
+            syncPointsToServer(username, localPoints);
+          }
+        } else {
+          syncPointsToServer(username, storage.getPoints());
+        }
+      }
+    } catch { /* 离线静默 */ }
   },
 
   saveCatInfo: (cat: CatInfo) => {
@@ -664,6 +761,8 @@ export const storage = {
     const key = getUserKey(USER_DATA_KEYS.POINTS);
     storage.setItem(key, JSON.stringify(points));
     invalidateCache(key);
+    const userId = getCurrentUsername();
+    if (userId) syncPointsToServer(userId, points);
   },
 
   addPoints: (amount: number, reason: string = '系统奖励') => {
@@ -725,14 +824,19 @@ export const storage = {
   },
 
   saveDiaries: (diaries: DiaryEntry[]): boolean => {
-    // 滑动窗口：只保留最近 MAX_DIARIES 条，按时间倒序（新在前）
     const trimmed = diaries.length > MAX_DIARIES ? diaries.slice(0, MAX_DIARIES) : diaries;
     const success = storage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(trimmed));
-    
+
     if (success && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('diary-updated'));
     }
-    
+
+    // 双写：逐条同步到服务端
+    const userId = getCurrentUsername();
+    if (userId) {
+      for (const d of trimmed) syncDiaryToServer(userId, d);
+    }
+
     return success;
   },
 
@@ -744,6 +848,8 @@ export const storage = {
     }
     const updated = diaries.filter(d => d.id !== id);
     storage.saveDiaries(updated);
+    const userId = getCurrentUsername();
+    if (userId) deleteDiaryFromServer(userId, id);
     return updated;
   },
 
@@ -765,12 +871,18 @@ export const storage = {
   saveTimeLetters: (letters: TimeLetter[]) => {
     const trimmed = letters.length > MAX_TIME_LETTERS ? letters.slice(0, MAX_TIME_LETTERS) : letters;
     storage.setItem(getUserKey(USER_DATA_KEYS.TIME_LETTERS), JSON.stringify(trimmed));
+    const userId = getCurrentUsername();
+    if (userId) {
+      for (const l of trimmed) syncLetterToServer(userId, l);
+    }
   },
 
   deleteTimeLetter: (id: string): TimeLetter[] => {
     const letters = storage.getTimeLetters();
     const updated = letters.filter(l => l.id !== id);
     storage.saveTimeLetters(updated);
+    const userId = getCurrentUsername();
+    if (userId) deleteLetterFromServer(userId, id);
     return updated;
   },
 
