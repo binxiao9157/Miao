@@ -1,4 +1,4 @@
-const CACHE_NAME = 'miao-v5';
+const CACHE_NAME = 'miao-v6';
 // 预缓存列表：应用 shell 资源
 const STATIC_ASSETS = [
   '/',
@@ -62,13 +62,8 @@ const cacheFirst = async (request) => {
   }
 };
 
-// 网络优先策略 (用于 API 数据)
+// 网络优先策略 (用于 GET API 数据；POST 请求已在 fetch handler 入口处放行)
 const networkFirst = async (request) => {
-  // 关键修复：仅对 GET 请求尝试缓存，POST 等请求直接走网络
-  if (request.method !== 'GET') {
-    return fetch(request);
-  }
-
   const cache = await caches.open(CACHE_NAME);
   try {
     const networkResponse = await fetch(request);
@@ -106,6 +101,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // 非 GET 请求（POST/PUT/DELETE）一律不拦截，直接交给浏览器处理
+  // 修复 Android Chrome 中 SW 转发 POST body 丢失导致登录失败的问题
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   // 1. 视频和图片：缓存优先（限定为 CDN/外部资源，避免缓存内部同扩展名请求）
   const isMediaExt = url.pathname.match(/\.(mp4|png|jpg|jpeg|gif|webp)$/);
   const isVideoQuery = url.search.includes('video');
@@ -137,10 +138,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 4. 其他 GET 资源：网络优先，失败回退缓存；非 GET 请求直接走网络
-  if (event.request.method !== 'GET') {
-    return;
-  }
+  // 4. 其他 GET 资源：网络优先，失败回退缓存
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request).then(r => r || new Response('Offline', { status: 503 })))
   );

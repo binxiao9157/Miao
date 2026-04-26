@@ -51,7 +51,10 @@ async function startServer() {
 
   // ── 用户注册/登录 API ──
   app.post("/api/auth/register", (req, res) => {
-    const { username, password, nickname, avatar } = req.body;
+    const username = (req.body.username || "").trim();
+    const password = (req.body.password || "").trim();
+    const nickname = (req.body.nickname || "").trim();
+    const avatar = (req.body.avatar || "").trim();
     if (!username || !password) return res.status(400).json({ error: "Missing username or password" });
 
     const users = readJSON<ServerUser[]>(usersFile, []);
@@ -66,7 +69,8 @@ async function startServer() {
   });
 
   app.post("/api/auth/login", (req, res) => {
-    const { username, password } = req.body;
+    const username = (req.body.username || "").trim();
+    const password = (req.body.password || "").trim();
     if (!username || !password) return res.status(400).json({ error: "Missing username or password" });
 
     const users = readJSON<ServerUser[]>(usersFile, []);

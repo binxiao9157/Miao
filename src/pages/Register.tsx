@@ -18,28 +18,42 @@ export default function Register() {
   const [isAgreed, setIsAgreed] = useState(false);
   const [shake, setShake] = useState(false);
 
-  const handleRegister = () => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleRegister = async () => {
     if (!isAgreed) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
       alert("请先阅读并勾选同意服务条款与隐私政策");
       return;
     }
-    if (!username || !password || !confirmPassword) {
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+    const trimmedConfirm = confirmPassword.trim();
+    if (!trimmedUsername || !trimmedPassword || !trimmedConfirm) {
       setError("请填写完整信息");
       return;
     }
-    if (password !== confirmPassword) {
+    if (trimmedPassword !== trimmedConfirm) {
       setError("两次输入的密码不一致");
       return;
     }
-    
-    register({
-      username,
-      password,
-      nickname: username, // 默认昵称为用户名
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
-    });
+
+    setIsLoading(true);
+    setError("");
+    try {
+      await register({
+        username: trimmedUsername,
+        password: trimmedPassword,
+        nickname: trimmedUsername,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${trimmedUsername}`
+      });
+    } catch (e: any) {
+      setError(e.message || "注册失败，请重试");
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(false);
     
     const hasCat = storage.getCatList().length > 0;
     if (hasCat) {
@@ -157,11 +171,12 @@ export default function Register() {
           </span>
         </motion.div>
 
-        <button 
+        <button
           onClick={handleRegister}
-          className="miao-btn-primary w-full py-5 text-lg font-black shadow-2xl mt-4"
+          disabled={isLoading}
+          className="miao-btn-primary w-full py-5 text-lg font-black shadow-2xl mt-4 disabled:opacity-60"
         >
-          立即注册
+          {isLoading ? "注册中..." : "立即注册"}
         </button>
         
         <div className="text-center mt-6">

@@ -38,21 +38,25 @@ export default function Login() {
   }, []);
 
   const performLogin = async (u = username, p = password) => {
-    if (!u || !p) {
+    const trimmedU = u.trim();
+    const trimmedP = p.trim();
+    if (!trimmedU || !trimmedP) {
       setError("请输入用户名和密码");
       return;
     }
     setIsLoading(true);
     setError("");
     try {
-      const success = await login(u, p);
-      if (success) {
+      const result = await login(trimmedU, trimmedP);
+      if (result.success) {
         const hasCat = storage.getCatList().length > 0;
         if (hasCat) {
           navigate("/", { replace: true });
         } else {
           navigate("/empty-cat", { replace: true });
         }
+      } else if (result.error === 'network') {
+        setError("网络连接失败，请检查网络后重试");
       } else {
         setError("用户名或密码错误");
       }

@@ -7,8 +7,8 @@ interface AuthContextType {
   isInitializing: boolean;
   hasCat: boolean;
   catCount: number;
-  login: (username: string, password: string) => Promise<boolean>;
-  register: (info: UserInfo) => void;
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: 'credentials' | 'network' }>;
+  register: (info: UserInfo) => Promise<void>;
   logout: () => void;
   updateProfile: (updates: Partial<UserInfo>) => void;
   refreshCatStatus: () => void;
@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshCatStatus();
   }, [refreshCatStatus]);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<{ success: boolean; error?: 'credentials' | 'network' }> => {
     // 1. 先查本地 localStorage
     const users = storage.getAllUsers();
     const savedUser = users.find(u => u.username === username && u.password === password);
@@ -61,17 +61,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       storage.syncFromServer(username).then(() => refreshCatStatus());
       
       refreshCatStatus();
-      return true;
+      return { success: true };
     }
 
-    // 2. 本地无此用户 → 回退到服务器验证（解决跨 PWA 实例 localStorage 隔离问题）
+    // 2. 本地无此用户 → 回退到服务器验证（解决跨设备 localStorage 隔离问题）
     try {
       const resp = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      if (!resp.ok) return false;
+      if (!resp.ok) return { success: false, error: 'credentials' };
 
       const serverUser = await resp.json();
       const userInfo: UserInfo = {
@@ -91,13 +91,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       storage.syncFromServer(username).then(() => refreshCatStatus());
       refreshCatStatus();
-      return true;
+      return { success: true };
     } catch {
-      return false;
+      return { success: false, error: 'network' };
     }
   };
 
-  const register = (info: UserInfo): void => {
+  const register = async (info: UserInfo): Promise<void> => {
+    // 1. 先同步注册到服务端，确保跨设备可登录
+    try {
+      const resp = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: info.username, password: info.password, nickname: info.nickname, avatar: info.avatar }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        if (resp.status === 409) throw new Error('用户名已被注册');
+        throw new Error(data.error || '注册失败，请重试');
+      }
+    } catch (e: any) {
+      if (e.message === '用户名已被注册') throw e;
+      // 网络异常时仍允许本地注册（离线容错），但打印警告
+      console.warn('[Register] 服务端注册失败，仅保存到本地:', e.message);
+    }
+
+    // 2. 本地持久化
     storage.saveUserInfo(info);
     storage.saveToken('mock_token_' + Date.now());
     storage.saveLoginTime(Date.now());
@@ -105,14 +124,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setUser(info);
     setIsAuthenticated(true);
-
-    // 服务端注册（异步，不阻塞 UI）
-    fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: info.username, password: info.password, nickname: info.nickname, avatar: info.avatar }),
-    }).catch(() => {});
-
     refreshCatStatus();
   };
 
