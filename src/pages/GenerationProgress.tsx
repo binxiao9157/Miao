@@ -21,7 +21,7 @@ export default function GenerationProgress() {
   // 1. 深度排查猫咪对象初始化逻辑：强制生成绝对唯一的新 ID
   const [newCatId] = useState(() => `cat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
 
-  const [status, setStatus] = useState<string>("正在准备生成...");
+  const [status, setStatus] = useState<string>("正在感知灵魂印记...");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(true);
@@ -34,11 +34,28 @@ export default function GenerationProgress() {
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // 灵动文案逻辑
+  const getImmersiveStatus = (p: number) => {
+    if (p < 20) return ["正在感知猫咪的灵魂印记...", "正在编织柔软的毛发肌理..."][Math.floor(p / 10) % 2];
+    if (p < 50) return ["正在为你的专属伙伴注入生命力...", "正在捕捉最灵动的眼神..."][Math.floor((p - 20) / 15) % 2];
+    if (p < 85) return ["正在教它如何撒娇和呼噜...", "正在为它布置舒适的数字猫窝..."][Math.floor((p - 50) / 17) % 2];
+    return ["正在进行最后的魔法同步...", "嘘，它即将苏醒..."][Math.floor((p - 85) / 7) % 2];
+  };
+
+  useEffect(() => {
+    if (progress > 0 && progress < 100 && !error) {
+      const currentImmersive = getImmersiveStatus(progress);
+      if (status !== currentImmersive && !status.includes('错误') && !status.includes('积分不足')) {
+        setStatus(currentImmersive);
+      }
+    }
+  }, [progress, status, error]);
+
   const resetGenerationState = () => {
     setIsGenerating(false);
     setError(null);
     setProgress(0);
-    setStatus("正在准备生成...");
+    setStatus("准备仪式中...");
     setAnchorImage(null);
     setPhase('t2i');
     setLoopCount(0);
@@ -69,7 +86,7 @@ export default function GenerationProgress() {
       
       let optimizedImg = img;
       if (img.startsWith('data:image')) {
-        setStatus("正在优化图像数据...");
+        setStatus("正在微调生命场...");
         try {
           optimizedImg = await new Promise((resolve, reject) => {
             if (abortSignal.aborted) { resolve(img); return; }
@@ -104,7 +121,7 @@ export default function GenerationProgress() {
       }
 
       // 第一阶段：生成核心待机视频 (0-100%)
-      setStatus("正在生成核心待机视频...");
+      setStatus("正在编织它的动作姿态...");
       setProgress(10);
       
       const idleTask = await VolcanoService.submitTask(optimizedImg, ACTION_PROMPTS.idle);
@@ -112,7 +129,7 @@ export default function GenerationProgress() {
       
       const url = await VolcanoService.pollTaskResult(
         idleTask.id,
-        (s) => setStatus(`正在生成待机视频 (${s})...`),
+        (s) => setStatus(getImmersiveStatus(progress)),
         abortSignal
       );
       
@@ -121,7 +138,7 @@ export default function GenerationProgress() {
       setProgress(100);
 
       // 废除“从生成视频中提取帧”的旧逻辑，统一使用用户刚才确认的那张 image
-      setStatus("正在同步到本地猫窝...");
+      setStatus("正在开启次元通道...");
       
       const anchorFrame = optimizedImg; // 直接使用确认过的首帧图
 
@@ -176,33 +193,35 @@ export default function GenerationProgress() {
     // 标记为正在解锁
     await FileManager.updateCatVideos(newCatId, {}, true);
 
-    // 后台静默发起剩余任务
+    // 后台静默发起剩余任务 (串行执行以避免 429 报错)
     const secondaryActions = ['tail', 'rubbing', 'blink'] as const;
-    try {
-      // 所有互动视频统一基于确认过的首帧图生成，不再从旧视频中抽帧
-      const anchorFrame = anchorImage || image;
+    
+    (async () => {
+      try {
+        const anchorFrame = anchorImage || image;
+        
+        for (const action of secondaryActions) {
+           console.log(`[Background] Starting generation for action: ${action}`);
+           try {
+             const task = await VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS[action]);
+             const url = await VolcanoService.pollTaskResult(task.id);
+             await FileManager.updateCatVideos(newCatId, { [action]: url }, true);
+             console.log(`[Background] Success generating action: ${action}`);
+           } catch (err) {
+             console.error(`[Background] Failed to generate action ${action}:`, err);
+           }
+           
+           // 动作之间强制等待 5s，给 API 喘息时间
+           await new Promise(resolve => setTimeout(resolve, 5000));
+        }
 
-      const tasks = secondaryActions.map(action => 
-        VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS[action])
-      );
-      const taskResults = await Promise.all(tasks);
-      
-      const pollPromises = taskResults.map((task, index) =>
-        VolcanoService.pollTaskResult(task.id).then(url => {
-          FileManager.updateCatVideos(newCatId, { [secondaryActions[index]]: url }, true);
-        })
-      );
-
-      const results = await Promise.allSettled(pollPromises);
-      results.forEach((r, i) => {
-        if (r.status === 'rejected') console.error(`动作 ${secondaryActions[i]} 生成失败:`, r.reason);
-      });
-      // 无论部分成功还是全部失败，清除解锁标记
-      await FileManager.updateCatVideos(newCatId, {}, false);
-    } catch (e) {
-      console.error("后台生成任务失败:", e);
-      await FileManager.updateCatVideos(newCatId, {}, false);
-    }
+        // 全部动作尝试完成后，清除解锁标记
+        await FileManager.updateCatVideos(newCatId, {}, false);
+      } catch (e) {
+        console.error("后台生成任务总体异常:", e);
+        await FileManager.updateCatVideos(newCatId, {}, false);
+      }
+    })();
   };
 
   const handleStayBasic = async () => {
@@ -245,7 +264,47 @@ export default function GenerationProgress() {
       } catch (err: any) {
         if (err.message === "任务轮询已中止" || err.message === "任务中止") return;
         console.error("初始化过程出错:", err);
-        const errorMsg = typeof err === 'string' ? err : (err.message || JSON.stringify(err));
+
+        // 尝试解析服务端返回的详细错误信息
+        let errorMsg = typeof err === 'string' ? err : (err.message || JSON.stringify(err));
+
+        // 优先检查是否有 details（包含更详细的调试信息）
+        if (err.response?.data?.details) {
+          try {
+            const details = JSON.parse(err.response.data.details);
+            // 如果有原始阿里云错误信息，显示出来
+            if (details.message) {
+              errorMsg = `阿里云错误: ${details.message}`;
+              if (details.code) errorMsg += `\n错误代码: ${details.code}`;
+              if (details.httpStatus) errorMsg += `\nHTTP状态: ${details.httpStatus}`;
+              if (details.originalData) {
+                errorMsg += `\n原始响应: ${JSON.stringify(details.originalData).substring(0, 200)}`;
+              }
+            }
+          } catch {
+            // details 不是 JSON 格式，直接显示
+            errorMsg = `${errorMsg}\n\n详细信息: ${err.response.data.details}`;
+          }
+        } else if (err.response?.data?.requestDetails) {
+          // 显示请求详情
+          const rd = err.response.data.requestDetails;
+          errorMsg = `错误: ${err.response.data.message || '未知错误'}\n\n`;
+          errorMsg += `=== 请求详情 ===\n`;
+          errorMsg += `模型: ${rd.model}\n`;
+          errorMsg += `首帧URL: ${rd.firstFrameUrl?.substring(0, 60)}...\n`;
+          errorMsg += `尾帧URL: ${rd.lastFrameUrl?.substring(0, 60)}...\n`;
+          errorMsg += `API: ${rd.baseUrl}\n`;
+          errorMsg += `Key: ${rd.apiKeyPrefix}\n`;
+          // 显示完整请求体
+          if (rd.fullRequestBody) {
+            errorMsg += `\n=== 完整请求体 ===\n`;
+            errorMsg += JSON.stringify(rd.fullRequestBody, null, 2).substring(0, 500);
+          }
+        } else if (err.response?.data?.message) {
+          // 直接使用服务端返回的 message
+          errorMsg = err.response.data.message;
+        }
+
         setError(errorMsg);
       }
     };
@@ -280,7 +339,7 @@ export default function GenerationProgress() {
               <AlertCircle size={40} />
             </div>
             <h2 className="text-2xl font-black text-[#5D4037] mb-4">生成遇到问题</h2>
-            <p className="text-[#5D4037]/60 mb-8 max-w-xs">{error}</p>
+            <p className="text-[#5D4037]/60 mb-8 max-w-xs whitespace-pre-wrap text-left bg-red-50 p-4 rounded-lg">{error}</p>
             <div className="flex flex-col gap-4 w-full max-w-xs">
               <button 
                 onClick={handleRetry}
@@ -340,6 +399,7 @@ export default function GenerationProgress() {
               </div>
             </div>
 
+            <h1 className="text-sm font-bold text-[#FF9D76] uppercase tracking-[0.2em] mb-4">Awakening Digital Life</h1>
             <h2 className="text-2xl font-black text-[#5D4037] mb-2">{status}</h2>
             <div className="w-full h-2 bg-[#FF9D76]/10 rounded-full overflow-hidden mb-4">
               <motion.div 
@@ -349,14 +409,14 @@ export default function GenerationProgress() {
               />
             </div>
             <p className="text-xs text-[#5D4037]/40 font-bold uppercase tracking-widest">
-              {progress < 100 ? "请耐心等待，魔法正在发生..." : "即将完成"}
+              {progress < 100 ? "Synchronizing soul..." : "Brewing magic completed"}
             </p>
 
             {/* 状态步骤列表 */}
             <div className="mt-12 w-full space-y-4 text-left">
-              <StatusStep label="分析图片特征" active={progress >= 5} done={progress > 5} />
-              <StatusStep label="生成核心待机动作" active={progress >= 10} done={progress === 100} />
-              <StatusStep label="同步到本地猫窝" active={progress >= 100} done={progress === 100} />
+              <StatusStep label="构筑灵魂基石" active={progress >= 5} done={progress > 5} />
+              <StatusStep label="注入生命律动" active={progress >= 10} done={progress === 100} />
+              <StatusStep label="魔法连接完成" active={progress >= 100} done={progress === 100} />
             </div>
           </motion.div>
         ) : phase === 'confirm' ? (

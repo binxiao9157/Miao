@@ -17,14 +17,6 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
-        output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-router': ['react-router-dom'],
-            'vendor-motion': ['motion/react'],
-            'vendor-icons': ['lucide-react'],
-          },
-        },
       },
     },
     server: {

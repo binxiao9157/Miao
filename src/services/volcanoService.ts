@@ -12,7 +12,7 @@ export const VolcanoConfig = {
     return import.meta.env.DEV && localStorage.getItem('DASHSCOPE_MOCK_MODE') === 'true'; 
   },
   get ModelId() {
-    return localStorage.getItem('DASHSCOPE_VIDEO_MODEL') || "wan2.2-i2v-flash";
+    return localStorage.getItem('DASHSCOPE_VIDEO_MODEL') || "wan2.2-kf2v-flash";
   },
   get T2IModelId() {
     return localStorage.getItem('DASHSCOPE_IMAGE_MODEL') || "qwen-image-2.0";
@@ -30,10 +30,22 @@ function buildHeaders() {
  * 互动动作对应的 Prompt 模版 (Seedance 高精度指令)
  */
 export const ACTION_PROMPTS = {
-  idle: "一只可爱的猫咪蹲坐在温馨的房间里，正视镜头。它缓慢站起来，走向镜头轻轻蹭了一下，然后退回到原来的位置蹲好。画面清晰，光影真实，竖屏构图。",
-  tail: "特写猫咪的面部。一只手轻轻抚摸猫咪的头顶，猫咪舒服地眯起眼睛。随后镜头拉远，猫咪保持蹲坐姿态。细节丰富。",
-  rubbing: "聚焦猫咪的前爪。猫咪左右交替踩奶，看起来非常放松和舒适。随后它停止动作，静静地蹲坐在原地。",
-  blink: "猫咪兴奋地看着镜头。主人拿着羽毛逗猫棒在旁边晃动，猫咪抬头挥动爪子尝试捕捉。随后逗猫棒移开，猫咪恢复安静蹲坐。"
+  idle: {
+    prompt: "基于图生图生成猫咪的照片，作为视频首帧。猫咪缓慢站起走向镜头轻蹭后退回蹲坐，尾帧与首帧画面 100% 一致；保留原始毛色与真实质感，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；超写实风格，固定摄像头，竖屏 9:16，480P，5秒无音频，种子值 12345。",
+    duration: 5
+  },
+  tail: {
+    prompt: "基于图生图生成猫咪的照片，作为视频首帧。虚拟手轻摸头顶，猫咪眯眼、耳朵后贴呈现享受状态，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏。尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；超写实风格，竖屏 9:16，480P，5秒无音频，种子值 12345。",
+    duration: 5
+  },
+  rubbing: {
+    prompt: "基于图生图生成猫咪的照片，作为视频首帧。猫咪前爪在柔软地毯上缓慢交替踩奶，身体轻微起伏，呈现放松舒适状态，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏。随后停止踩奶，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；超写实风格，固定摄像头，竖屏 9:16，480P，5秒无音频，种子值 12345。",
+    duration: 5
+  },
+  blink: {
+    prompt: "基于图生图生成猫咪的照片，作为视频首帧。主人手从右侧伸入持羽毛逗猫棒晃动，猫咪兴奋抬头、挥爪、原地小跳 2 次，全程保证猫咪完整身体（含头部、躯干、四肢）始终在竖屏 9:16 画面内，无裁切、无出屏，嘴巴细节严格遵循真实猫咪生理结构，无拟人化特征；随后逗猫棒移开，尾帧回归初始蹲坐姿态，与首帧画面 100% 一致；超写实风格，竖屏 9:16，480P，5 秒无音频，种子值 12345。",
+    duration: 5
+  }
 };
 
 /**
@@ -51,23 +63,27 @@ export class VolcanoService {
   /**
    * 提交视频生成任务 (SubmitTask) - 增加重试机制
    */
-  public static async submitTask(imageBase64: string, prompt?: string, retries: number = 2) {
+  public static async submitTask(imageBase64: string, actionData?: string | { prompt: string, duration?: number }, retries: number = 2) {
     if (VolcanoConfig.MOCK_MODE) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       return { id: 'mock_task_' + Date.now() };
     }
+
+    const { prompt, duration } = typeof actionData === 'object' 
+      ? actionData 
+      : { prompt: actionData || "A high quality video of this cat, cinematic lighting, realistic.", duration: 5 };
 
     let lastError: any;
     for (let i = 0; i <= retries; i++) {
       try {
         const response = await axios.post("/api/generate-video", {
           model: VolcanoConfig.ModelId,
-          prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic.",
+          prompt: prompt,
           image_base64: imageBase64,
           parameters: {
             seed: 12345, // 固定种子值，确保连贯性
-            resolution: "480p",
-            duration: 5,
+            resolution: "480P",
+            duration: duration || 5,
             audio: false
           }
         }, {
@@ -87,15 +103,20 @@ export class VolcanoService {
         };
       } catch (error: any) {
         lastError = error;
-        // 仅对 5xx 或网络错误进行重试
         const status = error.response?.status;
         const isNetworkError = !error.response;
-        const shouldRetry = (status && status >= 500) || isNetworkError;
+        
+        // 专门处理 429 频率限制：增加专门的等待时间
+        const isRateLimit = status === 429;
+        const shouldRetry = (status && status >= 500) || isNetworkError || isRateLimit;
         
         if (!shouldRetry || i === retries) break;
         
-        console.warn(`提交任务失败，正在进行第 ${i + 1} 次重试...`, error.message);
-        await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1))); // 指数退避
+        // 如果是频率限制，等待更久 (初始 5s)
+        const backoffDelay = isRateLimit ? 5000 * Math.pow(2, i) : 2000 * (i + 1);
+        console.warn(`提交任务失败 (${status || 'Network'}), 正在进行第 ${i + 1} 次重试... 延迟 ${backoffDelay}ms`, error.message);
+        
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
       }
     }
 
@@ -104,10 +125,15 @@ export class VolcanoService {
     if (error.response) {
       const data = error.response.data;
       console.error("提交失败详情 (HTTP Error):", error.response.status, data);
-      
+
       // 优先提取更详细的 message，如果没有则使用 error 字段
+      // 同时保留 details 信息用于调试
       const detailedMsg = data.message || data.error?.message || data.error || `提交失败 (${error.response.status})`;
-      throw new Error(detailedMsg);
+
+      // 将完整的响应数据附加到 error 对象上，传递给前端
+      const err = new Error(detailedMsg);
+      (err as any).response = error.response;
+      throw err;
     } else if (error.request) {
       console.error("网络错误 (No Response):", error.request);
       throw new Error("网络错误: 无法连接到服务器，请检查网络或稍后重试");
@@ -306,6 +332,7 @@ export class VolcanoService {
       if (status === 'succeeded') {
         let videoUrl = 
           result.output?.video_url || 
+          result.output?.results?.[0]?.url ||
           result.content?.video_url || 
           result.data?.video_url ||
           result.video_url;

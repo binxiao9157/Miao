@@ -5,6 +5,7 @@ import axios from "axios";
 import https from "https";
 import dotenv from "dotenv";
 import { fileURLToPath } from 'url';
+import FormData from 'form-data';
 
 dotenv.config();
 
@@ -97,7 +98,18 @@ async function startServer() {
     const cats = readJSON<ServerCat[]>(catsFile, []);
     const entry: ServerCat = { ...cat, userId };
     const idx = cats.findIndex(c => c.userId === userId && c.id === cat.id);
-    if (idx >= 0) cats[idx] = entry; else cats.push(entry);
+    if (idx >= 0) {
+      // 深度合并 videoPaths，保留已有的动作
+      cats[idx] = {
+        ...entry,
+        videoPaths: {
+          ...cats[idx].videoPaths,
+          ...entry.videoPaths
+        }
+      };
+    } else {
+      cats.push(entry);
+    }
     writeJSON(catsFile, cats);
     res.json({ success: true });
   });
@@ -210,11 +222,120 @@ async function startServer() {
     API_KEY: (process.env.DASHSCOPE_API_KEY || "").trim(),
     BASE_URL: (process.env.DASHSCOPE_BASE_URL || "https://dashscope.aliyuncs.com/api/v1").trim().replace(/\/$/, ''),
     IMAGE_MODEL: (process.env.DASHSCOPE_IMAGE_MODEL || "qwen-image-2.0").trim(),
-    VIDEO_MODEL: (process.env.DASHSCOPE_VIDEO_MODEL || "wan2.2-i2v-flash").trim()
+    VIDEO_MODEL: (process.env.DASHSCOPE_VIDEO_MODEL || "wan2.2-kf2v-flash").trim()
   };
 
   const ARK_API_KEY = DASHSCOPE_CONFIG.API_KEY;
   const ARK_BASE_URL = DASHSCOPE_CONFIG.BASE_URL;
+
+  // 辅助函数：将 fileid 转换为临时的公网 HTTP URL
+  const getFileUrl = async (fileId: string): Promise<string> => {
+    try {
+      const response = await axios.get(`${ARK_BASE_URL}/files/${fileId}`, {
+        headers: { 'Authorization': `Bearer ${ARK_API_KEY}` },
+        httpsAgent,
+        timeout: 10000
+      });
+      // DashScope API 返回的对象中包含 url 字段，是一个带签名的临时下载链接
+      const url = response.data?.url || response.data?.data?.url;
+      if (url) return url;
+      // 退而求其次，尝试使用原始 fileid
+      return `fileid://${fileId}`;
+    } catch (e) {
+      console.warn(`[Video] Failed to get URL for file ${fileId}, using fallback:`, e);
+      return `fileid://${fileId}`;
+    }
+  };
+
+  // 临时文件内存存储（用于 DashScope 回调抓取）
+  const tempFiles = new Map<string, { buffer: Buffer, contentType: string, expiry: number }>();
+  
+  // 清理过期临时文件 (每小时一次)
+  setInterval(() => {
+    const now = Date.now();
+    for (const [id, file] of tempFiles.entries()) {
+      if (now > file.expiry) tempFiles.delete(id);
+    }
+  }, 3600000);
+
+  app.get("/api/temp-file/:id", (req, res) => {
+    const file = tempFiles.get(req.params.id);
+    if (!file) return res.status(404).send("File not found or expired");
+    res.setHeader('Content-Type', file.contentType);
+    res.send(file.buffer);
+  });
+
+  // 辅助函数：上传图片到 DashScope 文件系统（支持 Base64 和外部 URL）
+  // 返回格式：{ success: true, fileId: string } | { success: false, error: string }
+  const uploadImageToDashScope = async (imageSource: string, sourceType: "Base64" | "URL"): Promise<{ success: boolean; fileId?: string; error?: string }> => {
+    try {
+      let buffer: Buffer;
+      let filename = 'frame.jpg';
+      let contentType = 'image/jpeg';
+
+      if (sourceType === "Base64") {
+        // Base64 图片：直接解码
+        const base64Clean = imageSource.replace(/^data:image\/\w+;base64,/, "");
+        buffer = Buffer.from(base64Clean, 'base64');
+        console.log("[Video] Processing Base64 image as JPEG");
+      } else {
+        // 外部 URL：先下载图片
+        console.log(`[Video] Downloading image from URL: ${imageSource.substring(0, 80)}...`);
+        try {
+          const downloadResp = await axios.get(imageSource, {
+            responseType: 'arraybuffer',
+            timeout: 30000,
+            httpsAgent
+          });
+          buffer = Buffer.from(downloadResp.data);
+          console.log("[Video] Processing downloaded image as JPEG");
+        } catch (downloadErr: any) {
+          const errMsg = downloadErr.response?.data?.message || downloadErr.message;
+          console.error("[Video] Download image failed:", errMsg);
+          return { success: false, error: `下载图片失败: ${errMsg}` };
+        }
+      }
+
+      const form = new FormData();
+      form.append('file', buffer, { filename, contentType });
+      form.append('description', 'Cat video keyframe');
+
+      const uploadResp = await axios.post(`${ARK_BASE_URL}/files`, form, {
+        headers: {
+          ...form.getHeaders(),
+          'Authorization': `Bearer ${ARK_API_KEY}`
+        },
+        httpsAgent,
+        timeout: 30000
+      });
+
+      if (uploadResp.data?.id) {
+        const fileId = `fileid://${uploadResp.data.id}`;
+        console.log(`[Video] File upload succeeded: ${fileId}`);
+        return { success: true, fileId };
+      } else if (uploadResp.data?.data?.id) {
+        const fileId = `fileid://${uploadResp.data.data.id}`;
+        console.log(`[Video] File upload succeeded (nested): ${fileId}`);
+        return { success: true, fileId };
+      } else if (uploadResp.data?.data?.uploaded_files?.[0]?.file_id) {
+        const fileId = `fileid://${uploadResp.data.data.uploaded_files[0].file_id}`;
+        console.log(`[Video] File upload succeeded (uploaded_files): ${fileId}`);
+        return { success: true, fileId };
+      } else {
+        console.error("[Video] File upload failed - unexpected response structure:", JSON.stringify(uploadResp.data));
+        return { success: false, error: "上传响应格式异常: " + JSON.stringify(uploadResp.data).substring(0, 200) };
+      }
+    } catch (uploadErr: any) {
+      const uploadData = uploadErr.response?.data;
+      const errMsg = uploadData?.message || uploadErr.message;
+      console.error("[Video] DashScope file upload error:", {
+        status: uploadErr.response?.status,
+        data: uploadData,
+        message: uploadErr.message
+      });
+      return { success: false, error: `上传失败 (${uploadErr.response?.status}): ${errMsg}` };
+    }
+  };
 
   if (!ARK_API_KEY) {
     console.warn("⚠️ 警告: DASHSCOPE_API_KEY 环境变量未设置。图片和视频生成功能将无法工作。");
@@ -231,30 +352,43 @@ async function startServer() {
   const sendError = (res: express.Response, error: any, defaultMessage: string) => {
     const status = error.response?.status || 500;
     const errorData = error.response?.data;
-    
+
     // DashScope error format: { code: "...", message: "..." } or { request_id: "...", code: "...", message: "..." }
     const errorCode = errorData?.code;
     const errorMessage = errorData?.message || error.message;
+
+    // 构建详细的错误信息用于调试
+    const detailedError = {
+      httpStatus: status,
+      code: errorCode,
+      message: errorMessage,
+      originalData: errorData
+    };
+    console.error("[Server Error Details]:", JSON.stringify(detailedError, null, 2));
 
     if (errorCode === "InvalidApiKey" || status === 401) {
       return res.status(401).json({
         error: "鉴权失败",
         message: "API Key 无效或已过期。",
-        code: "INVALID_API_KEY"
+        code: "INVALID_API_KEY",
+        details: JSON.stringify(detailedError)
       });
     }
 
     if (errorCode === "Arrearage" || errorMessage?.toLowerCase().includes("balance")) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: "账户欠费",
         message: "您的阿里云账户已欠费，请充值后重试。",
-        code: "ARREARAGE"
+        code: "ARREARAGE",
+        details: JSON.stringify(detailedError)
       });
     }
 
-    res.status(status).json({ 
+    res.status(status).json({
       error: defaultMessage,
-      message: errorMessage
+      message: errorMessage,
+      code: errorCode,
+      details: JSON.stringify(detailedError)
     });
   };
 
@@ -362,12 +496,14 @@ async function startServer() {
       });
 
       const output = response.data?.output;
-      const status = output?.task_status;
+      const status = output?.task_status || (response.data?.request_id ? 'PENDING' : 'FAILED'); // Fallback logic
+
+      console.log(`[TaskStatus] ID: ${taskId}, Status: ${status}`);
 
       if (status === 'SUCCEEDED') {
         // Results might be in different locations depending on the model
         let imageUrl = output?.results?.[0]?.url || output?.image_url;
-        const videoUrl = output?.video_url;
+        const videoUrl = output?.video_url || output?.results?.[0]?.url; // WAN2.1+ usually uses video_url
 
         // If qwen-image-2.0 results (multimodal choices format)
         if (!imageUrl && output?.choices) {
@@ -397,28 +533,54 @@ async function startServer() {
 
   // API Route for Video Generation (DashScope)
   app.post("/api/generate-video", async (req, res) => {
-    const { prompt, image_base64 } = req.body;
+    const { prompt, image_base64, parameters: clientParams } = req.body;
     if (!image_base64) {
       return res.status(400).json({ error: "缺少必要参数: image_base64", code: "INVALID_PARAMETER" });
     }
 
+    let firstFrameUrl = "";
+    let lastFrameUrl = "";
+
     try {
-      const url = `${ARK_BASE_URL}/services/aigc/video-generation/video-synthesis`;
-      
-      // DashScope Wan I2V usually requires an image URL or base64
-      // Some DashScope models require img_url
+      const url = `${ARK_BASE_URL}/services/aigc/image2video/video-synthesis`;
+
+      // 打印更详细的日志用于调试
+      console.log(`[Video] Image format: ${image_base64.substring(0, 50)}...`);
+
+      // 根据官方示例，支持三种格式：
+      // 1. Base64: data:image/jpeg;base64,xxx
+      // 2. 公网URL: https://xxx.jpg
+      // 3. fileid://xxx (DashScope文件ID)
+      firstFrameUrl = image_base64;
+      lastFrameUrl = image_base64;
+
+      if (image_base64.startsWith('fileid://')) {
+        // fileid 格式，尝试转换为 HTTP URL (带签名的临时链接)
+        const fileId = image_base64.replace('fileid://', '');
+        console.log(`[Video] Converting fileid ${fileId} to HTTP URL...`);
+        const httpUrl = await getFileUrl(fileId);
+        firstFrameUrl = httpUrl;
+        lastFrameUrl = httpUrl;
+        console.log("[Video] Resulting URL:", firstFrameUrl.substring(0, 100) + "...");
+      }
+
+      // 定义请求格式 - 根据官方示例使用 first_frame_url + last_frame_url
       const requestBody = {
         model: req.body.model || DASHSCOPE_CONFIG.VIDEO_MODEL,
         input: {
-          img_url: image_base64, // DashScope accepts data URLs usually
+          first_frame_url: firstFrameUrl,
+          last_frame_url: lastFrameUrl,
           prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic."
+        },
+        parameters: {
+          resolution: clientParams?.resolution || "480P",
+          prompt_extend: clientParams?.prompt_extend !== undefined ? clientParams.prompt_extend : true,
+          duration: clientParams?.duration || 5,
+          seed: clientParams?.seed || 12345
         }
       };
 
-      console.log("Submitting Video task to DashScope:", {
-        model: requestBody.model,
-        url: url
-      });
+      console.log("[Video] Request body:", JSON.stringify(requestBody, null, 2));
 
       const response = await axios.post(url, requestBody, {
         headers: {
@@ -432,13 +594,45 @@ async function startServer() {
 
       const taskId = response.data?.output?.task_id;
       if (taskId) {
+        console.log(`[Video] SUCCESS, taskId: ${taskId}`);
         res.json({ id: taskId, status: 'pending' });
       } else {
-        throw new Error("提交视频任务后未获取到 task_id");
+        const output = response.data?.output;
+        if (output?.task_id) {
+           res.json({ id: output.task_id, status: 'pending' });
+        } else {
+           throw new Error("提交视频任务后未获取到 task_id. 响应: " + JSON.stringify(response.data));
+        }
       }
     } catch (error: any) {
       console.error("DashScope Video API Error:", error.response?.data || error.message);
-      sendError(res, error, "提交视频生成失败");
+
+      // 返回更详细的错误信息
+      const errorData = error.response?.data;
+      const status = error.response?.status || 500;
+      
+      const requestDetails = {
+        model: req.body.model || DASHSCOPE_CONFIG.VIDEO_MODEL,
+        baseUrl: ARK_BASE_URL,
+        apiKeyPrefix: ARK_API_KEY ? ARK_API_KEY.substring(0, 10) + '...' : 'NOT_SET',
+        fullRequestBody: {
+          model: req.body.model || DASHSCOPE_CONFIG.VIDEO_MODEL,
+          input: {
+            first_frame_url: firstFrameUrl.substring(0, 50) + "...",
+            last_frame_url: lastFrameUrl.substring(0, 50) + "...",
+            prompt: prompt || "..."
+          },
+          parameters: clientParams
+        }
+      };
+
+      res.status(status).json({
+        error: "提交视频生成失败",
+        message: errorData?.message || error.message,
+        code: errorData?.code,
+        requestDetails: requestDetails,
+        details: JSON.stringify(errorData)
+      });
     }
   });
 

@@ -294,7 +294,11 @@ export default function Home() {
     const isUnlocked = actionKey === 'idle' || (cat?.videoPaths && actionKey && cat.videoPaths[actionKey as keyof typeof cat.videoPaths]);
 
     if (!isUnlocked && actionKey !== 'idle') {
-      showFloatingBubble("该动作尚未解锁哦～");
+      if (cat?.isUnlocking) {
+        showFloatingBubble("新动作正在生成中，请耐心等候哦～");
+      } else {
+        showFloatingBubble("该动作尚未解锁哦～");
+      }
       return;
     }
 
