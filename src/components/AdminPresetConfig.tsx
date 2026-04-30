@@ -32,6 +32,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
     setProfile(prev => ({
       ...defaults,
       mockMode: prev.mockMode,
+      skipImageStage: prev.skipImageStage,
       resolution: prev.resolution || defaults.resolution,
       duration: prev.duration || defaults.duration,
       seed: prev.seed || defaults.seed,
@@ -196,7 +197,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                   />
                 </label>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <label className="flex items-center justify-between bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
                   Prompt Extend
                   <input
@@ -211,6 +212,14 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                     type="checkbox"
                     checked={profile.mockMode}
                     onChange={(e) => setProfile(prev => ({ ...prev, mockMode: e.target.checked }))}
+                  />
+                </label>
+                <label className="flex items-center justify-between bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
+                  跳过首帧
+                  <input
+                    type="checkbox"
+                    checked={profile.skipImageStage}
+                    onChange={(e) => setProfile(prev => ({ ...prev, skipImageStage: e.target.checked }))}
                   />
                 </label>
               </div>

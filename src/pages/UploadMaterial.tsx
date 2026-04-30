@@ -4,6 +4,7 @@ import { ArrowLeft, Upload, Sparkles, X, Pencil, Check, Maximize2, Loader2 } fro
 import { motion, AnimatePresence } from "motion/react";
 import Cropper from 'react-easy-crop';
 import { VolcanoService, IMAGE_PROMPTS } from "../services/volcanoService";
+import { aiConfig } from "../services/ai/aiConfig";
 
 export default function UploadMaterial() {
   const navigate = useNavigate();
@@ -144,6 +145,22 @@ export default function UploadMaterial() {
   const handleGenerateImage = async () => {
     if (!selectedImage || !nickname.trim()) {
       triggerToast("请输入猫咪名字并上传照片哦～");
+      return;
+    }
+
+    const profile = aiConfig.getProfile();
+    if (profile.skipImageStage) {
+      navigate("/generation-progress", {
+        state: {
+          image: selectedImage,
+          name: nickname,
+          isRedemption,
+          isDebugRedemption,
+          redemptionAmount,
+          originalImage: selectedImage,
+          skippedImageStage: true
+        }
+      });
       return;
     }
     

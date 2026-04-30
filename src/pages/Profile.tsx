@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, QrCode, ScanQrCode } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { storage, CatInfo } from "../services/storage";
@@ -111,11 +112,26 @@ export default function Profile() {
     navigate("/notifications");
   };
 
+  const handleAdminTap = () => {
+    console.log("Admin tap triggered, current count:", clickCount);
+    setClickCount(prev => {
+      const next = prev + 1;
+      console.log("Next count:", next);
+      if (next >= 5) {
+        console.log("Opening admin panel...");
+        setShowAdmin(true);
+        return 0;
+      }
+      return next;
+    });
+  };
+
   return (
-    <div className="flex flex-col w-full min-h-full bg-gradient-to-b from-[#FFF9F5] to-[#FFE8D6]">
+    <div className="flex flex-col w-full h-full overflow-y-auto no-scrollbar bg-gradient-to-b from-[#FFF9F5] to-[#FFE8D6]">
       <PageHeader 
         title="Miao" 
         subtitle="MIAO SANCTUARY" 
+        onTitleClick={handleAdminTap}
         action={
           <div className="flex gap-2">
             <button 
@@ -321,21 +337,12 @@ export default function Profile() {
       </AnimatePresence>
 
       <footer className="mt-12 text-center pb-10">
-        <p 
-          onClick={() => {
-            setClickCount(prev => {
-              const next = prev + 1;
-              if (next >= 5) {
-                setShowAdmin(true);
-                return 0;
-              }
-              return next;
-            });
-          }}
-          className="text-[10px] font-bold text-on-surface-variant opacity-30 uppercase tracking-widest cursor-pointer select-none"
+        <button
+          onClick={handleAdminTap}
+          className="px-6 py-3 text-[10px] font-bold text-on-surface-variant opacity-30 uppercase tracking-widest cursor-pointer select-none active:scale-95 transition-transform"
         >
           MIAO SANCTUARY
-        </p>
+        </button>
         <div className="flex justify-center gap-1 mt-1">
           <Heart size={8} className="text-primary fill-current" />
           <Heart size={8} className="text-secondary fill-current" />
@@ -352,11 +359,14 @@ export default function Profile() {
       </footer>
 
       {/* Admin Panel Modal */}
-      <AnimatePresence>
-        {showAdmin && (
-          <AdminPresetConfig onClose={() => setShowAdmin(false)} />
-        )}
-      </AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
+          {showAdmin && (
+            <AdminPresetConfig onClose={() => setShowAdmin(false)} />
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
