@@ -106,30 +106,30 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
   };
 
   return (
-    <div className="backdrop-overlay flex items-center justify-center p-4">
+    <div className="backdrop-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-white rounded-[40px] w-full max-w-lg max-h-[80dvh] flex flex-col overflow-hidden shadow-2xl"
+        className="bg-white rounded-t-[28px] sm:rounded-[32px] w-full sm:max-w-lg h-[92dvh] sm:h-auto sm:max-h-[86dvh] flex flex-col overflow-hidden shadow-2xl"
       >
-        <div className="p-6 border-b flex items-center justify-between bg-gray-50">
-          <div>
-            <h2 className="text-xl font-black text-[#5D4037]">预设猫咪配置</h2>
+        <div className="px-4 py-4 sm:p-6 border-b flex items-center justify-between bg-gray-50 shrink-0">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-black text-[#5D4037] truncate">预设猫咪配置</h2>
             <p className="text-xs text-[#5D4037]/40 font-bold uppercase tracking-widest">管理员后台</p>
           </div>
-          <button onClick={onClose} className="p-2 bg-white rounded-full shadow-sm text-gray-400">
+          <button onClick={onClose} className="p-2 bg-white rounded-full shadow-sm text-gray-400 shrink-0">
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-grow overflow-y-auto p-6 space-y-6 no-scrollbar">
+        <div className="flex-grow overflow-y-auto px-4 py-5 sm:p-6 space-y-5 sm:space-y-6 no-scrollbar overscroll-contain">
           {/* AI 模型配置 */}
-          <div className="bg-blue-50/70 p-5 rounded-3xl border border-blue-100 space-y-4">
+          <div className="bg-blue-50/70 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-blue-100 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white text-blue-500 rounded-2xl flex items-center justify-center shadow-sm">
+              <div className="w-10 h-10 bg-white text-blue-500 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
                 <Cpu size={20} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-black text-[#5D4037]">AI 模型配置</p>
                 <p className="text-[10px] text-[#5D4037]/40 font-bold uppercase tracking-widest">Provider Profile</p>
               </div>
@@ -157,7 +157,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                 <input
                   value={profile.imageModel}
                   onChange={(e) => setProfile(prev => ({ ...prev, imageModel: e.target.value }))}
-                  className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
+                  className="w-full p-3 bg-white rounded-xl text-[13px] sm:text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200 font-mono"
                 />
               </label>
               <label className="space-y-1">
@@ -165,10 +165,10 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                 <input
                   value={profile.videoModel}
                   onChange={(e) => setProfile(prev => ({ ...prev, videoModel: e.target.value }))}
-                  className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
+                  className="w-full p-3 bg-white rounded-xl text-[13px] sm:text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200 font-mono"
                 />
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <label className="space-y-1">
                   <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">清晰度</span>
                   <input
@@ -197,8 +197,8 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                   />
                 </label>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <label className="flex items-center justify-between bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <label className="flex items-center justify-between gap-3 bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
                   Prompt Extend
                   <input
                     type="checkbox"
@@ -206,7 +206,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                     onChange={(e) => setProfile(prev => ({ ...prev, promptExtend: e.target.checked }))}
                   />
                 </label>
-                <label className="flex items-center justify-between bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
+                <label className="flex items-center justify-between gap-3 bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
                   Mock Mode
                   <input
                     type="checkbox"
@@ -214,7 +214,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                     onChange={(e) => setProfile(prev => ({ ...prev, mockMode: e.target.checked }))}
                   />
                 </label>
-                <label className="flex items-center justify-between bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
+                <label className="flex items-center justify-between gap-3 bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
                   跳过首帧
                   <input
                     type="checkbox"
@@ -227,10 +227,10 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
           </div>
 
           {/* 新增区域 */}
-          <div className="bg-[#FF9D76]/5 p-5 rounded-3xl border-2 border-dashed border-[#FF9D76]/20 space-y-4">
+          <div className="bg-[#FF9D76]/5 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 border-dashed border-[#FF9D76]/20 space-y-4">
             <p className="text-xs font-black text-[#FF9D76] uppercase tracking-widest">新增预设</p>
-            <div className="flex gap-4">
-              <div className="relative w-24 h-24 bg-white rounded-2xl border-2 border-white shadow-sm overflow-hidden flex items-center justify-center group cursor-pointer">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative w-full aspect-[2/1] sm:w-24 sm:h-24 sm:aspect-auto bg-white rounded-2xl border-2 border-white shadow-sm overflow-hidden flex items-center justify-center group cursor-pointer">
                 {isUploading ? (
                   <Loader2 className="animate-spin text-[#FF9D76]" size={24} />
                 ) : newImageUrl ? (
@@ -253,7 +253,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                   <Upload className="text-white" size={20} />
                 </div>
               </div>
-              <div className="flex-grow space-y-3">
+              <div className="flex-grow space-y-3 min-w-0">
                 <input 
                   type="text" 
                   placeholder="品种名称 (如: 布偶猫)" 
@@ -276,13 +276,13 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
           <div className="space-y-3">
             <p className="text-xs font-black text-[#5D4037]/40 uppercase tracking-widest ml-1">当前预设 ({presets.length})</p>
             {presets.map((preset) => (
-              <div key={preset.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100 group">
-                <div className="w-14 h-14 rounded-xl overflow-hidden shadow-sm bg-white">
+              <div key={preset.id} className="flex items-center gap-3 sm:gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100 group">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden shadow-sm bg-white shrink-0">
                   <img src={preset.imageUrl} className="w-full h-full object-cover" alt={preset.name} referrerPolicy="no-referrer" />
                 </div>
-                <div className="flex-grow">
+                <div className="flex-grow min-w-0">
                   <p className="font-bold text-[#5D4037] text-sm">{preset.name}</p>
-                  <p className="text-[10px] text-gray-400 font-mono truncate max-w-[150px]">{preset.id}</p>
+                  <p className="text-[10px] text-gray-400 font-mono truncate">{preset.id}</p>
                 </div>
                 <button 
                   onClick={() => handleDelete(preset.id)}
@@ -295,7 +295,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
           </div>
         </div>
 
-        <div className="p-6 bg-gray-50 border-t">
+        <div className="px-4 py-4 sm:p-6 bg-gray-50 border-t shrink-0">
           <button 
             onClick={handleSave}
             className="w-full py-4 bg-[#5D4037] text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"

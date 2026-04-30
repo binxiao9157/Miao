@@ -230,7 +230,7 @@ async function startServer() {
     API_KEY: (process.env.VOLC_API_KEY || "").trim(),
     BASE_URL: (process.env.VOLC_BASE_URL || process.env.VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks").trim().replace(/\/$/, ''),
     IMAGE_URL: (process.env.VOLC_IMAGE_URL || "https://ark.cn-beijing.volces.com/api/v3/images/generations").trim().replace(/\/$/, ''),
-    IMAGE_MODEL: (process.env.VOLC_IMAGE_MODEL || "Doubao-Seedream-4.5").trim(),
+    IMAGE_MODEL: (process.env.VOLC_IMAGE_MODEL || "doubao-seedream-4-5-251128").trim(),
     VIDEO_MODEL: (process.env.VOLC_VIDEO_MODEL || "doubao-seedance-1-5-pro-251215").trim()
   };
 
