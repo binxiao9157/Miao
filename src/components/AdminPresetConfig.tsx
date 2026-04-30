@@ -15,6 +15,8 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
   const [newImageUrl, setNewImageUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [profile, setProfile] = useState<AIProfile>(DEFAULT_AI_PROFILES.dashscope);
+  const modelInputClass = "w-full min-w-0 px-3 py-2.5 bg-white rounded-[14px] text-[11px] sm:text-sm leading-tight font-extrabold text-[#5D4037] outline-none focus:ring-2 focus:ring-blue-200 font-mono tracking-normal";
+  const compactInputClass = "w-full min-w-0 px-2.5 sm:px-3 py-2.5 bg-white rounded-[14px] text-sm font-extrabold text-[#5D4037] outline-none focus:ring-2 focus:ring-blue-200";
 
   useEffect(() => {
     setPresets(storage.getPresetCats());
@@ -106,32 +108,32 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
   };
 
   return (
-    <div className="backdrop-overlay flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="backdrop-overlay flex items-end sm:items-center justify-center !p-2 sm:!p-4">
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-white rounded-t-[28px] sm:rounded-[32px] w-full sm:max-w-lg h-[92dvh] sm:h-auto sm:max-h-[86dvh] flex flex-col overflow-hidden shadow-2xl"
+        className="bg-white rounded-[24px] sm:rounded-[32px] w-full max-w-[440px] sm:max-w-lg h-[calc(100dvh-1rem)] sm:h-auto sm:max-h-[86dvh] flex flex-col overflow-hidden shadow-2xl"
       >
-        <div className="px-4 py-4 sm:p-6 border-b flex items-center justify-between bg-gray-50 shrink-0">
+        <div className="px-4 py-3 sm:p-6 border-b flex items-center justify-between bg-gray-50 shrink-0">
           <div className="min-w-0">
-            <h2 className="text-lg sm:text-xl font-black text-[#5D4037] truncate">预设猫咪配置</h2>
-            <p className="text-xs text-[#5D4037]/40 font-bold uppercase tracking-widest">管理员后台</p>
+            <h2 className="text-xl sm:text-xl font-black text-[#5D4037] truncate">预设猫咪配置</h2>
+            <p className="text-[11px] text-[#5D4037]/40 font-bold uppercase tracking-widest">管理员后台</p>
           </div>
-          <button onClick={onClose} className="p-2 bg-white rounded-full shadow-sm text-gray-400 shrink-0">
-            <X size={20} />
+          <button onClick={onClose} className="w-10 h-10 bg-white rounded-full shadow-sm text-gray-400 shrink-0 flex items-center justify-center">
+            <X size={19} />
           </button>
         </div>
 
-        <div className="flex-grow overflow-y-auto px-4 py-5 sm:p-6 space-y-5 sm:space-y-6 no-scrollbar overscroll-contain">
+        <div className="flex-1 min-h-0 overflow-y-auto px-3.5 py-4 sm:p-6 space-y-4 sm:space-y-6 no-scrollbar overscroll-contain">
           {/* AI 模型配置 */}
-          <div className="bg-blue-50/70 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-blue-100 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white text-blue-500 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
-                <Cpu size={20} />
+          <div className="bg-blue-50/70 p-3.5 sm:p-5 rounded-[20px] sm:rounded-3xl border border-blue-100 space-y-3.5 sm:space-y-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-white text-blue-500 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                <Cpu size={18} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-black text-[#5D4037]">AI 模型配置</p>
-                <p className="text-[10px] text-[#5D4037]/40 font-bold uppercase tracking-widest">Provider Profile</p>
+                <p className="text-[15px] font-black text-[#5D4037]">AI 模型配置</p>
+                <p className="text-[9px] text-[#5D4037]/40 font-bold uppercase tracking-widest">Provider Profile</p>
               </div>
             </div>
 
@@ -140,9 +142,9 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                 <button
                   key={provider}
                   onClick={() => handleProviderChange(provider)}
-                  className={`py-3 rounded-2xl text-xs font-black transition-all ${
+                  className={`py-2.5 rounded-[18px] text-xs font-black transition-all ${
                     profile.provider === provider
-                      ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20"
+                      ? "bg-blue-500 text-white shadow-md shadow-blue-500/20"
                       : "bg-white text-[#5D4037]/60"
                   }`}
                 >
@@ -153,73 +155,76 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
 
             <div className="grid grid-cols-1 gap-3">
               <label className="space-y-1">
-                <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">图片模型</span>
+                <span className="text-[9px] font-black text-[#5D4037]/50 uppercase">图片模型</span>
                 <input
                   value={profile.imageModel}
                   onChange={(e) => setProfile(prev => ({ ...prev, imageModel: e.target.value }))}
-                  className="w-full p-3 bg-white rounded-xl text-[13px] sm:text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200 font-mono"
+                  className={modelInputClass}
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">视频模型</span>
+                <span className="text-[9px] font-black text-[#5D4037]/50 uppercase">视频模型</span>
                 <input
                   value={profile.videoModel}
                   onChange={(e) => setProfile(prev => ({ ...prev, videoModel: e.target.value }))}
-                  className="w-full p-3 bg-white rounded-xl text-[13px] sm:text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200 font-mono"
+                  className={modelInputClass}
                 />
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">清晰度</span>
+                  <span className="text-[9px] font-black text-[#5D4037]/50 uppercase">清晰度</span>
                   <input
                     value={profile.resolution}
                     onChange={(e) => setProfile(prev => ({ ...prev, resolution: e.target.value }))}
-                    className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
+                    className={compactInputClass}
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">时长</span>
+                  <span className="text-[9px] font-black text-[#5D4037]/50 uppercase">时长</span>
                   <input
                     type="number"
                     min={1}
                     value={profile.duration}
                     onChange={(e) => setProfile(prev => ({ ...prev, duration: Number(e.target.value) || 5 }))}
-                    className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
+                    className={compactInputClass}
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">Seed</span>
+                  <span className="text-[9px] font-black text-[#5D4037]/50 uppercase">Seed</span>
                   <input
                     type="number"
                     value={profile.seed}
                     onChange={(e) => setProfile(prev => ({ ...prev, seed: Number(e.target.value) || 12345 }))}
-                    className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
+                    className={compactInputClass}
                   />
                 </label>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <label className="flex items-center justify-between gap-3 bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
-                  Prompt Extend
+              <div className="grid grid-cols-3 gap-2">
+                <label className="flex min-h-11 items-center justify-between gap-1.5 bg-white rounded-[14px] px-2.5 sm:px-3 py-2 text-[11px] leading-tight font-black text-[#5D4037]/70">
+                  扩展
                   <input
                     type="checkbox"
                     checked={profile.promptExtend}
                     onChange={(e) => setProfile(prev => ({ ...prev, promptExtend: e.target.checked }))}
+                    className="w-4 h-4 shrink-0 accent-blue-500"
                   />
                 </label>
-                <label className="flex items-center justify-between gap-3 bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
-                  Mock Mode
+                <label className="flex min-h-11 items-center justify-between gap-1.5 bg-white rounded-[14px] px-2.5 sm:px-3 py-2 text-[11px] leading-tight font-black text-[#5D4037]/70">
+                  Mock
                   <input
                     type="checkbox"
                     checked={profile.mockMode}
                     onChange={(e) => setProfile(prev => ({ ...prev, mockMode: e.target.checked }))}
+                    className="w-4 h-4 shrink-0 accent-blue-500"
                   />
                 </label>
-                <label className="flex items-center justify-between gap-3 bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
-                  跳过首帧
+                <label className="flex min-h-11 items-center justify-between gap-1.5 bg-white rounded-[14px] px-2.5 sm:px-3 py-2 text-[11px] leading-tight font-black text-[#5D4037]/70">
+                  跳首帧
                   <input
                     type="checkbox"
                     checked={profile.skipImageStage}
                     onChange={(e) => setProfile(prev => ({ ...prev, skipImageStage: e.target.checked }))}
+                    className="w-4 h-4 shrink-0 accent-blue-500"
                   />
                 </label>
               </div>
@@ -227,10 +232,10 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
           </div>
 
           {/* 新增区域 */}
-          <div className="bg-[#FF9D76]/5 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 border-dashed border-[#FF9D76]/20 space-y-4">
-            <p className="text-xs font-black text-[#FF9D76] uppercase tracking-widest">新增预设</p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative w-full aspect-[2/1] sm:w-24 sm:h-24 sm:aspect-auto bg-white rounded-2xl border-2 border-white shadow-sm overflow-hidden flex items-center justify-center group cursor-pointer">
+          <div className="bg-[#FF9D76]/5 p-3.5 sm:p-5 rounded-[20px] sm:rounded-3xl border-2 border-dashed border-[#FF9D76]/20 space-y-3">
+            <p className="text-[11px] font-black text-[#FF9D76] uppercase tracking-widest">新增预设</p>
+            <div className="flex gap-3 sm:gap-4">
+              <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-white rounded-2xl border-2 border-white shadow-sm overflow-hidden flex items-center justify-center group cursor-pointer shrink-0">
                 {isUploading ? (
                   <Loader2 className="animate-spin text-[#FF9D76]" size={24} />
                 ) : newImageUrl ? (
@@ -253,17 +258,17 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                   <Upload className="text-white" size={20} />
                 </div>
               </div>
-              <div className="flex-grow space-y-3 min-w-0">
+              <div className="flex-grow space-y-2.5 min-w-0">
                 <input 
                   type="text" 
                   placeholder="品种名称 (如: 布偶猫)" 
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full p-3 bg-white rounded-xl border-none shadow-sm text-sm font-bold outline-none focus:ring-2 focus:ring-[#FF9D76]/20"
+                  className="w-full px-3 py-2.5 bg-white rounded-[14px] border-none shadow-sm text-sm font-bold outline-none focus:ring-2 focus:ring-[#FF9D76]/20"
                 />
                 <button 
                   onClick={handleAdd}
-                  className="w-full py-3 bg-[#FF9D76] text-white rounded-xl font-black text-sm shadow-lg shadow-[#FF9D76]/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-[#FF9D76] text-white rounded-[14px] font-black text-sm shadow-lg shadow-[#FF9D76]/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
                   <Plus size={16} />
                   添加预设
@@ -276,8 +281,8 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
           <div className="space-y-3">
             <p className="text-xs font-black text-[#5D4037]/40 uppercase tracking-widest ml-1">当前预设 ({presets.length})</p>
             {presets.map((preset) => (
-              <div key={preset.id} className="flex items-center gap-3 sm:gap-4 p-3 bg-gray-50 rounded-2xl border border-gray-100 group">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden shadow-sm bg-white shrink-0">
+              <div key={preset.id} className="flex items-center gap-3 sm:gap-4 p-2.5 sm:p-3 bg-gray-50 rounded-2xl border border-gray-100 group">
+                <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl overflow-hidden shadow-sm bg-white shrink-0">
                   <img src={preset.imageUrl} className="w-full h-full object-cover" alt={preset.name} referrerPolicy="no-referrer" />
                 </div>
                 <div className="flex-grow min-w-0">
@@ -295,10 +300,10 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
           </div>
         </div>
 
-        <div className="px-4 py-4 sm:p-6 bg-gray-50 border-t shrink-0">
+        <div className="px-4 py-3 sm:p-6 bg-gray-50 border-t shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
           <button 
             onClick={handleSave}
-            className="w-full py-4 bg-[#5D4037] text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+            className="w-full py-3 sm:py-4 bg-[#5D4037] text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
           >
             <Save size={20} />
             保存所有配置

@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import { createPortal } from "react-dom";
 import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, QrCode, ScanQrCode } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { storage, CatInfo } from "../services/storage";
@@ -8,7 +7,6 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import InstallPromptBanner from "../components/InstallPromptBanner";
 import PageHeader from "../components/PageHeader";
-import AdminPresetConfig from "../components/AdminPresetConfig";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -18,7 +16,6 @@ export default function Profile() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [clickCount, setClickCount] = useState(0);
-  const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
     const loadStats = () => {
@@ -113,13 +110,10 @@ export default function Profile() {
   };
 
   const handleAdminTap = () => {
-    console.log("Admin tap triggered, current count:", clickCount);
     setClickCount(prev => {
       const next = prev + 1;
-      console.log("Next count:", next);
       if (next >= 5) {
-        console.log("Opening admin panel...");
-        setShowAdmin(true);
+        navigate("/admin-settings");
         return 0;
       }
       return next;
@@ -127,7 +121,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="flex flex-col w-full h-full overflow-y-auto no-scrollbar bg-gradient-to-b from-[#FFF9F5] to-[#FFE8D6]">
+    <div className="flex flex-col w-full min-h-full bg-gradient-to-b from-[#FFF9F5] to-[#FFE8D6]">
       <PageHeader 
         title="Miao" 
         subtitle="MIAO SANCTUARY" 
@@ -357,16 +351,6 @@ export default function Profile() {
           浙ICP备2026026483号-1
         </a>
       </footer>
-
-      {/* Admin Panel Modal */}
-      {createPortal(
-        <AnimatePresence>
-          {showAdmin && (
-            <AdminPresetConfig onClose={() => setShowAdmin(false)} />
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
     </div>
   );
 }
