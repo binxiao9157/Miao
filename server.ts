@@ -592,9 +592,8 @@ async function startServer() {
   const generateVolcVideo = async (body: any) => {
     const { prompt, parameters: clientParams, negative_prompt } = body;
     const firstFrame = body.first_frame || body.image_base64;
-    const lastFrame = body.last_frame || firstFrame;
     if (!firstFrame) {
-      const err: any = new Error("缺少必要参数: first_frame");
+      const err: any = new Error("缺少必要参数: image_base64");
       err.response = { status: 400, data: { code: "INVALID_PARAMETER", message: err.message } };
       throw err;
     }
@@ -604,11 +603,36 @@ async function startServer() {
       throw err;
     }
 
-    const contentArray: any[] = [
-      { type: "image_url", image_url: { url: firstFrame } },
-      { type: "image_url", image_url: { url: lastFrame } },
-      { type: "text", text: prompt || "A high quality video of this cat, cinematic lighting, realistic." }
-    ];
+    let dataUrl = "";
+    if (firstFrame) {
+      let cleanBase64 = firstFrame.replace(/\s/g, '');
+      if (cleanBase64.startsWith('http')) {
+        dataUrl = cleanBase64;
+      } else {
+        let mimeType = 'image/png';
+        if (cleanBase64.includes('base64,')) {
+          const parts = cleanBase64.split('base64,');
+          const header = parts[0];
+          cleanBase64 = parts[1];
+          const match = header.match(/data:([^;]+);/);
+          if (match) mimeType = match[1];
+        }
+        dataUrl = `data:${mimeType};base64,${cleanBase64}`;
+      }
+    }
+
+    const contentArray: any[] = [];
+    if (dataUrl) {
+      contentArray.push({
+        type: "image_url",
+        image_url: { url: dataUrl }
+      });
+    }
+    contentArray.push({
+      type: "text",
+      text: prompt || "A high quality video of this cat, cinematic lighting, realistic."
+    });
+
     const requestBody: any = {
       model: body.model || VOLC_CONFIG.VIDEO_MODEL,
       content: contentArray,
@@ -617,22 +641,36 @@ async function startServer() {
         seed: clientParams?.seed || 12345,
         duration: clientParams?.duration || 5,
         fps: 25,
-        first_frame_constraint: true,
-        last_frame_constraint: true,
+        first_frame_constraint: true
       }
     };
     if (negative_prompt) requestBody.parameters.negative_prompt = negative_prompt;
 
-    const response = await axios.post(VOLC_CONFIG.BASE_URL, requestBody, {
-      headers: {
-        'Authorization': `Bearer ${VOLC_CONFIG.API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      httpsAgent,
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
-      timeout: 120000
-    });
+    let response;
+    let retries = 2;
+    while (retries >= 0) {
+      try {
+        response = await axios.post(VOLC_CONFIG.BASE_URL, requestBody, {
+          headers: {
+            'Authorization': `Bearer ${VOLC_CONFIG.API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          httpsAgent,
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          timeout: 120000
+        });
+        break;
+      } catch (error: any) {
+        if (error.code === 'ECONNRESET' && retries > 0) {
+          retries--;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (!response) throw new Error("Failed to get response from Volcengine API after retries");
 
     const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;
     if (taskId) return { ...response.data, id: taskId, status: 'pending', provider: 'volcengine' };
