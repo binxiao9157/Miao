@@ -7,7 +7,6 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import InstallPromptBanner from "../components/InstallPromptBanner";
 import PageHeader from "../components/PageHeader";
-import AdminPresetConfig from "../components/AdminPresetConfig";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -17,7 +16,6 @@ export default function Profile() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [clickCount, setClickCount] = useState(0);
-  const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
     const loadStats = () => {
@@ -115,7 +113,7 @@ export default function Profile() {
     setClickCount(prev => {
       const next = prev + 1;
       if (next >= 5) {
-        setShowAdmin(true);
+        navigate("/admin-settings");
         return 0;
       }
       return next;
@@ -353,13 +351,6 @@ export default function Profile() {
           浙ICP备2026026483号-1
         </a>
       </footer>
-
-      {/* Admin Panel Modal */}
-      <AnimatePresence>
-        {showAdmin && (
-          <AdminPresetConfig onClose={() => setShowAdmin(false)} />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

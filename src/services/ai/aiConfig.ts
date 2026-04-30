@@ -28,7 +28,7 @@ export const DEFAULT_AI_PROFILES: Record<AIProvider, AIProfile> = {
   },
   volcengine: {
     provider: 'volcengine',
-    imageModel: 'Doubao-Seedream-4.5',
+    imageModel: 'doubao-seedream-4-5-251128',
     videoModel: 'doubao-seedance-1-5-pro-251215',
     resolution: '480P',
     duration: 5,

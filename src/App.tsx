@@ -40,6 +40,7 @@ const AddFriendQR = lazyRetry(() => import("./pages/AddFriendQR"));
 const ScanFriend = lazyRetry(() => import("./pages/ScanFriend"));
 const Download = lazyRetry(() => import("./pages/Download"));
 const Feedback = lazyRetry(() => import("./pages/Feedback"));
+const AdminSettings = lazyRetry(() => import("./pages/AdminSettings"));
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 import SplashScreen from "./components/SplashScreen";
@@ -115,6 +116,7 @@ function AppRoutes() {
         <Route path="/add-friend-qr" element={<ProtectedRoute><AddFriendQR /></ProtectedRoute>} />
         <Route path="/scan-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />
         <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+        <Route path="/admin-settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
   
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />
