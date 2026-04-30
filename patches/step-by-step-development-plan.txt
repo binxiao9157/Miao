@@ -1,0 +1,72 @@
+Step 1 - Frontend AI config and unified client
+Files:
+- src/services/ai/types.ts
+- src/services/ai/aiConfig.ts
+- src/services/ai/actionPrompts.ts
+- src/services/ai/aiClient.ts
+- src/services/volcanoService.ts
+- .env.example
+
+Goal:
+- Add provider profiles for DashScope and Volcengine.
+- Keep the old VolcanoService API as a compatibility layer.
+- Send provider/model/first-frame/last-frame parameters to the server.
+
+Validation:
+- npm run lint
+- npm run build
+- Confirm the hidden admin panel can save provider/model settings.
+
+Step 2 - Server AI provider routes
+Files:
+- server.ts
+
+Goal:
+- Add /api/ai/generate-image.
+- Add /api/ai/generate-video.
+- Add /api/ai/:type-status/:provider/:taskId.
+- Keep old /api/generate-image and /api/generate-video for compatibility.
+- Add DashScope and Volcengine provider adapters behind a unified response shape.
+
+Validation:
+- npm run dev
+- curl -s http://localhost:3000/api/health
+- curl -s -X POST http://localhost:3000/api/ai/generate-image -H 'Content-Type: application/json' -d '{"provider":"dashscope"}'
+- curl -s -X POST http://localhost:3000/api/ai/generate-video -H 'Content-Type: application/json' -d '{"provider":"volcengine","prompt":"test"}'
+- The last two commands should return controlled 400 validation errors without crashing the server.
+
+Step 3 - Admin AI profile UI
+Files:
+- src/components/AdminPresetConfig.tsx
+
+Goal:
+- Add AI provider/model controls to the existing hidden admin panel.
+- Support switching between DashScope and Volcengine.
+- Support editing image model, video model, resolution, duration, seed, promptExtend, and mockMode.
+
+Validation:
+- Open Profile page.
+- Tap the footer "MIAO SANCTUARY" 5 times.
+- Switch provider and save.
+- Confirm localStorage values update and subsequent generation requests use the selected provider.
+
+Step 4 - Real model validation
+Required environment variables:
+- DASHSCOPE_API_KEY
+- DASHSCOPE_BASE_URL
+- DASHSCOPE_IMAGE_MODEL
+- DASHSCOPE_VIDEO_MODEL
+- VOLC_API_KEY
+- VOLC_BASE_URL
+- VOLC_IMAGE_URL
+- VOLC_IMAGE_MODEL
+- VOLC_VIDEO_MODEL
+
+Goal:
+- Validate DashScope image and video generation.
+- Validate Volcengine image and first/last-frame video generation.
+- Adjust provider request bodies if either vendor returns model-specific parameter errors.
+
+Notes:
+- Do not commit real API keys.
+- Rotate any key that has been pasted into chat or logs.

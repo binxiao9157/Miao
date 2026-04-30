@@ -1,0 +1,149 @@
+diff --git a/src/components/AdminPresetConfig.tsx b/src/components/AdminPresetConfig.tsx
+index 41dca87..00f70ab 100644
+--- a/src/components/AdminPresetConfig.tsx
++++ b/src/components/AdminPresetConfig.tsx
+@@ -1,7 +1,9 @@
+ import React, { useState, useEffect } from "react";
+-import { X, Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2 } from "lucide-react";
++import { X, Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2, Cpu } from "lucide-react";
+ import { storage, PresetCat } from "../services/storage";
+ import { motion } from "motion/react";
++import { aiConfig, DEFAULT_AI_PROFILES } from "../services/ai/aiConfig";
++import { AIProfile, AIProvider } from "../services/ai/types";
+ 
+ interface AdminPresetConfigProps {
+   onClose: () => void;
+@@ -12,16 +14,31 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
+   const [newName, setNewName] = useState("");
+   const [newImageUrl, setNewImageUrl] = useState("");
+   const [isUploading, setIsUploading] = useState(false);
++  const [profile, setProfile] = useState<AIProfile>(DEFAULT_AI_PROFILES.dashscope);
+ 
+   useEffect(() => {
+     setPresets(storage.getPresetCats());
++    setProfile(aiConfig.getProfile());
+   }, []);
+ 
+   const handleSave = () => {
+     storage.savePresetCats(presets);
++    aiConfig.saveProfile(profile);
+     alert("配置已保存！");
+   };
+ 
++  const handleProviderChange = (provider: AIProvider) => {
++    const defaults = DEFAULT_AI_PROFILES[provider];
++    setProfile(prev => ({
++      ...defaults,
++      mockMode: prev.mockMode,
++      resolution: prev.resolution || defaults.resolution,
++      duration: prev.duration || defaults.duration,
++      seed: prev.seed || defaults.seed,
++      promptExtend: prev.promptExtend,
++    }));
++  };
++
+   const handleAdd = () => {
+     if (!newName || !newImageUrl) {
+       alert("请输入品种名称和图片地址");
+@@ -105,6 +122,101 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
+         </div>
+ 
+         <div className="flex-grow overflow-y-auto p-6 space-y-6 no-scrollbar">
++          {/* AI 模型配置 */}
++          <div className="bg-blue-50/70 p-5 rounded-3xl border border-blue-100 space-y-4">
++            <div className="flex items-center gap-3">
++              <div className="w-10 h-10 bg-white text-blue-500 rounded-2xl flex items-center justify-center shadow-sm">
++                <Cpu size={20} />
++              </div>
++              <div>
++                <p className="text-sm font-black text-[#5D4037]">AI 模型配置</p>
++                <p className="text-[10px] text-[#5D4037]/40 font-bold uppercase tracking-widest">Provider Profile</p>
++              </div>
++            </div>
++
++            <div className="grid grid-cols-2 gap-2">
++              {(['dashscope', 'volcengine'] as AIProvider[]).map(provider => (
++                <button
++                  key={provider}
++                  onClick={() => handleProviderChange(provider)}
++                  className={`py-3 rounded-2xl text-xs font-black transition-all ${
++                    profile.provider === provider
++                      ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20"
++                      : "bg-white text-[#5D4037]/60"
++                  }`}
++                >
++                  {provider === 'dashscope' ? '阿里百练' : '火山引擎'}
++                </button>
++              ))}
++            </div>
++
++            <div className="grid grid-cols-1 gap-3">
++              <label className="space-y-1">
++                <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">图片模型</span>
++                <input
++                  value={profile.imageModel}
++                  onChange={(e) => setProfile(prev => ({ ...prev, imageModel: e.target.value }))}
++                  className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
++                />
++              </label>
++              <label className="space-y-1">
++                <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">视频模型</span>
++                <input
++                  value={profile.videoModel}
++                  onChange={(e) => setProfile(prev => ({ ...prev, videoModel: e.target.value }))}
++                  className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
++                />
++              </label>
++              <div className="grid grid-cols-3 gap-2">
++                <label className="space-y-1">
++                  <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">清晰度</span>
++                  <input
++                    value={profile.resolution}
++                    onChange={(e) => setProfile(prev => ({ ...prev, resolution: e.target.value }))}
++                    className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
++                  />
++                </label>
++                <label className="space-y-1">
++                  <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">时长</span>
++                  <input
++                    type="number"
++                    min={1}
++                    value={profile.duration}
++                    onChange={(e) => setProfile(prev => ({ ...prev, duration: Number(e.target.value) || 5 }))}
++                    className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
++                  />
++                </label>
++                <label className="space-y-1">
++                  <span className="text-[10px] font-black text-[#5D4037]/50 uppercase">Seed</span>
++                  <input
++                    type="number"
++                    value={profile.seed}
++                    onChange={(e) => setProfile(prev => ({ ...prev, seed: Number(e.target.value) || 12345 }))}
++                    className="w-full p-3 bg-white rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
++                  />
++                </label>
++              </div>
++              <div className="grid grid-cols-2 gap-2">
++                <label className="flex items-center justify-between bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
++                  Prompt Extend
++                  <input
++                    type="checkbox"
++                    checked={profile.promptExtend}
++                    onChange={(e) => setProfile(prev => ({ ...prev, promptExtend: e.target.checked }))}
++                  />
++                </label>
++                <label className="flex items-center justify-between bg-white rounded-xl p-3 text-xs font-black text-[#5D4037]/70">
++                  Mock Mode
++                  <input
++                    type="checkbox"
++                    checked={profile.mockMode}
++                    onChange={(e) => setProfile(prev => ({ ...prev, mockMode: e.target.checked }))}
++                  />
++                </label>
++              </div>
++            </div>
++          </div>
++
+           {/* 新增区域 */}
+           <div className="bg-[#FF9D76]/5 p-5 rounded-3xl border-2 border-dashed border-[#FF9D76]/20 space-y-4">
+             <p className="text-xs font-black text-[#FF9D76] uppercase tracking-widest">新增预设</p>

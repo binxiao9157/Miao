@@ -1,0 +1,322 @@
+diff --git a/server.ts b/server.ts
+index 3bb845d..17d99f2 100644
+--- a/server.ts
++++ b/server.ts
+@@ -225,6 +225,15 @@ async function startServer() {
+     VIDEO_MODEL: (process.env.DASHSCOPE_VIDEO_MODEL || "wan2.2-kf2v-flash").trim()
+   };
+ 
++  // ── 火山引擎 Ark 配置 ──
++  const VOLC_CONFIG = {
++    API_KEY: (process.env.VOLC_API_KEY || "").trim(),
++    BASE_URL: (process.env.VOLC_BASE_URL || process.env.VOLC_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks").trim().replace(/\/$/, ''),
++    IMAGE_URL: (process.env.VOLC_IMAGE_URL || "https://ark.cn-beijing.volces.com/api/v3/images/generations").trim().replace(/\/$/, ''),
++    IMAGE_MODEL: (process.env.VOLC_IMAGE_MODEL || "Doubao-Seedream-4.5").trim(),
++    VIDEO_MODEL: (process.env.VOLC_VIDEO_MODEL || "doubao-seedance-1-5-pro-251215").trim()
++  };
++
+   const ARK_API_KEY = DASHSCOPE_CONFIG.API_KEY;
+   const ARK_BASE_URL = DASHSCOPE_CONFIG.BASE_URL;
+ 
+@@ -348,6 +357,13 @@ async function startServer() {
+     baseUrl: ARK_BASE_URL
+   });
+ 
++  console.log("Server Volcengine Config Initialized:", {
++    hasApiKey: !!VOLC_CONFIG.API_KEY,
++    imageModel: VOLC_CONFIG.IMAGE_MODEL,
++    videoModel: VOLC_CONFIG.VIDEO_MODEL,
++    baseUrl: VOLC_CONFIG.BASE_URL
++  });
++
+   // Helper to send standardized error responses
+   const sendError = (res: express.Response, error: any, defaultMessage: string) => {
+     const status = error.response?.status || 500;
+@@ -392,6 +408,287 @@ async function startServer() {
+     });
+   };
+ 
++  type AIProviderName = "dashscope" | "volcengine";
++
++  const normalizeProvider = (provider: unknown): AIProviderName => {
++    return provider === "volcengine" ? "volcengine" : "dashscope";
++  };
++
++  const toImageUrl = (imageSource: string) => imageSource;
++
++  const normalizeDashScopeStatus = (data: any) => {
++    const output = data?.output;
++    const status = output?.task_status || (data?.request_id ? 'PENDING' : 'FAILED');
++    if (status === 'SUCCEEDED') {
++      let imageUrl = output?.results?.[0]?.url || output?.image_url;
++      const videoUrl = output?.video_url || output?.results?.[0]?.url;
++      if (!imageUrl && output?.choices) {
++        const content = output.choices[0]?.message?.content;
++        if (Array.isArray(content)) {
++          const imgItem = content.find((c: any) => c.image);
++          if (imgItem) imageUrl = imgItem.image;
++        }
++      }
++      return {
++        status: 'succeeded',
++        image_url: imageUrl,
++        video_url: videoUrl,
++        output: { ...output, image_url: imageUrl, video_url: videoUrl }
++      };
++    }
++    if (status === 'FAILED') {
++      return { status: 'failed', message: output?.message || "任务生成失败", output };
++    }
++    return { status: 'running', output };
++  };
++
++  const normalizeVolcStatus = (data: any) => {
++    const rawStatus = String(data?.status || data?.task_status || data?.data?.status || '').toLowerCase();
++    const succeeded = ['succeeded', 'success', 'completed', 'done'].includes(rawStatus);
++    const failed = ['failed', 'error', 'cancelled', 'canceled'].includes(rawStatus);
++    const imageUrl = data?.data?.[0]?.url || data?.image_url || data?.result?.image_url;
++    const videoUrl =
++      data?.content?.video_url ||
++      data?.data?.video_url ||
++      data?.video_url ||
++      data?.response?.video?.uri ||
++      data?.result?.video_url;
++
++    if (succeeded) return { status: 'succeeded', image_url: imageUrl, video_url: videoUrl, output: data };
++    if (failed) return { status: 'failed', message: data?.error || data?.message || "任务生成失败", output: data };
++    return { status: 'running', output: data };
++  };
++
++  const generateDashScopeImage = async (body: any) => {
++    const { prompt, image_base64 } = body;
++    if (!prompt || typeof prompt !== 'string') {
++      const err: any = new Error("缺少必要参数: prompt");
++      err.response = { status: 400, data: { code: "INVALID_PARAMETER", message: err.message } };
++      throw err;
++    }
++
++    const url = `${ARK_BASE_URL}/services/aigc/multimodal-generation/generation`;
++    const messages = [{ role: "user", content: [] as any[] }];
++    if (image_base64) messages[0].content.push({ image: image_base64 });
++    messages[0].content.push({ text: prompt });
++
++    const requestBody = {
++      model: body.model || DASHSCOPE_CONFIG.IMAGE_MODEL,
++      input: { messages },
++      parameters: {
++        n: 1,
++        result_format: "message",
++        watermark: false
++      }
++    };
++
++    const response = await axios.post(url, requestBody, {
++      headers: {
++        'Authorization': `Bearer ${ARK_API_KEY}`,
++        'Content-Type': 'application/json'
++      },
++      httpsAgent,
++      timeout: 90000
++    });
++
++    const output = response.data?.output;
++    const content = output?.choices?.[0]?.message?.content;
++    if (Array.isArray(content)) {
++      const imgItem = content.find((c: any) => c.image);
++      if (imgItem?.image) {
++        return { id: `sync:${Date.now()}`, status: 'succeeded', image_url: imgItem.image, provider: 'dashscope' };
++      }
++    }
++    const taskId = output?.task_id;
++    if (taskId) return { id: taskId, status: 'pending', provider: 'dashscope' };
++    throw new Error("DashScope 未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
++  };
++
++  const generateVolcImage = async (body: any) => {
++    const { prompt, image_base64 } = body;
++    if (!prompt || typeof prompt !== 'string') {
++      const err: any = new Error("缺少必要参数: prompt");
++      err.response = { status: 400, data: { code: "INVALID_PARAMETER", message: err.message } };
++      throw err;
++    }
++    if (!VOLC_CONFIG.API_KEY) {
++      const err: any = new Error("服务器未配置 VOLC_API_KEY");
++      err.response = { status: 500, data: { code: "MISSING_API_KEY", message: err.message } };
++      throw err;
++    }
++
++    const requestBody: any = {
++      model: body.model || VOLC_CONFIG.IMAGE_MODEL,
++      prompt,
++      size: "1024x1024"
++    };
++    if (image_base64) requestBody.image = image_base64;
++
++    const response = await axios.post(VOLC_CONFIG.IMAGE_URL, requestBody, {
++      headers: {
++        'Authorization': `Bearer ${VOLC_CONFIG.API_KEY}`,
++        'Content-Type': 'application/json'
++      },
++      httpsAgent,
++      timeout: 90000
++    });
++
++    const imageUrl = response.data?.data?.[0]?.url || response.data?.image_url || response.data?.url;
++    const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;
++    if (imageUrl) return { id: `sync:${Date.now()}`, status: 'succeeded', image_url: imageUrl, provider: 'volcengine' };
++    if (taskId) return { id: taskId, status: 'pending', provider: 'volcengine' };
++    throw new Error("火山引擎未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
++  };
++
++  const generateDashScopeVideo = async (body: any) => {
++    const { prompt, parameters: clientParams } = body;
++    const firstFrame = body.first_frame || body.image_base64;
++    const lastFrame = body.last_frame || firstFrame;
++    if (!firstFrame) {
++      const err: any = new Error("缺少必要参数: first_frame");
++      err.response = { status: 400, data: { code: "INVALID_PARAMETER", message: err.message } };
++      throw err;
++    }
++
++    let firstFrameUrl = toImageUrl(firstFrame);
++    let lastFrameUrl = toImageUrl(lastFrame);
++    if (firstFrameUrl.startsWith('fileid://')) {
++      firstFrameUrl = await getFileUrl(firstFrameUrl.replace('fileid://', ''));
++    }
++    if (lastFrameUrl.startsWith('fileid://')) {
++      lastFrameUrl = await getFileUrl(lastFrameUrl.replace('fileid://', ''));
++    }
++
++    const requestBody = {
++      model: body.model || DASHSCOPE_CONFIG.VIDEO_MODEL,
++      input: {
++        first_frame_url: firstFrameUrl,
++        last_frame_url: lastFrameUrl,
++        prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic."
++      },
++      parameters: {
++        resolution: clientParams?.resolution || "480P",
++        prompt_extend: clientParams?.prompt_extend !== undefined ? clientParams.prompt_extend : true,
++        duration: clientParams?.duration || 5,
++        seed: clientParams?.seed || 12345
++      }
++    };
++
++    const response = await axios.post(`${ARK_BASE_URL}/services/aigc/image2video/video-synthesis`, requestBody, {
++      headers: {
++        'Authorization': `Bearer ${ARK_API_KEY}`,
++        'Content-Type': 'application/json',
++        'X-DashScope-Async': 'enable'
++      },
++      httpsAgent,
++      timeout: 60000
++    });
++
++    const taskId = response.data?.output?.task_id;
++    if (taskId) return { id: taskId, status: 'pending', provider: 'dashscope' };
++    throw new Error("提交视频任务后未获取到 task_id. 响应: " + JSON.stringify(response.data));
++  };
++
++  const generateVolcVideo = async (body: any) => {
++    const { prompt, parameters: clientParams, negative_prompt } = body;
++    const firstFrame = body.first_frame || body.image_base64;
++    const lastFrame = body.last_frame || firstFrame;
++    if (!firstFrame) {
++      const err: any = new Error("缺少必要参数: first_frame");
++      err.response = { status: 400, data: { code: "INVALID_PARAMETER", message: err.message } };
++      throw err;
++    }
++    if (!VOLC_CONFIG.API_KEY) {
++      const err: any = new Error("服务器未配置 VOLC_API_KEY");
++      err.response = { status: 500, data: { code: "MISSING_API_KEY", message: err.message } };
++      throw err;
++    }
++
++    const contentArray: any[] = [
++      { type: "image_url", image_url: { url: firstFrame } },
++      { type: "image_url", image_url: { url: lastFrame } },
++      { type: "text", text: prompt || "A high quality video of this cat, cinematic lighting, realistic." }
++    ];
++    const requestBody: any = {
++      model: body.model || VOLC_CONFIG.VIDEO_MODEL,
++      content: contentArray,
++      parameters: {
++        size: clientParams?.resolution === "480P" || clientParams?.resolution === "480p" ? "720x1280" : (clientParams?.size || "720x1280"),
++        seed: clientParams?.seed || 12345,
++        duration: clientParams?.duration || 5,
++        fps: 25,
++        first_frame_constraint: true,
++        last_frame_constraint: true,
++      }
++    };
++    if (negative_prompt) requestBody.parameters.negative_prompt = negative_prompt;
++
++    const response = await axios.post(VOLC_CONFIG.BASE_URL, requestBody, {
++      headers: {
++        'Authorization': `Bearer ${VOLC_CONFIG.API_KEY}`,
++        'Content-Type': 'application/json'
++      },
++      httpsAgent,
++      maxContentLength: Infinity,
++      maxBodyLength: Infinity,
++      timeout: 120000
++    });
++
++    const taskId = response.data?.id || response.data?.task_id || response.data?.data?.id;
++    if (taskId) return { ...response.data, id: taskId, status: 'pending', provider: 'volcengine' };
++    throw new Error("提交火山视频任务后未获取到 task_id. 响应: " + JSON.stringify(response.data));
++  };
++
++  app.post("/api/ai/generate-image", async (req, res) => {
++    try {
++      const provider = normalizeProvider(req.body.provider);
++      const result = provider === "volcengine"
++        ? await generateVolcImage(req.body)
++        : await generateDashScopeImage(req.body);
++      res.json(result);
++    } catch (error: any) {
++      sendError(res, error, "生成图片失败");
++    }
++  });
++
++  app.post("/api/ai/generate-video", async (req, res) => {
++    try {
++      const provider = normalizeProvider(req.body.provider);
++      const result = provider === "volcengine"
++        ? await generateVolcVideo(req.body)
++        : await generateDashScopeVideo(req.body);
++      res.json(result);
++    } catch (error: any) {
++      sendError(res, error, "提交视频生成失败");
++    }
++  });
++
++  app.get("/api/ai/:type(image|video)-status/:provider/:taskId", async (req, res) => {
++    const provider = normalizeProvider(req.params.provider);
++    const { taskId } = req.params;
++    try {
++      if (taskId.startsWith('sync:')) {
++        return res.status(400).json({ status: 'failed', message: '同步任务无需轮询' });
++      }
++      if (provider === "volcengine") {
++        const response = await axios.get(`${VOLC_CONFIG.BASE_URL}/${taskId}`, {
++          headers: { 'Authorization': `Bearer ${VOLC_CONFIG.API_KEY}` },
++          httpsAgent,
++          timeout: 60000
++        });
++        return res.json(normalizeVolcStatus(response.data));
++      }
++      const response = await axios.get(`${ARK_BASE_URL}/tasks/${taskId}`, {
++        headers: { 'Authorization': `Bearer ${ARK_API_KEY}` },
++        httpsAgent,
++        timeout: 20000
++      });
++      res.json(normalizeDashScopeStatus(response.data));
++    } catch (error: any) {
++      sendError(res, error, "查询状态失败");
++    }
++  });
++
+   // API Route for Image Generation (DashScope)
+   app.post("/api/generate-image", async (req, res) => {
+     const { prompt, image_base64 } = req.body;
