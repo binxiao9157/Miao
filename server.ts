@@ -592,6 +592,7 @@ async function startServer() {
   const generateVolcVideo = async (body: any) => {
     const { prompt, parameters: clientParams, negative_prompt } = body;
     const firstFrame = body.first_frame || body.image_base64;
+    const lastFrame = body.last_frame || firstFrame;
     if (!firstFrame) {
       const err: any = new Error("缺少必要参数: image_base64");
       err.response = { status: 400, data: { code: "INVALID_PARAMETER", message: err.message } };
@@ -603,45 +604,51 @@ async function startServer() {
       throw err;
     }
 
-    let dataUrl = "";
-    if (firstFrame) {
-      let cleanBase64 = firstFrame.replace(/\s/g, '');
+    const normalizeImageUrl = (source: string) => {
+      let cleanBase64 = source.replace(/\s/g, '');
       if (cleanBase64.startsWith('http')) {
-        dataUrl = cleanBase64;
-      } else {
-        let mimeType = 'image/png';
-        if (cleanBase64.includes('base64,')) {
-          const parts = cleanBase64.split('base64,');
-          const header = parts[0];
-          cleanBase64 = parts[1];
-          const match = header.match(/data:([^;]+);/);
-          if (match) mimeType = match[1];
-        }
-        dataUrl = `data:${mimeType};base64,${cleanBase64}`;
+        return cleanBase64;
       }
-    }
+      let mimeType = 'image/png';
+      if (cleanBase64.includes('base64,')) {
+        const parts = cleanBase64.split('base64,');
+        const header = parts[0];
+        cleanBase64 = parts[1];
+        const match = header.match(/data:([^;]+);/);
+        if (match) mimeType = match[1];
+      }
+      return `data:${mimeType};base64,${cleanBase64}`;
+    };
 
-    const contentArray: any[] = [];
-    if (dataUrl) {
-      contentArray.push({
+    const firstFrameUrl = normalizeImageUrl(firstFrame);
+    const lastFrameUrl = normalizeImageUrl(lastFrame);
+    const contentArray: any[] = [
+      {
+        type: "text",
+        text: prompt || "A high quality video of this cat, cinematic lighting, realistic."
+      },
+      {
         type: "image_url",
-        image_url: { url: dataUrl }
-      });
-    }
-    contentArray.push({
-      type: "text",
-      text: prompt || "A high quality video of this cat, cinematic lighting, realistic."
-    });
+        image_url: { url: firstFrameUrl },
+        role: "first_frame"
+      },
+      {
+        type: "image_url",
+        image_url: { url: lastFrameUrl },
+        role: "last_frame"
+      }
+    ];
 
     const requestBody: any = {
       model: body.model || VOLC_CONFIG.VIDEO_MODEL,
       content: contentArray,
+      generate_audio: clientParams?.audio === true,
+      ratio: clientParams?.ratio || "adaptive",
+      duration: clientParams?.duration || 5,
       parameters: {
         size: clientParams?.resolution === "480P" || clientParams?.resolution === "480p" ? "720x1280" : (clientParams?.size || "720x1280"),
         seed: clientParams?.seed || 12345,
-        duration: clientParams?.duration || 5,
-        fps: 25,
-        first_frame_constraint: true
+        fps: 25
       }
     };
     if (negative_prompt) requestBody.parameters.negative_prompt = negative_prompt;
