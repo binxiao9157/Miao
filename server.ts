@@ -4,6 +4,8 @@ import fs from "fs";
 import axios from "axios";
 import https from "https";
 import dotenv from "dotenv";
+import crypto from "crypto";
+import multer from "multer";
 import { fileURLToPath } from 'url';
 import FormData from 'form-data';
 
@@ -14,9 +16,22 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   app.use(express.json({ limit: '50mb' }));
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+  app.use((req, res, next) => {
+    const headerType = String(req.headers['x-client-type'] || '').toLowerCase();
+    const ua = String(req.headers['user-agent'] || '').toLowerCase();
+    const referer = String(req.headers.referer || '').toLowerCase();
+    const clientType =
+      headerType ||
+      (ua.includes('miniprogram') || referer.includes('servicewechat.com') ? 'wechat-miniprogram' : 'pwa');
+    (req as any).clientType = clientType;
+    res.setHeader('X-Detected-Client-Type', clientType);
+    next();
+  });
 
   const httpsAgent = new https.Agent({
     keepAlive: true,
@@ -45,13 +60,60 @@ async function startServer() {
     fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
   }
 
-  interface ServerUser { username: string; nickname: string; avatar: string; password: string; }
+  interface ServerUser { username: string; nickname: string; avatar: string; password: string; openid?: string; unionid?: string; }
   interface ServerCat {
     id: string; userId: string; name: string; breed: string; color: string;
     avatar: string; source: string; createdAt?: number;
     videoPath?: string; videoPaths?: Record<string, string>; remoteVideoUrl?: string;
     placeholderImage?: string; anchorFrame?: string; isUnlocking?: boolean;
   }
+
+  const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || "miao-dev-secret-change-me";
+  const tokenTtlMs = Number(process.env.SESSION_TTL_MS || 30 * 24 * 60 * 60 * 1000);
+
+  const base64url = (input: Buffer | string) =>
+    Buffer.from(input).toString('base64url');
+
+  const signToken = (payload: Record<string, any>) => {
+    const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+    const body = base64url(JSON.stringify({ ...payload, exp: Date.now() + tokenTtlMs }));
+    const sig = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+    return `${header}.${body}.${sig}`;
+  };
+
+  const verifyToken = (token: string): { username: string } | null => {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const expected = crypto.createHmac('sha256', JWT_SECRET).update(`${parts[0]}.${parts[1]}`).digest('base64url');
+    if (expected.length !== parts[2].length) return null;
+    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(parts[2]))) return null;
+    try {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+      if (!payload?.username || Number(payload.exp || 0) < Date.now()) return null;
+      return { username: payload.username };
+    } catch {
+      return null;
+    }
+  };
+
+  const publicUser = (user: ServerUser) => ({
+    username: user.username,
+    nickname: user.nickname,
+    avatar: user.avatar,
+    openidBound: !!user.openid,
+    passwordSet: !!user.password
+  });
+
+  const authRequired: express.RequestHandler = (req, res, next) => {
+    const raw = String(req.headers.authorization || '');
+    const token = raw.startsWith('Bearer ') ? raw.slice(7).trim() : '';
+    const auth = token ? verifyToken(token) : null;
+    if (!auth) return res.status(401).json({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    (req as any).auth = auth;
+    next();
+  };
+
+  const getAuthedUsername = (req: express.Request) => (req as any).auth?.username as string;
 
   // ── 用户注册/登录 API ──
   app.post("/api/auth/register", (req, res) => {
@@ -82,6 +144,145 @@ async function startServer() {
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
     console.log(`[Auth] Login: ${username}`);
     res.json({ username: user.username, nickname: user.nickname, avatar: user.avatar });
+  });
+
+  app.post("/api/v1/auth/register", (req, res) => {
+    const username = (req.body.username || "").trim();
+    const password = (req.body.password || "").trim();
+    const nickname = (req.body.nickname || "").trim();
+    const avatar = (req.body.avatar || "").trim();
+    if (!username || !password) return res.status(400).json({ error: "Missing username or password", code: "INVALID_PARAMETER" });
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    if (users.find(u => u.username === username)) {
+      return res.status(409).json({ error: "Username already exists", code: "USERNAME_EXISTS" });
+    }
+    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '' };
+    users.push(user);
+    writeJSON(usersFile, users);
+    res.json({ token: signToken({ username: user.username }), user: publicUser(user) });
+  });
+
+  app.post("/api/v1/auth/password-login", (req, res) => {
+    const username = (req.body.username || "").trim();
+    const password = (req.body.password || "").trim();
+    if (!username || !password) return res.status(400).json({ error: "Missing username or password", code: "INVALID_PARAMETER" });
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const user = users.find(u => u.username === username && u.password === password);
+    if (!user) return res.status(401).json({ error: "Invalid credentials", code: "INVALID_CREDENTIALS" });
+    res.json({ token: signToken({ username: user.username }), user: publicUser(user) });
+  });
+
+  app.post("/api/v1/auth/wechat-login", async (req, res) => {
+    const code = (req.body.code || "").trim();
+    const nickname = (req.body.nickname || "").trim();
+    const avatar = (req.body.avatar || "").trim();
+    if (!code) return res.status(400).json({ error: "Missing code", code: "INVALID_PARAMETER" });
+    if (!process.env.WECHAT_APPID || !process.env.WECHAT_APPSECRET) {
+      if (process.env.NODE_ENV !== "production" || process.env.WECHAT_LOGIN_DEV_MOCK === "true") {
+        const requestedDevOpenid = (req.body.devOpenid || process.env.WECHAT_DEV_OPENID || "dev_local_wechat_user").trim();
+        const devOpenid = requestedDevOpenid.startsWith("dev_")
+          ? requestedDevOpenid
+          : `dev_${crypto.createHash('sha256').update(requestedDevOpenid).digest('hex').slice(0, 16)}`;
+        const users = readJSON<ServerUser[]>(usersFile, []);
+        let user = users.find(u => u.openid === devOpenid);
+        if (!user) {
+          user = {
+            username: `wx_${devOpenid}`,
+            password: "",
+            nickname: nickname || `微信测试用户_${devOpenid.slice(-4)}`,
+            avatar,
+            openid: devOpenid
+          };
+          users.push(user);
+        } else {
+          if (nickname) user.nickname = nickname;
+          if (avatar) user.avatar = avatar;
+        }
+        writeJSON(usersFile, users);
+        return res.json({
+          token: signToken({ username: user.username }),
+          user: publicUser(user),
+          openidBound: true,
+          devMock: true
+        });
+      }
+      return res.status(501).json({ error: "WeChat login is not configured", code: "WECHAT_NOT_CONFIGURED" });
+    }
+
+    try {
+      const wxResp = await axios.get("https://api.weixin.qq.com/sns/jscode2session", {
+        params: {
+          appid: process.env.WECHAT_APPID,
+          secret: process.env.WECHAT_APPSECRET,
+          js_code: code,
+          grant_type: "authorization_code"
+        },
+        timeout: 10000,
+        httpsAgent
+      });
+      const openid = wxResp.data?.openid;
+      if (!openid) {
+        return res.status(401).json({ error: wxResp.data?.errmsg || "WeChat code exchange failed", code: "WECHAT_LOGIN_FAILED" });
+      }
+
+      const users = readJSON<ServerUser[]>(usersFile, []);
+      let user = users.find(u => u.openid === openid);
+      if (!user) {
+        user = {
+          username: `wx_${openid}`,
+          password: "",
+          nickname: nickname || `微信用户_${openid.slice(-4)}`,
+          avatar,
+          openid,
+          unionid: wxResp.data?.unionid
+        };
+        users.push(user);
+      } else {
+        if (nickname) user.nickname = nickname;
+        if (avatar) user.avatar = avatar;
+        if (wxResp.data?.unionid) user.unionid = wxResp.data.unionid;
+      }
+      writeJSON(usersFile, users);
+      res.json({ token: signToken({ username: user.username }), user: publicUser(user), openidBound: true });
+    } catch (error: any) {
+      res.status(502).json({ error: "WeChat login request failed", message: error.message, code: "WECHAT_UPSTREAM_ERROR" });
+    }
+  });
+
+  app.post("/api/v1/auth/set-password", authRequired, (req, res) => {
+    const username = getAuthedUsername(req);
+    const currentPassword = String(req.body.currentPassword || "").trim();
+    const password = String(req.body.password || "").trim();
+
+    if (!password) {
+      return res.status(400).json({ error: "Missing password", code: "INVALID_PARAMETER" });
+    }
+    if (password.length < 6 || password.length > 20) {
+      return res.status(400).json({ error: "Password length must be 6-20 characters", code: "INVALID_PASSWORD_LENGTH" });
+    }
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const user = users.find(u => u.username === username);
+    if (!user) {
+      return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+    }
+
+    if (user.password && user.password !== currentPassword) {
+      return res.status(401).json({ error: "Invalid current password", code: "INVALID_CURRENT_PASSWORD" });
+    }
+
+    user.password = password;
+    writeJSON(usersFile, users);
+    res.json({ success: true, user: publicUser(user) });
+  });
+
+  app.get("/api/v1/me", authRequired, (req, res) => {
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const user = users.find(u => u.username === getAuthedUsername(req));
+    if (!user) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+    res.json({ user: publicUser(user), clientType: (req as any).clientType });
   });
 
   // ── 猫咪 CRUD API ──
@@ -205,6 +406,116 @@ async function startServer() {
     if (idx >= 0) all[idx].data = data; else all.push({ userId, data });
     writeJSON(pointsFile, all);
     res.json({ success: true });
+  });
+
+  app.get("/api/v1/cats", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    res.json(cats.filter(c => c.userId === userId));
+  });
+
+  app.post("/api/v1/cats", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const cat = req.body.cat || req.body;
+    if (!cat?.id) return res.status(400).json({ error: "Missing cat.id", code: "INVALID_PARAMETER" });
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    const entry: ServerCat = { ...cat, userId };
+    const idx = cats.findIndex(c => c.userId === userId && c.id === cat.id);
+    if (idx >= 0) {
+      cats[idx] = {
+        ...entry,
+        videoPaths: {
+          ...cats[idx].videoPaths,
+          ...entry.videoPaths
+        }
+      };
+    } else {
+      cats.push(entry);
+    }
+    writeJSON(catsFile, cats);
+    res.json({ success: true, cat: entry });
+  });
+
+  app.delete("/api/v1/cats/:catId", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    writeJSON(catsFile, cats.filter(c => !(c.userId === userId && c.id === req.params.catId)));
+    res.json({ success: true });
+  });
+
+  app.delete("/api/v1/cats", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    writeJSON(catsFile, cats.filter(c => c.userId !== userId));
+    res.json({ success: true });
+  });
+
+  app.get("/api/v1/diaries", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const all = readJSON<ServerDiary[]>(diariesFile, []);
+    res.json(all.filter(d => d.userId === userId));
+  });
+
+  app.post("/api/v1/diaries", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const diary = req.body.diary || req.body;
+    if (!diary?.id) return res.status(400).json({ error: "Missing diary.id", code: "INVALID_PARAMETER" });
+    const all = readJSON<ServerDiary[]>(diariesFile, []);
+    const entry: ServerDiary = { ...diary, userId };
+    const idx = all.findIndex(d => d.userId === userId && d.id === diary.id);
+    if (idx >= 0) all[idx] = entry; else all.push(entry);
+    writeJSON(diariesFile, all);
+    res.json({ success: true, diary: entry });
+  });
+
+  app.delete("/api/v1/diaries/:diaryId", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const all = readJSON<ServerDiary[]>(diariesFile, []);
+    writeJSON(diariesFile, all.filter(d => !(d.userId === userId && d.id === req.params.diaryId)));
+    res.json({ success: true });
+  });
+
+  app.get("/api/v1/letters", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const all = readJSON<ServerLetter[]>(lettersFile, []);
+    res.json(all.filter(l => l.userId === userId));
+  });
+
+  app.post("/api/v1/letters", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const letter = req.body.letter || req.body;
+    if (!letter?.id) return res.status(400).json({ error: "Missing letter.id", code: "INVALID_PARAMETER" });
+    const all = readJSON<ServerLetter[]>(lettersFile, []);
+    const entry: ServerLetter = { ...letter, userId };
+    const idx = all.findIndex(l => l.userId === userId && l.id === letter.id);
+    if (idx >= 0) all[idx] = entry; else all.push(entry);
+    writeJSON(lettersFile, all);
+    res.json({ success: true, letter: entry });
+  });
+
+  app.delete("/api/v1/letters/:letterId", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const all = readJSON<ServerLetter[]>(lettersFile, []);
+    writeJSON(lettersFile, all.filter(l => !(l.userId === userId && l.id === req.params.letterId)));
+    res.json({ success: true });
+  });
+
+  app.get("/api/v1/points", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const all = readJSON<ServerPoints[]>(pointsFile, []);
+    const entry = all.find(p => p.userId === userId);
+    res.json(entry?.data || null);
+  });
+
+  app.post("/api/v1/points", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const data = req.body.data || req.body;
+    if (!data) return res.status(400).json({ error: "Missing data", code: "INVALID_PARAMETER" });
+    const all = readJSON<ServerPoints[]>(pointsFile, []);
+    const idx = all.findIndex(p => p.userId === userId);
+    if (idx >= 0) all[idx].data = data; else all.push({ userId, data });
+    writeJSON(pointsFile, all);
+    res.json({ success: true, data });
   });
 
   // Health check endpoint
@@ -734,6 +1045,74 @@ async function startServer() {
     }
   });
 
+  app.post("/api/v1/ai/tasks", authRequired, async (req, res) => {
+    const type = req.body.type === "image" ? "image" : "video";
+    try {
+      const provider = normalizeProvider(req.body.provider);
+      const result = type === "image"
+        ? (provider === "volcengine" ? await generateVolcImage(req.body) : await generateDashScopeImage(req.body))
+        : (provider === "volcengine" ? await generateVolcVideo(req.body) : await generateDashScopeVideo(req.body));
+      res.json({ ...result, type, provider });
+    } catch (error: any) {
+      sendError(res, error, type === "image" ? "生成图片失败" : "提交视频生成失败");
+    }
+  });
+
+  app.post("/api/v1/ai/tasks-file", authRequired, upload.single('image'), async (req, res) => {
+    const type = req.body.type === "image" ? "image" : "video";
+    if (!req.file) return res.status(400).json({ error: "缺少图片文件", code: "INVALID_PARAMETER" });
+    const mime = req.file.mimetype || 'image/jpeg';
+    const imageData = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+    const body = {
+      ...req.body,
+      image_base64: imageData,
+      first_frame: imageData,
+      last_frame: imageData,
+      parameters: {
+        seed: req.body.seed ? Number(req.body.seed) : undefined,
+        resolution: req.body.resolution,
+        duration: req.body.duration ? Number(req.body.duration) : undefined,
+        audio: req.body.audio === 'true',
+      }
+    };
+    try {
+      const provider = normalizeProvider(req.body.provider);
+      const result = type === "image"
+        ? (provider === "volcengine" ? await generateVolcImage(body) : await generateDashScopeImage(body))
+        : (provider === "volcengine" ? await generateVolcVideo(body) : await generateDashScopeVideo(body));
+      res.json({ ...result, type, provider });
+    } catch (error: any) {
+      sendError(res, error, type === "image" ? "生成图片失败" : "提交视频生成失败");
+    }
+  });
+
+  app.get("/api/v1/ai/tasks/:taskId", authRequired, async (req, res) => {
+    const provider = normalizeProvider(req.query.provider);
+    const type = req.query.type === "image" ? "image" : "video";
+    const { taskId } = req.params;
+    try {
+      if (taskId.startsWith('sync:')) {
+        return res.status(400).json({ status: 'failed', message: '同步任务无需轮询' });
+      }
+      if (provider === "volcengine") {
+        const response = await axios.get(`${VOLC_CONFIG.BASE_URL}/${taskId}`, {
+          headers: { 'Authorization': `Bearer ${VOLC_CONFIG.API_KEY}` },
+          httpsAgent,
+          timeout: 60000
+        });
+        return res.json({ ...normalizeVolcStatus(response.data), type, provider });
+      }
+      const response = await axios.get(`${ARK_BASE_URL}/tasks/${taskId}`, {
+        headers: { 'Authorization': `Bearer ${ARK_API_KEY}` },
+        httpsAgent,
+        timeout: 20000
+      });
+      res.json({ ...normalizeDashScopeStatus(response.data), type, provider });
+    } catch (error: any) {
+      sendError(res, error, "查询状态失败");
+    }
+  });
+
   // API Route for Image Generation (DashScope)
   app.post("/api/generate-image", async (req, res) => {
     const { prompt, image_base64 } = req.body;
@@ -1016,7 +1395,7 @@ async function startServer() {
   const uploadsDir = path.resolve(__dirname, 'uploads', 'videos');
   fs.mkdirSync(uploadsDir, { recursive: true });
 
-  app.post("/api/persist-video", async (req, res) => {
+  const persistVideoHandler: express.RequestHandler = async (req, res) => {
     const { videoUrl, catId, action } = req.body;
     if (!videoUrl || !catId || !action) {
       return res.status(400).json({ error: "Missing videoUrl, catId, or action" });
@@ -1045,7 +1424,10 @@ async function startServer() {
       console.error(`[Persist] Failed to download video:`, error.message);
       res.status(500).json({ error: "Failed to persist video", originalUrl: videoUrl });
     }
-  });
+  };
+
+  app.post("/api/persist-video", persistVideoHandler);
+  app.post("/api/v1/assets/persist-video", authRequired, persistVideoHandler);
 
   app.use('/uploads', express.static(path.resolve(__dirname, 'uploads'), {
     maxAge: '30d',
