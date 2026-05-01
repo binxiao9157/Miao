@@ -548,8 +548,23 @@ async function startServer() {
   const ARK_API_KEY = DASHSCOPE_CONFIG.API_KEY;
   const ARK_BASE_URL = DASHSCOPE_CONFIG.BASE_URL;
 
+  const ensureDashScopeApiKey = () => {
+    if (!ARK_API_KEY) {
+      const err: any = new Error("服务器未配置 DASHSCOPE_API_KEY，无法调用阿里灵积模型");
+      err.response = {
+        status: 500,
+        data: {
+          code: "MISSING_DASHSCOPE_API_KEY",
+          message: err.message
+        }
+      };
+      throw err;
+    }
+  };
+
   // 辅助函数：将 fileid 转换为临时的公网 HTTP URL
   const getFileUrl = async (fileId: string): Promise<string> => {
+    ensureDashScopeApiKey();
     try {
       const response = await axios.get(`${ARK_BASE_URL}/files/${fileId}`, {
         headers: { 'Authorization': `Bearer ${ARK_API_KEY}` },
@@ -588,6 +603,7 @@ async function startServer() {
   // 辅助函数：上传图片到 DashScope 文件系统（支持 Base64 和外部 URL）
   // 返回格式：{ success: true, fileId: string } | { success: false, error: string }
   const uploadImageToDashScope = async (imageSource: string, sourceType: "Base64" | "URL"): Promise<{ success: boolean; fileId?: string; error?: string }> => {
+    ensureDashScopeApiKey();
     try {
       let buffer: Buffer;
       let filename = 'frame.jpg';
@@ -702,11 +718,29 @@ async function startServer() {
       });
     }
 
+    if (errorCode === "MISSING_DASHSCOPE_API_KEY") {
+      return res.status(500).json({
+        error: "阿里灵积未配置",
+        message: "服务器未配置 DASHSCOPE_API_KEY，请在 Miao_remote/.env 中配置有效的阿里灵积 API Key 后重启服务。",
+        code: "MISSING_DASHSCOPE_API_KEY",
+        details: JSON.stringify(detailedError)
+      });
+    }
+
     if (errorCode === "Arrearage" || errorMessage?.toLowerCase().includes("balance")) {
       return res.status(403).json({
         error: "账户欠费",
         message: "您的阿里云账户已欠费，请充值后重试。",
         code: "ARREARAGE",
+        details: JSON.stringify(detailedError)
+      });
+    }
+
+    if (errorCode === "AllocationQuota.FreeTierOnly") {
+      return res.status(403).json({
+        error: "免费额度已用尽",
+        message: "阿里灵积当前模型的免费额度已用尽，且账号开启了“仅使用免费额度”。请到阿里云百炼/DashScope 控制台关闭该限制并开通付费调用，或切换到仍有额度的模型/API Key。",
+        code: "DASHSCOPE_FREE_TIER_EXHAUSTED",
         details: JSON.stringify(detailedError)
       });
     }
@@ -771,6 +805,7 @@ async function startServer() {
   };
 
   const generateDashScopeImage = async (body: any) => {
+    ensureDashScopeApiKey();
     const { prompt, image_base64 } = body;
     if (!prompt || typeof prompt !== 'string') {
       const err: any = new Error("缺少必要参数: prompt");
@@ -851,31 +886,36 @@ async function startServer() {
     throw new Error("火山引擎未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
   };
 
-  const generateDashScopeVideo = async (body: any) => {
-    const { prompt, parameters: clientParams } = body;
-    const firstFrame = body.first_frame || body.image_base64;
-    const lastFrame = body.last_frame || firstFrame;
-    if (!firstFrame) {
-      const err: any = new Error("缺少必要参数: first_frame");
-      err.response = { status: 400, data: { code: "INVALID_PARAMETER", message: err.message } };
-      throw err;
+  const getDashScopeVideoFrameUrl = async (source: string): Promise<string> => {
+    if (source.startsWith('fileid://')) {
+      return getFileUrl(source.replace('fileid://', ''));
     }
+    return source;
+  };
 
-    let firstFrameUrl = toImageUrl(firstFrame);
-    let lastFrameUrl = toImageUrl(lastFrame);
-    if (firstFrameUrl.startsWith('fileid://')) {
-      firstFrameUrl = await getFileUrl(firstFrameUrl.replace('fileid://', ''));
+  const uploadDashScopeFrameAndGetUrl = async (source: string): Promise<string> => {
+    const uploadResult = await uploadImageToDashScope(
+      source,
+      source.startsWith('http') ? 'URL' : 'Base64'
+    );
+    if (!uploadResult.success || !uploadResult.fileId) {
+      throw new Error(uploadResult.error || "DashScope 首帧上传失败");
     }
-    if (lastFrameUrl.startsWith('fileid://')) {
-      lastFrameUrl = await getFileUrl(lastFrameUrl.replace('fileid://', ''));
-    }
+    return getFileUrl(uploadResult.fileId.replace('fileid://', ''));
+  };
 
+  const postDashScopeVideoTask = async (
+    body: any,
+    firstFrameUrl: string,
+    lastFrameUrl: string,
+    clientParams: any
+  ) => {
     const requestBody = {
       model: body.model || DASHSCOPE_CONFIG.VIDEO_MODEL,
       input: {
         first_frame_url: firstFrameUrl,
         last_frame_url: lastFrameUrl,
-        prompt: prompt || "A high quality video of this cat, cinematic lighting, realistic."
+        prompt: body.prompt || "A high quality video of this cat, cinematic lighting, realistic."
       },
       parameters: {
         resolution: clientParams?.resolution || "480P",
@@ -885,7 +925,7 @@ async function startServer() {
       }
     };
 
-    const response = await axios.post(`${ARK_BASE_URL}/services/aigc/image2video/video-synthesis`, requestBody, {
+    return axios.post(`${ARK_BASE_URL}/services/aigc/image2video/video-synthesis`, requestBody, {
       headers: {
         'Authorization': `Bearer ${ARK_API_KEY}`,
         'Content-Type': 'application/json',
@@ -894,6 +934,44 @@ async function startServer() {
       httpsAgent,
       timeout: 60000
     });
+  };
+
+  const generateDashScopeVideo = async (body: any) => {
+    ensureDashScopeApiKey();
+    const { parameters: clientParams } = body;
+    const firstFrame = body.first_frame || body.image_base64;
+    const lastFrame = body.last_frame || firstFrame;
+    if (!firstFrame) {
+      const err: any = new Error("缺少必要参数: first_frame");
+      err.response = { status: 400, data: { code: "INVALID_PARAMETER", message: err.message } };
+      throw err;
+    }
+
+    let firstFrameUrl = await getDashScopeVideoFrameUrl(toImageUrl(firstFrame));
+    let lastFrameUrl = await getDashScopeVideoFrameUrl(toImageUrl(lastFrame));
+    let response;
+
+    try {
+      response = await postDashScopeVideoTask(body, firstFrameUrl, lastFrameUrl, clientParams);
+    } catch (error: any) {
+      const status = error.response?.status;
+      const code = error.response?.data?.code;
+      const quotaLimited = code === "AllocationQuota.FreeTierOnly";
+      const shouldRetryWithUploadedFrame = !quotaLimited && (status === 403 || code === "Forbidden" || code === "AccessDenied");
+      if (!shouldRetryWithUploadedFrame) throw error;
+
+      console.warn("[Video] DashScope direct frame URL was rejected, retrying with uploaded DashScope file URL:", {
+        status,
+        code,
+        message: error.response?.data?.message || error.message,
+      });
+
+      firstFrameUrl = await uploadDashScopeFrameAndGetUrl(toImageUrl(firstFrame));
+      lastFrameUrl = lastFrame === firstFrame
+        ? firstFrameUrl
+        : await uploadDashScopeFrameAndGetUrl(toImageUrl(lastFrame));
+      response = await postDashScopeVideoTask(body, firstFrameUrl, lastFrameUrl, clientParams);
+    }
 
     const taskId = response.data?.output?.task_id;
     if (taskId) return { id: taskId, status: 'pending', provider: 'dashscope' };
@@ -1034,6 +1112,7 @@ async function startServer() {
         });
         return res.json(normalizeVolcStatus(response.data));
       }
+      ensureDashScopeApiKey();
       const response = await axios.get(`${ARK_BASE_URL}/tasks/${taskId}`, {
         headers: { 'Authorization': `Bearer ${ARK_API_KEY}` },
         httpsAgent,
@@ -1102,6 +1181,7 @@ async function startServer() {
         });
         return res.json({ ...normalizeVolcStatus(response.data), type, provider });
       }
+      ensureDashScopeApiKey();
       const response = await axios.get(`${ARK_BASE_URL}/tasks/${taskId}`, {
         headers: { 'Authorization': `Bearer ${ARK_API_KEY}` },
         httpsAgent,
