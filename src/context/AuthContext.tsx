@@ -16,6 +16,78 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+type AuthResponse = {
+  token?: string;
+  user?: Partial<UserInfo>;
+};
+
+class AuthApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'AuthApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const toUserInfo = (serverUser: Partial<UserInfo> | undefined, password: string, fallbackUsername: string): UserInfo => {
+  const username = (serverUser?.username || fallbackUsername).trim();
+  return {
+    username,
+    password,
+    nickname: serverUser?.nickname || username,
+    avatar: serverUser?.avatar || '',
+  };
+};
+
+const requestAuth = async (path: string, payload: Record<string, string | undefined>): Promise<AuthResponse> => {
+  const resp = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new AuthApiError(data.error || '认证请求失败', resp.status, data.code);
+  }
+  return data;
+};
+
+const ensureServerAccountForLocalUser = async (localUser: UserInfo): Promise<UserInfo | null> => {
+  if (!localUser.password) return null;
+
+  try {
+    const data = await requestAuth('/api/v1/auth/password-login', {
+      username: localUser.username,
+      password: localUser.password,
+    });
+    const userInfo = toUserInfo(data.user, localUser.password, localUser.username);
+    storage.saveUserInfo(userInfo);
+    if (data.token) storage.saveToken(data.token);
+    return userInfo;
+  } catch (error) {
+    if (!(error instanceof AuthApiError) || error.status !== 401) return null;
+  }
+
+  try {
+    const data = await requestAuth('/api/v1/auth/register', {
+      username: localUser.username,
+      password: localUser.password,
+      nickname: localUser.nickname,
+      avatar: localUser.avatar,
+    });
+    const userInfo = toUserInfo(data.user, localUser.password, localUser.username);
+    storage.saveUserInfo(userInfo);
+    if (data.token) storage.saveToken(data.token);
+    return userInfo;
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // 移除免登录逻辑，每次打开 App 均需重新登录
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -35,96 +107,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentUser) {
       setUser(currentUser);
       setIsAuthenticated(true);
+      ensureServerAccountForLocalUser(currentUser).then((syncedUser) => {
+        if (syncedUser) setUser(syncedUser);
+      });
     }
     refreshCatStatus();
   }, [refreshCatStatus]);
 
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: 'credentials' | 'network' }> => {
-    // 1. 先查本地 localStorage
-    const users = storage.getAllUsers();
-    const savedUser = users.find(u => u.username === username && u.password === password);
-    
-    if (savedUser) {
-      storage.saveUserInfo(savedUser);
-      storage.saveToken('mock_token_' + Date.now());
-      storage.saveLoginTime(Date.now());
-      storage.saveLastActiveTime(Date.now());
-      
-      setIsAuthenticated(true);
-      setUser(savedUser);
-
-      fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password: savedUser.password }),
-      }).catch(() => {});
-      storage.syncFromServer(username).then(() => refreshCatStatus());
-      
-      refreshCatStatus();
-      return { success: true };
-    }
-
-    // 2. 本地无此用户 → 回退到服务器验证（解决跨设备 localStorage 隔离问题）
-    try {
-      const resp = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      if (!resp.ok) return { success: false, error: 'credentials' };
-
-      const serverUser = await resp.json();
-      const userInfo: UserInfo = {
-        username: serverUser.username,
-        password,
-        nickname: serverUser.nickname || username,
-        avatar: serverUser.avatar || '',
-      };
-
+    const persistLogin = (userInfo: UserInfo, token?: string) => {
       storage.saveUserInfo(userInfo);
-      storage.saveToken('mock_token_' + Date.now());
+      storage.saveToken(token || 'mock_token_' + Date.now());
       storage.saveLoginTime(Date.now());
       storage.saveLastActiveTime(Date.now());
 
       setIsAuthenticated(true);
       setUser(userInfo);
 
-      storage.syncFromServer(username).then(() => refreshCatStatus());
+      storage.syncFromServer(userInfo.username).then(() => refreshCatStatus());
       refreshCatStatus();
+    };
+
+    // 老版本 PWA 曾允许服务端注册失败后仅保存本地；这里用于把这类历史账号补写到服务端。
+    const users = storage.getAllUsers();
+    const savedUser = users.find(u => u.username === username && u.password === password);
+
+    try {
+      const data = await requestAuth('/api/v1/auth/password-login', { username, password });
+      persistLogin(toUserInfo(data.user, password, username), data.token);
       return { success: true };
-    } catch {
-      return { success: false, error: 'network' };
+    } catch (error) {
+      if (!(error instanceof AuthApiError)) {
+        return { success: false, error: 'network' };
+      }
+
+      if (error.status !== 401 || !savedUser) {
+        return { success: false, error: error.status >= 500 ? 'network' : 'credentials' };
+      }
+
+      try {
+        const data = await requestAuth('/api/v1/auth/register', {
+          username: savedUser.username,
+          password: savedUser.password,
+          nickname: savedUser.nickname,
+          avatar: savedUser.avatar,
+        });
+        const userInfo = toUserInfo(data.user, savedUser.password || password, savedUser.username);
+        persistLogin(userInfo, data.token);
+        return { success: true };
+      } catch (migrationError) {
+        if (migrationError instanceof AuthApiError && migrationError.status >= 500) {
+          return { success: false, error: 'network' };
+        }
+        return { success: false, error: 'credentials' };
+      }
     }
   };
 
   const register = async (info: UserInfo): Promise<void> => {
-    // 1. 先同步注册到服务端，确保跨设备可登录
     try {
-      const resp = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: info.username, password: info.password, nickname: info.nickname, avatar: info.avatar }),
+      const data = await requestAuth('/api/v1/auth/register', {
+        username: info.username,
+        password: info.password,
+        nickname: info.nickname,
+        avatar: info.avatar,
       });
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        if (resp.status === 409) throw new Error('用户名已被注册');
-        throw new Error(data.error || '注册失败，请重试');
-      }
+      const userInfo = toUserInfo(data.user, info.password || '', info.username);
+      storage.saveUserInfo(userInfo);
+      storage.saveToken(data.token || 'mock_token_' + Date.now());
+      storage.saveLoginTime(Date.now());
+      storage.saveLastActiveTime(Date.now());
+
+      setIsAuthenticated(true);
+      setUser(userInfo);
+      refreshCatStatus();
     } catch (e: any) {
-      if (e.message === '用户名已被注册') throw e;
-      // 网络异常时仍允许本地注册（离线容错），但打印警告
-      console.warn('[Register] 服务端注册失败，仅保存到本地:', e.message);
+      if (e instanceof AuthApiError && e.status === 409) {
+        throw new Error('用户名已被注册');
+      }
+      throw new Error(e?.message || '注册失败，请重试');
     }
-
-    // 2. 本地持久化
-    storage.saveUserInfo(info);
-    storage.saveToken('mock_token_' + Date.now());
-    storage.saveLoginTime(Date.now());
-    storage.saveLastActiveTime(Date.now());
-
-    setUser(info);
-    setIsAuthenticated(true);
-    refreshCatStatus();
   };
 
   const logout = () => {

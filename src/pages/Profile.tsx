@@ -3,7 +3,7 @@ import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as U
 import { useAuthContext } from "../context/AuthContext";
 import { storage, CatInfo } from "../services/storage";
 import { computeNotifications } from "./NotificationList";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import InstallPromptBanner from "../components/InstallPromptBanner";
 import PageHeader from "../components/PageHeader";
@@ -15,7 +15,8 @@ export default function Profile() {
   const [activeCat, setActiveCat] = useState<CatInfo | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [clickCount, setClickCount] = useState(0);
+  const adminTapCountRef = useRef(0);
+  const adminTapTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const loadStats = () => {
@@ -110,15 +111,25 @@ export default function Profile() {
   };
 
   const handleAdminTap = () => {
-    setClickCount(prev => {
-      const next = prev + 1;
-      if (next >= 5) {
-        navigate("/admin-settings");
-        return 0;
-      }
-      return next;
-    });
+    adminTapCountRef.current += 1;
+    if (adminTapTimerRef.current) window.clearTimeout(adminTapTimerRef.current);
+
+    if (adminTapCountRef.current >= 5) {
+      adminTapCountRef.current = 0;
+      navigate("/admin-settings");
+      return;
+    }
+
+    adminTapTimerRef.current = window.setTimeout(() => {
+      adminTapCountRef.current = 0;
+    }, 2000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (adminTapTimerRef.current) window.clearTimeout(adminTapTimerRef.current);
+    };
+  }, []);
 
   return (
     <div className="flex flex-col w-full min-h-full bg-gradient-to-b from-[#FFF9F5] to-[#FFE8D6]">
