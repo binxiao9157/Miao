@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import { ChevronLeft, Zap, Image as ImageIcon, QrCode, CheckCircle, AlertCircle, UserPlus, X, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { storage, FriendInfo } from "../services/storage";
+import { FriendInfo, storage } from "../services/storage";
 import { QRCodeCanvas } from "qrcode.react";
+import { friendService } from "../services/friendService";
 
 export default function ScanFriend() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function ScanFriend() {
   const [showToast, setShowToast] = useState(false);
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [showMyQR, setShowMyQR] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,34 +95,30 @@ export default function ScanFriend() {
 
   const handleScanResult = async (decodedText: string) => {
     try {
-      const data = JSON.parse(decodedText);
-      if (data.type === 'miao_friend_invite' && data.uid) {
-        const mockFriend: FriendInfo = {
-          id: data.uid,
-          nickname: data.nickname || `喵友_${data.uid.slice(-4)}`,
-          avatar: data.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.uid}`,
-          catName: data.catName || "小橘",
-          catAvatar: data.catAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${data.uid}`,
-          addedAt: Date.now()
-        };
-        
-        setPendingFriend(mockFriend);
-        
-        if (scannerRef.current?.isScanning) {
-          await scannerRef.current.stop();
-          scannerRef.current.clear();
-          stopTracks();
-        }
-      } else {
-        setScannedUID(decodedText);
+      const code = friendService.extractInviteCode(decodedText);
+      if (!code) {
+        setScannedUID("无法识别的好友邀请码");
         setShowToast(true);
-        setTimeout(() => {
-          setShowToast(false);
-          setScannedUID(null);
-        }, 3000);
+        return;
       }
-    } catch (e) {
-      setScannedUID(decodedText);
+      const invite = await friendService.getInvite(code);
+      setInviteCode(code);
+      setPendingFriend({
+        id: invite.ownerId,
+        nickname: invite.inviter?.nickname || invite.ownerId,
+        avatar: invite.inviter?.avatar || "",
+        catName: invite.catName || "小猫",
+        catAvatar: invite.catAvatar || "",
+        addedAt: Date.now()
+      });
+
+      if (scannerRef.current?.isScanning) {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+        stopTracks();
+      }
+    } catch (e: any) {
+      setScannedUID(e?.message || "邀请码无效或已过期");
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
@@ -150,22 +148,35 @@ export default function ScanFriend() {
     }
   };
 
-  const confirmAddFriend = () => {
-    if (pendingFriend) {
-      storage.addFriend(pendingFriend);
-      setShowToast(true);
-      setScannedUID(`已添加 ${pendingFriend.nickname}`);
-      setPendingFriend(null);
-      setTimeout(() => {
-        setShowToast(false);
-        setScannedUID(null);
-        startScanner();
-      }, 2000);
+  const confirmAddFriend = async () => {
+    if (pendingFriend && inviteCode) {
+      try {
+        await friendService.acceptInvite(inviteCode);
+        setShowToast(true);
+        setScannedUID(`已添加 ${pendingFriend.nickname}`);
+        setPendingFriend(null);
+        setTimeout(() => {
+          setShowToast(false);
+          setScannedUID(null);
+          startScanner();
+        }, 2000);
+      } catch (error: any) {
+        setError(error?.message || "添加好友失败");
+        setTimeout(() => setError(null), 3000);
+      }
     }
   };
 
   useEffect(() => {
     let isUnmounted = false;
+    const queryInvite = new URLSearchParams(window.location.search).get("invite");
+    if (queryInvite) {
+      handleScanResult(queryInvite);
+      return () => {
+        isUnmounted = true;
+        stopTracks();
+      };
+    }
     const timer = setTimeout(() => startScanner(isUnmounted), 100);
 
     const handleVisibilityChange = () => {
