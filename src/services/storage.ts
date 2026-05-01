@@ -922,63 +922,15 @@ export const storage = {
     return storage.safeParse<FriendInfo[]>(getUserKey(USER_DATA_KEYS.FRIENDS), []);
   },
 
+  saveFriends: (friends: FriendInfo[]) => {
+    storage.setItem(getUserKey(USER_DATA_KEYS.FRIENDS), JSON.stringify(friends));
+  },
+
   addFriend: (friend: FriendInfo) => {
     const friends = storage.getFriends();
     if (!friends.find(f => f.id === friend.id)) {
       friends.push(friend);
       storage.setItem(getUserKey(USER_DATA_KEYS.FRIENDS), JSON.stringify(friends));
-      
-      // 当添加好友时，模拟生成几条好友日记以供展示
-      const mockDiaries: FriendDiaryEntry[] = [
-        {
-          id: `fdiary_${friend.id}_1`,
-          catId: `cat_${friend.id}`,
-          authorId: friend.id,
-          authorNickname: friend.nickname,
-          authorAvatar: friend.avatar,
-          catName: friend.catName,
-          content: `今天和 ${friend.catName} 一起晒了太阳，它睡得好香呀～`,
-          media: `https://picsum.photos/seed/${friend.id}_1/800/600`,
-          mediaType: 'image',
-          createdAt: Date.now() - 3600000,
-          likes: 5,
-          isLiked: false,
-          comments: []
-        },
-        {
-          id: `fdiary_${friend.id}_2`,
-          catId: `cat_${friend.id}`,
-          authorId: friend.id,
-          authorNickname: friend.nickname,
-          authorAvatar: friend.avatar,
-          catName: friend.catName,
-          content: `${friend.catName} 好像又胖了一点点，是不是该减肥了？`,
-          media: `https://picsum.photos/seed/${friend.id}_2/800/600`,
-          mediaType: 'image',
-          createdAt: Date.now() - 86400000,
-          likes: 12,
-          isLiked: true,
-          comments: [{ id: 'c1', content: '好可爱的猫咪！' }]
-        },
-        {
-          id: `fdiary_${friend.id}_3`,
-          catId: `cat_${friend.id}`,
-          authorId: friend.id,
-          authorNickname: friend.nickname,
-          authorAvatar: friend.avatar,
-          catName: friend.catName,
-          content: `新买的逗猫棒，${friend.catName} 玩疯了哈哈。`,
-          media: `https://picsum.photos/seed/${friend.id}_3/800/600`,
-          mediaType: 'image',
-          createdAt: Date.now() - 172800000,
-          likes: 8,
-          isLiked: false,
-          comments: []
-        }
-      ];
-      const existingFriendDiaries = storage.getFriendDiaries();
-      storage.saveFriendDiaries([...mockDiaries, ...existingFriendDiaries]);
-      
       return true;
     }
     return false;

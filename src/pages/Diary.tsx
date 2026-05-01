@@ -9,7 +9,7 @@ import DiaryCard from "../components/DiaryCard";
 import { shareService } from "../services/shareService";
 import PageHeader from "../components/PageHeader";
 import { mediaStorage } from "../services/mediaStorage";
-import { mockFriendService } from "../services/mockFriendService";
+import { friendService } from "../services/friendService";
 import { PrivateMessageShare } from "../components/PrivateMessageShare";
 import CommentInput from "../components/CommentInput";
 import { ShareSheet } from "../components/ShareSheet";
@@ -76,8 +76,7 @@ export default function Diary() {
     return () => clearTimeout(timer);
   }, [commentingId]);
 
-  const loadData = useCallback(() => {
-    mockFriendService.initializeMockData();
+  const loadData = useCallback(async () => {
     const currentActiveCat = storage.getActiveCat();
     setActiveCat(currentActiveCat);
     
@@ -88,17 +87,23 @@ export default function Diary() {
       setDiaries([]);
     }
     
+    try {
+      await friendService.syncFriends();
+      await friendService.syncFriendDiaries();
+    } catch (error) {
+      console.warn("同步好友动态失败:", error);
+    }
     setFriendDiaries(storage.getFriendDiaries());
     setCatList(storage.getCatList());
   }, []);
 
   useEffect(() => {
     // 缩短延迟，平衡动画流畅度与加载速度
-    const timer = setTimeout(loadData, 50);
+    const timer = setTimeout(() => { void loadData(); }, 50);
     
     // 监听猫咪切换事件
     const handleCatChange = () => {
-      loadData();
+      void loadData();
     };
     window.addEventListener('active-cat-changed', handleCatChange);
     
@@ -330,7 +335,12 @@ export default function Diary() {
   const handleWechatInvite = async () => {
     if (!selectedCatForQR) return;
 
-    const inviteUrl = `${window.location.origin}/join?uid=${user?.username || 'unknown'}&cat=${selectedCatForQR.id}`;
+    const invite = await friendService.createInvite({
+      id: selectedCatForQR.id,
+      name: selectedCatForQR.name,
+      avatar: selectedCatForQR.avatar,
+    });
+    const inviteUrl = friendService.buildInvitePayload(invite.code);
     const options = {
       title: `快来 Miao 看看我的小猫 ${selectedCatForQR.name} 吧！`,
       text: "我正在 Miao 养猫，邀请你成为我的好友，一起记录萌宠瞬间～",

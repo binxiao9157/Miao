@@ -49,6 +49,8 @@ async function startServer() {
   const diariesFile = path.join(dataDir, 'diaries.json');
   const lettersFile = path.join(dataDir, 'letters.json');
   const pointsFile = path.join(dataDir, 'points.json');
+  const friendsFile = path.join(dataDir, 'friends.json');
+  const friendInvitesFile = path.join(dataDir, 'friend-invites.json');
 
   function readJSON<T>(file: string, fallback: T): T {
     try {
@@ -66,6 +68,14 @@ async function startServer() {
     avatar: string; source: string; createdAt?: number;
     videoPath?: string; videoPaths?: Record<string, string>; remoteVideoUrl?: string;
     placeholderImage?: string; anchorFrame?: string; isUnlocking?: boolean;
+  }
+  interface ServerFriend {
+    userId: string; friendId: string; nickname: string; avatar: string;
+    catName: string; catAvatar: string; addedAt: number;
+  }
+  interface ServerFriendInvite {
+    code: string; ownerId: string; catId?: string; catName?: string;
+    catAvatar?: string; createdAt: number; expiresAt: number;
   }
 
   const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || "miao-dev-secret-change-me";
@@ -114,6 +124,45 @@ async function startServer() {
   };
 
   const getAuthedUsername = (req: express.Request) => (req as any).auth?.username as string;
+
+  const getUserPublicProfile = (username: string) => {
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const user = users.find(u => u.username === username);
+    return user ? publicUser(user) : { username, nickname: username, avatar: "", openidBound: false, passwordSet: false };
+  };
+
+  const getUserPrimaryCat = (username: string) => {
+    const cats = readJSON<ServerCat[]>(catsFile, [])
+      .filter(c => c.userId === username)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return cats[0] || null;
+  };
+
+  const toClientFriend = (friend: ServerFriend) => ({
+    id: friend.friendId,
+    nickname: friend.nickname,
+    avatar: friend.avatar,
+    catName: friend.catName,
+    catAvatar: friend.catAvatar,
+    addedAt: friend.addedAt,
+  });
+
+  const upsertFriend = (all: ServerFriend[], userId: string, friendId: string, cat?: Partial<ServerFriend>) => {
+    const profile = getUserPublicProfile(friendId);
+    const primaryCat = getUserPrimaryCat(friendId);
+    const entry: ServerFriend = {
+      userId,
+      friendId,
+      nickname: String(profile.nickname || friendId),
+      avatar: String(profile.avatar || ""),
+      catName: String(cat?.catName || primaryCat?.name || "小猫"),
+      catAvatar: String(cat?.catAvatar || primaryCat?.avatar || ""),
+      addedAt: cat?.addedAt || Date.now(),
+    };
+    const idx = all.findIndex(f => f.userId === userId && f.friendId === friendId);
+    if (idx >= 0) all[idx] = { ...all[idx], ...entry, addedAt: all[idx].addedAt || entry.addedAt };
+    else all.push(entry);
+  };
 
   // ── 用户注册/登录 API ──
   app.post("/api/auth/register", (req, res) => {
@@ -512,10 +561,98 @@ async function startServer() {
     const data = req.body.data || req.body;
     if (!data) return res.status(400).json({ error: "Missing data", code: "INVALID_PARAMETER" });
     const all = readJSON<ServerPoints[]>(pointsFile, []);
+    const nextData = { ...data, updatedAt: data.updatedAt || Date.now() };
     const idx = all.findIndex(p => p.userId === userId);
-    if (idx >= 0) all[idx].data = data; else all.push({ userId, data });
+    if (idx >= 0) all[idx].data = nextData; else all.push({ userId, data: nextData });
     writeJSON(pointsFile, all);
-    res.json({ success: true, data });
+    res.json({ success: true, data: nextData });
+  });
+
+  app.post("/api/v1/friend-invites", authRequired, (req, res) => {
+    const ownerId = getAuthedUsername(req);
+    const code = crypto.randomBytes(9).toString('base64url');
+    const now = Date.now();
+    const invite: ServerFriendInvite = {
+      code,
+      ownerId,
+      catId: String(req.body.catId || "").trim(),
+      catName: String(req.body.catName || "").trim(),
+      catAvatar: String(req.body.catAvatar || "").trim(),
+      createdAt: now,
+      expiresAt: now + 7 * 24 * 60 * 60 * 1000,
+    };
+    const invites = readJSON<ServerFriendInvite[]>(friendInvitesFile, [])
+      .filter(i => i.expiresAt > now && i.ownerId !== ownerId);
+    invites.push(invite);
+    writeJSON(friendInvitesFile, invites);
+    res.json({ invite: { ...invite, inviter: getUserPublicProfile(ownerId) } });
+  });
+
+  app.get("/api/v1/friend-invites/:code", authRequired, (req, res) => {
+    const code = String(req.params.code || "").trim();
+    const invite = readJSON<ServerFriendInvite[]>(friendInvitesFile, [])
+      .find(i => i.code === code && i.expiresAt > Date.now());
+    if (!invite) return res.status(404).json({ error: "Invite not found or expired", code: "INVITE_NOT_FOUND" });
+    res.json({ invite: { ...invite, inviter: getUserPublicProfile(invite.ownerId) } });
+  });
+
+  app.get("/api/v1/friends", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const friends = readJSON<ServerFriend[]>(friendsFile, [])
+      .filter(f => f.userId === userId)
+      .map(toClientFriend);
+    res.json(friends);
+  });
+
+  app.post("/api/v1/friends/accept", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const code = String(req.body.code || "").trim();
+    const invite = readJSON<ServerFriendInvite[]>(friendInvitesFile, [])
+      .find(i => i.code === code && i.expiresAt > Date.now());
+    if (!invite) return res.status(404).json({ error: "Invite not found or expired", code: "INVITE_NOT_FOUND" });
+    if (invite.ownerId === userId) {
+      return res.status(400).json({ error: "Cannot add yourself", code: "CANNOT_ADD_SELF" });
+    }
+
+    const friends = readJSON<ServerFriend[]>(friendsFile, []);
+    upsertFriend(friends, userId, invite.ownerId, {
+      catName: invite.catName || undefined,
+      catAvatar: invite.catAvatar || undefined,
+      addedAt: Date.now(),
+    });
+    const accepterCat = getUserPrimaryCat(userId);
+    upsertFriend(friends, invite.ownerId, userId, {
+      catName: accepterCat?.name,
+      catAvatar: accepterCat?.avatar,
+      addedAt: Date.now(),
+    });
+    writeJSON(friendsFile, friends);
+
+    const acceptedFriend = friends.find(f => f.userId === userId && f.friendId === invite.ownerId);
+    res.json({ success: true, friend: acceptedFriend ? toClientFriend(acceptedFriend) : null });
+  });
+
+  app.get("/api/v1/friends/diaries", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const friends = readJSON<ServerFriend[]>(friendsFile, []).filter(f => f.userId === userId);
+    const friendIds = new Set(friends.map(f => f.friendId));
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    const diaries = readJSON<ServerDiary[]>(diariesFile, [])
+      .filter(d => friendIds.has(d.userId))
+      .map(d => {
+        const user = users.find(u => u.username === d.userId);
+        const cat = cats.find(c => c.userId === d.userId && c.id === d.catId) || getUserPrimaryCat(d.userId);
+        return {
+          ...d,
+          authorId: d.userId,
+          authorNickname: user?.nickname || d.userId,
+          authorAvatar: user?.avatar || "",
+          catName: cat?.name || "小猫",
+        };
+      })
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    res.json(diaries);
   });
 
   // Health check endpoint

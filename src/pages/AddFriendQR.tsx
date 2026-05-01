@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { storage } from "../services/storage";
+import { friendService, FriendInvite } from "../services/friendService";
 
 export default function AddFriendQR() {
   const location = useLocation();
@@ -14,6 +15,7 @@ export default function AddFriendQR() {
   const [qrError, setQrError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [invite, setInvite] = useState<FriendInvite | null>(null);
   const qrCardRef = useRef<HTMLDivElement>(null);
 
   // 1. 统一数据初始化逻辑：处理从不同入口进入的情况
@@ -37,6 +39,16 @@ export default function AddFriendQR() {
   };
 
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!cat || invite) return;
+    friendService.createInvite({ id: cat.id, name: cat.name, avatar: cat.avatar })
+      .then(setInvite)
+      .catch((error) => {
+        console.error("创建好友邀请码失败:", error);
+        showToast(error?.message || "创建邀请码失败", "error");
+      });
+  }, [cat?.id, invite]);
 
   // 加载图片为 HTMLImageElement，跨域失败时返回 null
   const loadImage = (src: string): Promise<HTMLImageElement | null> => {
@@ -239,7 +251,7 @@ export default function AddFriendQR() {
   const handleShareLink = async () => {
     if (!user || !cat) return;
 
-    const inviteUrl = `${window.location.origin}/join?uid=${user.username}&cat=${cat.id}`;
+    const inviteUrl = invite ? friendService.buildInvitePayload(invite.code) : window.location.origin;
     const shareData = {
       title: 'Miao - 萌宠陪伴',
       text: `我是 ${user.nickname}，快来 Miao 看看我的小猫 ${cat.name} 吧！一起记录萌宠瞬间～`,
@@ -265,6 +277,8 @@ export default function AddFriendQR() {
     }
   };
 
+  const qrData = invite ? friendService.buildInvitePayload(invite.code) : "";
+
   if (!user || !cat) {
     return (
       <div className="flex flex-col items-center justify-center min-h-dvh p-6 text-center bg-background">
@@ -282,14 +296,6 @@ export default function AddFriendQR() {
       </div>
     );
   }
-
-  const qrData = useMemo(() => JSON.stringify({
-    type: 'miao_friend_invite',
-    uid: user.username,
-    nickname: user.nickname,
-    catName: cat?.name,
-    timestamp: Date.now()
-  }), [user.username, user.nickname, cat?.name]);
 
   if (!cat) {
     return (
@@ -353,7 +359,7 @@ export default function AddFriendQR() {
             ) : (
               <div className="bg-white p-2 rounded-xl shadow-sm">
                 <QRCodeCanvas 
-                  value={qrData} 
+                  value={qrData || "miao://friend"} 
                   size={180}
                   level="M"
                   includeMargin={false}
