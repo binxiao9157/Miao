@@ -81,6 +81,9 @@ export default function Diary() {
     setActiveCat(currentActiveCat);
     
     const allDiaries = storage.getDiaries();
+    if (allDiaries.some(d => d.media?.startsWith('indexeddb:'))) {
+      storage.saveDiaries(allDiaries);
+    }
     if (currentActiveCat) {
       setDiaries(allDiaries.filter(d => d.catId === currentActiveCat.id));
     } else {

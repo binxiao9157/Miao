@@ -34,6 +34,7 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    setDisplayMedia(undefined);
     if (entry.media?.startsWith('indexeddb:')) {
       const mediaId = entry.media.split(':')[1];
       mediaStorage.getMedia(mediaId).then(data => {

@@ -170,9 +170,28 @@ function deleteAllCatsFromServer(userId: string) {
 }
 
 // ── 日记/信件/积分 双写辅助函数 ──
-function syncDiaryToServer(userId: string, diary: DiaryEntry) {
+async function resolveServerDiaryPayload(diary: DiaryEntry): Promise<DiaryEntry> {
   const { media, ...rest } = diary;
-  const payload = media?.startsWith('indexeddb:') ? rest : diary;
+
+  if (media?.startsWith('miao_media:')) {
+    return rest;
+  }
+
+  if (media?.startsWith('indexeddb:')) {
+    const mediaId = media.split(':')[1];
+    try {
+      const mediaData = await mediaStorage.getMedia(mediaId);
+      return mediaData ? { ...diary, media: mediaData } : rest;
+    } catch {
+      return rest;
+    }
+  }
+
+  return diary;
+}
+
+async function syncDiaryToServer(userId: string, diary: DiaryEntry) {
+  const payload = await resolveServerDiaryPayload(diary);
   fetch('/api/diaries', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
