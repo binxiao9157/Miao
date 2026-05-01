@@ -180,7 +180,10 @@ async function startServer() {
     if (!code) return res.status(400).json({ error: "Missing code", code: "INVALID_PARAMETER" });
     if (!process.env.WECHAT_APPID || !process.env.WECHAT_APPSECRET) {
       if (process.env.NODE_ENV !== "production" || process.env.WECHAT_LOGIN_DEV_MOCK === "true") {
-        const devOpenid = `dev_${crypto.createHash('sha256').update(code).digest('hex').slice(0, 16)}`;
+        const requestedDevOpenid = (req.body.devOpenid || process.env.WECHAT_DEV_OPENID || "dev_local_wechat_user").trim();
+        const devOpenid = requestedDevOpenid.startsWith("dev_")
+          ? requestedDevOpenid
+          : `dev_${crypto.createHash('sha256').update(requestedDevOpenid).digest('hex').slice(0, 16)}`;
         const users = readJSON<ServerUser[]>(usersFile, []);
         let user = users.find(u => u.openid === devOpenid);
         if (!user) {
