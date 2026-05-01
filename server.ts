@@ -100,7 +100,8 @@ async function startServer() {
     username: user.username,
     nickname: user.nickname,
     avatar: user.avatar,
-    openidBound: !!user.openid
+    openidBound: !!user.openid,
+    passwordSet: !!user.password
   });
 
   const authRequired: express.RequestHandler = (req, res, next) => {
@@ -248,6 +249,33 @@ async function startServer() {
     } catch (error: any) {
       res.status(502).json({ error: "WeChat login request failed", message: error.message, code: "WECHAT_UPSTREAM_ERROR" });
     }
+  });
+
+  app.post("/api/v1/auth/set-password", authRequired, (req, res) => {
+    const username = getAuthedUsername(req);
+    const currentPassword = String(req.body.currentPassword || "").trim();
+    const password = String(req.body.password || "").trim();
+
+    if (!password) {
+      return res.status(400).json({ error: "Missing password", code: "INVALID_PARAMETER" });
+    }
+    if (password.length < 6 || password.length > 20) {
+      return res.status(400).json({ error: "Password length must be 6-20 characters", code: "INVALID_PASSWORD_LENGTH" });
+    }
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const user = users.find(u => u.username === username);
+    if (!user) {
+      return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+    }
+
+    if (user.password && user.password !== currentPassword) {
+      return res.status(401).json({ error: "Invalid current password", code: "INVALID_CURRENT_PASSWORD" });
+    }
+
+    user.password = password;
+    writeJSON(usersFile, users);
+    res.json({ success: true, user: publicUser(user) });
   });
 
   app.get("/api/v1/me", authRequired, (req, res) => {
