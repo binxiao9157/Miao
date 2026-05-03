@@ -21,5 +21,5 @@ export const ACTION_PROMPTS: Record<'idle' | 'tail' | 'rubbing' | 'blink', Video
 
 export const IMAGE_PROMPTS = {
   anchor: (breed: string, color: string) =>
-    `A ultra-realistic, high-detail portrait of a ${breed} cat with ${color} fur, sitting comfortably in a soft cat nest, cinematic lighting, 4k resolution, looking at the camera.`
+    `A ultra-realistic, high-detail portrait of a cat with ${color} fur${breed && breed !== '未知' ? `, ${breed} breed` : ''}, sitting comfortably in a soft cat nest, cinematic lighting, 4k resolution, looking at the camera. Do NOT render any text, watermark, or name on the image.`
 };
