@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import React, { lazy, Suspense, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 function lazyRetry(importFn: () => Promise<{ default: React.ComponentType<any> }>) {
   return lazy(async () => {
@@ -59,6 +59,57 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Handle miao://friend?invite=CODE deep links.
+ * - If the page is loaded with a miao:// URL (e.g. OS-level protocol handler),
+ *   parse the invite code and redirect to /scan-friend?invite=CODE.
+ * - Also register the web-based protocol handler when supported.
+ */
+function DeepLinkHandler() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+
+    // Case 1:_loaded via miao:// protocol (OS routes the custom scheme to the PWA)
+    if (url.protocol === "miao:") {
+      const code = url.searchParams.get("invite") || url.searchParams.get("code");
+      if (code) {
+        navigate(`/scan-friend?invite=${encodeURIComponent(code)}`, { replace: true });
+      }
+      return;
+    }
+
+    // Case 2: web fallback — /join-friend?invite=CODE or ?deep_link=miao://...
+    const deepLink = url.searchParams.get("deep_link");
+    if (deepLink && deepLink.startsWith("miao://friend")) {
+      try {
+        const parsed = new URL(deepLink);
+        const code = parsed.searchParams.get("invite") || parsed.searchParams.get("code");
+        if (code) {
+          navigate(`/scan-friend?invite=${encodeURIComponent(code)}`, { replace: true });
+        }
+      } catch {
+        // invalid deep link, ignore
+      }
+    }
+
+    // Register protocol handler for miao:// scheme (Chrome 96+ on HTTPS)
+    if ("registerProtocolHandler" in navigator) {
+      try {
+        (navigator as any).registerProtocolHandler(
+          "miao",
+          `${window.location.origin}/join-friend?deep_link=%s`
+        );
+      } catch {
+        // Not supported or not in secure context, ignore
+      }
+    }
+  }, [navigate]);
+
+  return null;
+}
+
 function AppRoutes() {
   const { isAuthenticated, isInitializing, hasCat } = useAuthContext();
   const location = useLocation(); // Force re-render on route change
@@ -67,6 +118,7 @@ function AppRoutes() {
 
   return (
     <Suspense fallback={<div className="min-h-dvh bg-[#FFF9F5] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
+      <DeepLinkHandler />
       <Routes location={location}>
         {/* Auth Routes */}
         <Route path="/login" element={
@@ -115,6 +167,7 @@ function AppRoutes() {
         <Route path="/switch-companion" element={<ProtectedRoute><SwitchCompanion /></ProtectedRoute>} />
         <Route path="/add-friend-qr" element={<ProtectedRoute><AddFriendQR /></ProtectedRoute>} />
         <Route path="/scan-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />
+        <Route path="/join-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />
         <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
         <Route path="/admin-settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
   

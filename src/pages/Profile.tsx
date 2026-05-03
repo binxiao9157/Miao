@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, QrCode, ScanQrCode } from "lucide-react";
+import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, QrCode, ScanQrCode, HardDrive } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { storage, CatInfo } from "../services/storage";
 import { computeNotifications } from "./NotificationList";
@@ -15,6 +15,7 @@ export default function Profile() {
   const [activeCat, setActiveCat] = useState<CatInfo | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCacheToast, setShowCacheToast] = useState(false);
   const adminTapCountRef = useRef(0);
   const adminTapTimerRef = useRef<number | null>(null);
 
@@ -98,6 +99,12 @@ export default function Profile() {
     storage.clearAll(); // 物理删除当前用户的所有数据
     logout(); // 内存清理
     navigate("/register", { replace: true });
+  };
+
+  const handleClearCache = () => {
+    localStorage.clear();
+    setShowCacheToast(true);
+    setTimeout(() => setShowCacheToast(false), 2000);
   };
 
   const menuItems = [
@@ -240,7 +247,20 @@ export default function Profile() {
               <ChevronRight size={16} className="text-on-surface-variant opacity-30" />
             </button>
           ))}
-          
+
+          <button
+            onClick={handleClearCache}
+            className="w-full flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm active:scale-[0.98] transition-all hover:shadow-md"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-teal-50 text-teal-500 rounded-xl flex items-center justify-center">
+                <HardDrive size={20} />
+              </div>
+              <span className="font-bold text-on-surface text-sm">清除缓存</span>
+            </div>
+            <ChevronRight size={16} className="text-on-surface-variant opacity-30" />
+          </button>
+
           <button 
             onClick={() => setShowLogoutConfirm(true)}
             className="w-full flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm active:scale-[0.98] transition-all hover:shadow-md mt-6"
@@ -336,6 +356,23 @@ export default function Profile() {
                   再想想
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Clear Cache Toast */}
+      <AnimatePresence>
+        {showCacheToast && (
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200]">
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-black/80 backdrop-blur-md text-white px-6 py-3 rounded-2xl shadow-xl text-sm font-bold flex items-center gap-2"
+            >
+              <HardDrive size={16} />
+              缓存已清除
             </motion.div>
           </div>
         )}

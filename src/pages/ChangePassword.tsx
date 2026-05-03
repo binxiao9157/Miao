@@ -12,6 +12,7 @@ export default function ChangePassword() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -22,15 +23,9 @@ export default function ChangePassword() {
     setTimeout(() => setShowToast(null), 3000);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       setError("请填写完整信息");
-      return;
-    }
-    // 通过 storage.findUser 从持久层校验密码，避免仅依赖内存中可能过期的 user 对象
-    const savedUser = user?.username ? storage.findUser(user.username) : null;
-    if (!savedUser || currentPassword !== savedUser.password) {
-      setError("当前密码错误");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -42,9 +37,43 @@ export default function ChangePassword() {
       return;
     }
 
-    updateProfile({ password: newPassword });
-    triggerToast("密码修改成功喵～");
-    setTimeout(() => navigate(-1), 1500);
+    setSaving(true);
+    setError("");
+
+    try {
+      const token = storage.getToken();
+      const resp = await fetch("/api/v1/auth/set-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ currentPassword, password: newPassword }),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        if (data.code === "INVALID_CURRENT_PASSWORD") {
+          setError("当前密码错误");
+        } else if (data.code === "INVALID_PASSWORD_LENGTH") {
+          setError("新密码长度须为6-20位");
+        } else {
+          setError(data.error || data.message || "修改失败，请重试");
+        }
+        return;
+      }
+
+      // Sync local password
+      if (user?.username) {
+        storage.updatePassword(user.username, newPassword);
+      }
+      triggerToast("密码修改成功喵～");
+      setTimeout(() => navigate(-1), 1500);
+    } catch (err: any) {
+      setError("网络错误，请重试");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -164,11 +193,12 @@ export default function ChangePassword() {
           </div>
         )}
 
-        <button 
+        <button
           onClick={handleSave}
-          className="miao-btn-primary w-full py-5 text-lg font-black shadow-2xl mt-4"
+          disabled={saving}
+          className="miao-btn-primary w-full py-5 text-lg font-black shadow-2xl mt-4 disabled:opacity-50"
         >
-          保存修改
+          {saving ? "保存中..." : "保存修改"}
         </button>
       </div>
       

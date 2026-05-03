@@ -52,7 +52,7 @@ export const friendService = {
   extractInviteCode,
 
   buildInvitePayload(code: string) {
-    return `${window.location.origin}/scan-friend?invite=${encodeURIComponent(code)}`;
+    return `miao://friend?invite=${encodeURIComponent(code)}`;
   },
 
   async createInvite(cat: { id?: string; name?: string; avatar?: string }): Promise<FriendInvite> {
