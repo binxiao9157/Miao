@@ -5,15 +5,29 @@ import { useEffect, useState, useCallback } from "react";
 import { storage } from "../services/storage";
 import PageHeader from "../components/PageHeader";
 
+interface ServerNotification {
+  id: string;
+  recipientId: string;
+  senderId: string;
+  type: string;
+  title: string;
+  content: string;
+  catAvatar?: string;
+  createdAt: number;
+  read: boolean;
+}
+
 interface NotificationItem {
   id: string;
-  type: 'letter' | 'points' | 'system';
+  type: 'letter' | 'points' | 'system' | 'friend_share';
   unreadCount: number;
-  isRead: boolean; // 新增：是否已读
+  isRead: boolean;
   title: string;
   content: string;
   timestamp: number;
   link?: string;
+  source?: 'local' | 'server';
+  serverId?: string;
 }
 
 const formatNotificationTime = (timestamp: number) => {
@@ -39,6 +53,42 @@ const formatNotificationTime = (timestamp: number) => {
 };
 
 /** 从 localStorage 同步计算通知列表 */
+async function requestApi<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const token = storage.getToken();
+  const resp = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Client-Type": "pwa",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error((data as any).error || `HTTP ${resp.status}`);
+  return data as T;
+}
+
+async function fetchServerNotifications(): Promise<NotificationItem[]> {
+  try {
+    const list = await requestApi<ServerNotification[]>("/api/v1/notifications");
+    return (list || []).map((n) => ({
+      id: `server_${n.id}`,
+      serverId: n.id,
+      type: (n.type || 'friend_share') as NotificationItem['type'],
+      unreadCount: n.read ? 0 : 1,
+      isRead: n.read,
+      title: n.title,
+      content: n.content,
+      timestamp: n.createdAt || Date.now(),
+      link: n.type === 'friend_share' ? '/diary' : undefined,
+      source: 'server' as const,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export function computeNotifications(): NotificationItem[] {
   const points = storage.getPoints();
   const letters = storage.getTimeLetters();
@@ -105,35 +155,42 @@ export default function NotificationList() {
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => computeNotifications());
   const [lastReadTime, setLastReadTime] = useState(() => storage.getLastReadNotificationTime());
 
-  // keep-alive：路由激活时静默刷新数据，不清空列表，无闪烁
-  useEffect(() => {
-    const refresh = () => {
-      setNotifications(computeNotifications());
-    };
+  const loadAll = useCallback(async () => {
+    const local = computeNotifications();
+    const server = await fetchServerNotifications();
+    const all = [...server, ...local];
+    all.sort((a, b) => b.timestamp - a.timestamp);
+    setNotifications(all);
+  }, []);
 
+  // keep-alive：路由激活时刷新数据（含服务端通知）
+  useEffect(() => {
     if (location.pathname === '/notifications') {
-      refresh();
+      loadAll();
     }
 
+    const refresh = () => { loadAll(); };
     window.addEventListener('fast-forward-changed', refresh);
     return () => window.removeEventListener('fast-forward-changed', refresh);
-  }, [location.pathname]);
+  }, [location.pathname, loadAll]);
 
   const handleNotificationClick = (item: NotificationItem) => {
-    // 动作一：标记已读
+    // 标记已读
     storage.markNotificationAsRead(item.id);
-    
-    // 动作二：执行跳转
+    if (item.source === 'server' && item.serverId) {
+      requestApi(`/api/v1/notifications/${item.serverId}/read`, { method: 'PUT' }).catch(() => {});
+    }
+
+    // 执行跳转
     if (item.id === 'system_greeting') {
-      // 系统问候跳转到首页
       navigate("/", { state: { fromNotification: true, notificationType: 'system' } });
     } else if (item.id === 'points_update') {
-      // 积分变动跳转到积分页
       navigate("/points");
+    } else if (item.type === 'friend_share') {
+      navigate("/diary");
     } else if (item.link) {
       navigate(item.link);
     } else {
-      // 没有任何跳转则只刷新本地状态
       setNotifications(computeNotifications());
     }
   };
@@ -145,6 +202,8 @@ export default function NotificationList() {
         return <div className={`${baseClass} bg-blue-50 text-blue-500`}><Mail size={22} /></div>;
       case 'points':
         return <div className={`${baseClass} bg-orange-50 text-orange-500`}><Star size={22} /></div>;
+      case 'friend_share':
+        return <div className={`${baseClass} bg-primary/5 text-primary`}><Bell size={22} /></div>;
       default:
         return <div className={`${baseClass} bg-primary/5 text-primary`}><Bell size={22} /></div>;
     }
