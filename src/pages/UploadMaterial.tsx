@@ -169,7 +169,7 @@ export default function UploadMaterial() {
       // Stage 1: Qwen Image Generation (using VolcanoService)
       // 使用用户定制的详细中文提示词
       const prompt = `
-基于输入猫咪照片，将猫咪主体取出重新生成一张照片。猫咪名字叫作：${nickname}。
+基于输入猫咪照片，将猫咪主体取出重新生成一张照片。
 主体描述：
 以输入照片中的猫咪为唯一主体，精确提取其外观特征（包括毛色、花纹、体型、眼睛颜色），保持其独特的生物特征不变。
 猫咪呈标准蹲坐姿态，前爪并拢，身体端正，头部微微抬起，双眼圆睁，目光直视镜头，表情平静而专注。
@@ -196,6 +196,7 @@ export default function UploadMaterial() {
 风格：照片级真实感，避免卡通化、绘画感或艺术化处理。
 禁止添加额外元素（如玩具、食物、其他动物或人物）。
 禁止改变猫咪原始姿态、品种特征或表情。
+禁止在画面上添加任何文字、水印或名字。
 保持光影逻辑一致，无违和感。
 `.trim();
       const task = await VolcanoService.submitImageTask(prompt, selectedImage); 
