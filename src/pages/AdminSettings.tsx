@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Cpu, Image as ImageIcon, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
-import { LayoutGroup, motion } from "motion/react";
+import { Cpu, Image as ImageIcon, Loader2, Plus, Save, Trash2, Upload, RotateCcw } from "lucide-react";
+import { LayoutGroup, motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
 import { aiConfig, DEFAULT_AI_PROFILES } from "../services/ai/aiConfig";
 import { AIProfile, AIProvider } from "../services/ai/types";
@@ -14,6 +14,7 @@ export default function AdminSettings() {
   const [newImageUrl, setNewImageUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [profile, setProfile] = useState<AIProfile>(DEFAULT_AI_PROFILES.dashscope);
+  const [showResetToast, setShowResetToast] = useState(false);
 
   const fieldLabelClass = "text-[10px] font-black text-on-surface-variant/55 uppercase tracking-[0.16em] ml-1";
   const modelInputClass = "w-full min-w-0 h-12 px-4 bg-white rounded-[18px] text-[13px] sm:text-sm leading-none font-semibold text-[#5D4037] outline-none focus:ring-2 focus:ring-[#FF9D76]/20 font-mono tracking-normal shadow-sm";
@@ -42,6 +43,13 @@ export default function AdminSettings() {
     storage.savePresetCats(presets);
     aiConfig.saveProfile(profile);
     alert("配置已保存！");
+  };
+
+  const handleReset = () => {
+    aiConfig.reset();
+    setProfile(aiConfig.getProfile());
+    setShowResetToast(true);
+    setTimeout(() => setShowResetToast(false), 2000);
   };
 
   const handleAdd = () => {
@@ -302,14 +310,40 @@ export default function AdminSettings() {
       </main>
 
       <div className="shrink-0 px-6 pt-3 bg-background/95 backdrop-blur-md border-t border-outline-variant/60" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
-        <button
-          onClick={handleSave}
-          className="w-full py-4 bg-[#FF9D76] text-white rounded-full font-black text-base shadow-xl shadow-[#FF9D76]/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-        >
-          <Save size={20} />
-          保存所有配置
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleReset}
+            className="flex-1 py-4 bg-white text-[#5D4037]/70 rounded-full font-black text-base shadow-sm border border-outline-variant/40 active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <RotateCcw size={18} />
+            恢复默认
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-[2] py-4 bg-[#FF9D76] text-white rounded-full font-black text-base shadow-xl shadow-[#FF9D76]/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <Save size={20} />
+            保存所有配置
+          </button>
+        </div>
       </div>
+
+      {/* Reset Toast */}
+      <AnimatePresence>
+        {showResetToast && (
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200]">
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-black/80 backdrop-blur-md text-white px-6 py-3 rounded-2xl shadow-xl text-sm font-bold flex items-center gap-2"
+            >
+              <RotateCcw size={16} />
+              已恢复默认
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

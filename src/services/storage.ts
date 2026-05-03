@@ -18,22 +18,22 @@ export interface CatInfo {
   color: string;
   avatar: string;
   source: 'created' | 'uploaded';
-  createdAt?: number; // 新增：猫咪创建/领养时间戳
-  videoPath?: string; // 默认视频路径 (Idle/Petting)
+  createdAt?: number;
+  updatedAt?: number;
+  videoPath?: string;
   videoPaths?: {
     idle?: string;
     tail?: string;
     rubbing?: string;
     blink?: string;
-    // Keep old ones for compatibility if needed, but we'll use the new ones
     petting?: string;
     feeding?: string;
     teasing?: string;
   };
-  remoteVideoUrl?: string; // 视频远程路径 (Fallback)
-  placeholderImage?: string; // 高画质静态占位图 (Base64)
-  anchorFrame?: string; // 两阶段生成中的锚定底图 (Base64)
-  isUnlocking?: boolean; // 是否正在后台解锁更多动作
+  remoteVideoUrl?: string;
+  placeholderImage?: string;
+  anchorFrame?: string;
+  isUnlocking?: boolean;
 }
 
 export interface AppSettings {
@@ -149,6 +149,73 @@ function getCurrentUsername(): string | null {
     if (!raw) return null;
     return JSON.parse(raw).username || null;
   } catch { return null; }
+}
+
+function normalizePlayableVideoUrl(url?: string): string | undefined {
+  if (!url) return url;
+  if (url.startsWith('/')) {
+    const baseURL = typeof window !== 'undefined' ? window.location.origin : '';
+    return baseURL ? `${baseURL}${url}` : url;
+  }
+  return url.replace(/^http:\/\/localhost(?::|\/)/, (match) => match.replace('localhost', '127.0.0.1'));
+}
+
+function normalizeCatVideoUrls(cat: CatInfo): CatInfo {
+  const videoPaths = cat.videoPaths
+    ? Object.fromEntries(
+        Object.entries(cat.videoPaths).map(([action, url]) => [action, normalizePlayableVideoUrl(url)])
+      )
+    : cat.videoPaths;
+
+  return {
+    ...cat,
+    videoPath: normalizePlayableVideoUrl(cat.videoPath),
+    videoPaths,
+    remoteVideoUrl: normalizePlayableVideoUrl(cat.remoteVideoUrl),
+  };
+}
+
+function stripServerCat(cat: CatInfo & { userId?: string }): CatInfo {
+  const { userId, ...rest } = cat;
+  return normalizeCatVideoUrls(rest);
+}
+
+function mergeCat(local?: CatInfo, remote?: CatInfo): CatInfo {
+  if (!local) return stripServerCat(remote as CatInfo);
+  if (!remote) return normalizeCatVideoUrls(local);
+
+  const normalizedLocal = normalizeCatVideoUrls(local);
+  const normalizedRemote = stripServerCat(remote);
+  const localRevision = normalizedLocal.updatedAt || normalizedLocal.createdAt || 0;
+  const remoteRevision = normalizedRemote.updatedAt || normalizedRemote.createdAt || 0;
+  const base = localRevision >= remoteRevision ? normalizedLocal : normalizedRemote;
+  const other = base === normalizedLocal ? normalizedRemote : normalizedLocal;
+
+  return {
+    ...other,
+    ...base,
+    videoPaths: {
+      ...(other.videoPaths || {}),
+      ...(base.videoPaths || {}),
+    },
+    videoPath: base.videoPath || other.videoPath,
+    remoteVideoUrl: base.remoteVideoUrl || other.remoteVideoUrl,
+    placeholderImage: base.placeholderImage || other.placeholderImage,
+    anchorFrame: base.anchorFrame || other.anchorFrame,
+    updatedAt: Math.max(localRevision, remoteRevision, normalizedLocal.updatedAt || 0, normalizedRemote.updatedAt || 0),
+  };
+}
+
+function hasMeaningfulCatDifference(a: CatInfo, b: CatInfo): boolean {
+  return JSON.stringify({
+    ...a,
+    placeholderImage: undefined,
+    anchorFrame: undefined,
+  }) !== JSON.stringify({
+    ...b,
+    placeholderImage: undefined,
+    anchorFrame: undefined,
+  });
 }
 
 function syncCatToServer(userId: string, cat: CatInfo) {
@@ -590,16 +657,28 @@ export const storage = {
           const localMap = new Map(localCats.map(c => [c.id, c]));
           const serverMap = new Map(serverCats.map(c => [c.id, c]));
           const merged: CatInfo[] = [];
-          const allIds = new Set([...localMap.keys(), ...serverMap.keys()]);
-          for (const id of allIds) {
-            const l = localMap.get(id);
-            const s = serverMap.get(id);
-            if (l && s) merged.push((l.createdAt || 0) >= (s.createdAt || 0) ? l : s);
-            else if (l) { merged.push(l); syncCatToServer(username, l); }
-            else if (s) merged.push(s);
+          const syncBackTasks: Promise<void>[] = [];
+
+          for (const id of new Set([...localMap.keys(), ...serverMap.keys()])) {
+            const local = localMap.get(id);
+            const remote = serverMap.get(id);
+            const cat = mergeCat(local, remote);
+            merged.push(cat);
+
+            if (!remote || hasMeaningfulCatDifference(cat, remote)) {
+              syncBackTasks.push(syncCatToServer(username, cat).catch(() => undefined));
+            }
           }
+
+          merged.sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
           storage.saveCatList(merged);
-          if (merged.length > 0 && !storage.getActiveCatId()) storage.setActiveCatId(merged[0].id);
+
+          const activeId = storage.getActiveCatId();
+          if (merged.length > 0 && (!activeId || !merged.some(cat => cat.id === activeId))) {
+            storage.setActiveCatId(merged[0].id);
+          }
+
+          await Promise.all(syncBackTasks);
         }
       }
     } catch { /* 离线静默 */ }
@@ -675,17 +754,21 @@ export const storage = {
   },
 
   saveCatInfo: (cat: CatInfo) => {
+    const nextCat = {
+      ...cat,
+      updatedAt: Date.now(),
+    };
     const list = storage.getCatList();
-    const index = list.findIndex(c => c.id === cat.id);
+    const index = list.findIndex(c => c.id === nextCat.id);
     if (index >= 0) {
-      list[index] = cat;
+      list[index] = nextCat;
     } else {
-      list.push(cat);
+      list.push(nextCat);
     }
     storage.saveCatList(list);
-    storage.setActiveCatId(cat.id);
+    storage.setActiveCatId(nextCat.id);
     const userId = getCurrentUsername();
-    if (userId) syncCatToServer(userId, cat);
+    if (userId) syncCatToServer(userId, nextCat);
   },
 
   getActiveCatId: (): string | null => {
