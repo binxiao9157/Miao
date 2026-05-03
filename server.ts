@@ -51,6 +51,7 @@ async function startServer() {
   const pointsFile = path.join(dataDir, 'points.json');
   const friendsFile = path.join(dataDir, 'friends.json');
   const friendInvitesFile = path.join(dataDir, 'friend-invites.json');
+  const notificationsFile = path.join(dataDir, 'notifications.json');
 
   function readJSON<T>(file: string, fallback: T): T {
     try {
@@ -76,6 +77,10 @@ async function startServer() {
   interface ServerFriendInvite {
     code: string; ownerId: string; catId?: string; catName?: string;
     catAvatar?: string; createdAt: number; expiresAt: number;
+  }
+  interface ServerNotification {
+    id: string; recipientId: string; senderId: string; type: string;
+    title: string; content: string; catAvatar?: string; createdAt: number; read: boolean;
   }
 
   const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || "miao-dev-secret-change-me";
@@ -653,6 +658,65 @@ async function startServer() {
       })
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     res.json(diaries);
+  });
+
+  // ── 通知 API ──
+  app.get("/api/v1/notifications", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const notifications = readJSON<ServerNotification[]>(notificationsFile, [])
+      .filter(n => n.recipientId === userId)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    res.json(notifications);
+  });
+
+  app.post("/api/v1/notifications", authRequired, (req, res) => {
+    const senderId = getAuthedUsername(req);
+    const { recipientId, type, title, content, catAvatar } = req.body;
+    if (!recipientId || !type || !title || !content) {
+      return res.status(400).json({ error: "Missing required fields: recipientId, type, title, content", code: "MISSING_FIELDS" });
+    }
+    if (recipientId === senderId) {
+      return res.status(400).json({ error: "Cannot send notification to yourself", code: "CANNOT_NOTIFY_SELF" });
+    }
+    // Verify recipient exists
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    if (!users.find(u => u.username === recipientId)) {
+      return res.status(404).json({ error: "Recipient not found", code: "RECIPIENT_NOT_FOUND" });
+    }
+    const notifications = readJSON<ServerNotification[]>(notificationsFile, []);
+    const notification: ServerNotification = {
+      id: crypto.randomBytes(8).toString('hex'),
+      recipientId,
+      senderId,
+      type,
+      title,
+      content,
+      catAvatar: catAvatar || undefined,
+      createdAt: Date.now(),
+      read: false,
+    };
+    notifications.push(notification);
+    writeJSON(notificationsFile, notifications);
+    res.json({ success: true, notification });
+  });
+
+  app.put("/api/v1/notifications/:id/read", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const notifId = req.params.id;
+    const notifications = readJSON<ServerNotification[]>(notificationsFile, []);
+    const notif = notifications.find(n => n.id === notifId && n.recipientId === userId);
+    if (!notif) return res.status(404).json({ error: "Notification not found", code: "NOT_FOUND" });
+    notif.read = true;
+    writeJSON(notificationsFile, notifications);
+    res.json({ success: true });
+  });
+
+  app.put("/api/v1/notifications/read-all", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const notifications = readJSON<ServerNotification[]>(notificationsFile, []);
+    notifications.forEach(n => { if (n.recipientId === userId) n.read = true; });
+    writeJSON(notificationsFile, notifications);
+    res.json({ success: true });
   });
 
   // Health check endpoint
