@@ -743,6 +743,31 @@ async function startServer() {
     res.json({ comment });
   });
 
+  // 删除评论
+  app.delete("/api/v1/diaries/:diaryId/comments/:commentId", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const { diaryId, commentId } = req.params;
+    if (!diaryId || !commentId) return res.status(400).json({ error: "Missing diaryId or commentId", code: "INVALID_PARAMETER" });
+
+    const allComments = readJSON<Record<string, ServerComment[]>>(diaryCommentsFile, {});
+    const comments = allComments[diaryId] || [];
+    const target = comments.find(c => c.id === commentId);
+    if (!target) return res.status(404).json({ error: "Comment not found", code: "NOT_FOUND" });
+
+    // 只有评论作者或日记作者可以删除
+    const allDiaries = readJSON<ServerDiary[]>(diariesFile, []);
+    const diary = allDiaries.find(d => d.id === diaryId);
+    const isCommentAuthor = target.authorId === userId;
+    const isDiaryOwner = diary?.userId === userId;
+    if (!isCommentAuthor && !isDiaryOwner) {
+      return res.status(403).json({ error: "Not authorized to delete this comment", code: "FORBIDDEN" });
+    }
+
+    allComments[diaryId] = comments.filter(c => c.id !== commentId);
+    writeJSON(diaryCommentsFile, allComments);
+    res.json({ success: true });
+  });
+
   app.get("/api/v1/letters", authRequired, (req, res) => {
     const userId = getAuthedUsername(req);
     const all = readJSON<ServerLetter[]>(lettersFile, []);
