@@ -52,6 +52,8 @@ async function startServer() {
   const friendsFile = path.join(dataDir, 'friends.json');
   const friendInvitesFile = path.join(dataDir, 'friend-invites.json');
   const notificationsFile = path.join(dataDir, 'notifications.json');
+  const diaryLikesFile = path.join(dataDir, 'diary-likes.json');
+  const diaryCommentsFile = path.join(dataDir, 'diary-comments.json');
 
   function readJSON<T>(file: string, fallback: T): T {
     try {
@@ -63,7 +65,7 @@ async function startServer() {
     fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
   }
 
-  interface ServerUser { username: string; nickname: string; avatar: string; password: string; openid?: string; unionid?: string; }
+  interface ServerUser { username: string; nickname: string; avatar: string; password: string; phone?: string; openid?: string; unionid?: string; }
   interface ServerCat {
     id: string; userId: string; name: string; breed: string; color: string;
     avatar: string; source: string; createdAt?: number;
@@ -85,6 +87,27 @@ async function startServer() {
 
   const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || "miao-dev-secret-change-me";
   const tokenTtlMs = Number(process.env.SESSION_TTL_MS || 30 * 24 * 60 * 60 * 1000);
+
+  // ── 微信 access_token 缓存（用于 getPhoneNumber 接口）──
+  let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+
+  async function getAccessToken(): Promise<string> {
+    if (!process.env.WECHAT_APPID || !process.env.WECHAT_APPSECRET) return '';
+    if (cachedAccessToken && Date.now() < cachedAccessToken.expiresAt) {
+      return cachedAccessToken.token;
+    }
+    const resp = await axios.get(
+      `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${process.env.WECHAT_APPID}&secret=${process.env.WECHAT_APPSECRET}`,
+      { timeout: 10000, httpsAgent }
+    );
+    if (!resp.data?.access_token) throw new Error('Failed to get access_token: ' + (resp.data?.errmsg || 'unknown'));
+    const expiresIn = typeof resp.data.expires_in === 'number' && resp.data.expires_in > 0 ? resp.data.expires_in : 7200;
+    cachedAccessToken = {
+      token: resp.data.access_token,
+      expiresAt: Date.now() + (expiresIn - 300) * 1000,
+    };
+    return cachedAccessToken.token;
+  }
 
   const base64url = (input: Buffer | string) =>
     Buffer.from(input).toString('base64url');
@@ -111,10 +134,17 @@ async function startServer() {
     }
   };
 
+  const maskPhone = (phone?: string) => {
+    if (!phone) return undefined;
+    if (phone.length < 7) return '******';
+    return phone.slice(0, 3) + '****' + phone.slice(-4);
+  };
+
   const publicUser = (user: ServerUser) => ({
     username: user.username,
     nickname: user.nickname,
     avatar: user.avatar,
+    phone: maskPhone(user.phone),
     openidBound: !!user.openid,
     passwordSet: !!user.password
   });
@@ -305,6 +335,84 @@ async function startServer() {
     }
   });
 
+  // ── 手机号快捷登录 ──
+  app.post("/api/v1/auth/phone-login", async (req, res) => {
+    const phoneCode = String(req.body.phoneCode || "").trim();
+    const loginCode = String(req.body.loginCode || "").trim();
+    if (!phoneCode) return res.status(400).json({ error: "Missing phoneCode", code: "INVALID_PARAMETER" });
+
+    let phone: string;
+    let openid: string | undefined;
+
+    // Mock 模式：未配置 WECHAT_APPID 时用 phoneCode hash 生成模拟手机号
+    if (!process.env.WECHAT_APPID || !process.env.WECHAT_APPSECRET) {
+      if (process.env.NODE_ENV === "production") {
+        return res.status(501).json({ error: "Phone login is not configured", code: "WECHAT_NOT_CONFIGURED" });
+      }
+      const hash = crypto.createHash('sha256').update(phoneCode).digest('hex');
+      phone = '138' + hash.slice(-8);
+    } else {
+      // 生产模式：用 access_token + phoneCode 调微信 getPhoneNumber 接口
+      try {
+        const accessToken = await getAccessToken();
+        const wxResp = await axios.post(
+          `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${accessToken}`,
+          { code: phoneCode },
+          { timeout: 10000, httpsAgent }
+        );
+        const phoneNumber = wxResp.data?.phone_info?.phoneNumber;
+        if (!phoneNumber) {
+          return res.status(401).json({ error: wxResp.data?.errmsg || "Failed to get phone number", code: "PHONE_LOGIN_FAILED" });
+        }
+        phone = phoneNumber;
+      } catch (error: any) {
+        return res.status(502).json({ error: "WeChat phone number request failed", message: error.message, code: "WECHAT_UPSTREAM_ERROR" });
+      }
+    }
+
+    // 可选：用 loginCode 换取 openid
+    if (loginCode && process.env.WECHAT_APPID && process.env.WECHAT_APPSECRET) {
+      try {
+        const wxResp = await axios.get("https://api.weixin.qq.com/sns/jscode2session", {
+          params: {
+            appid: process.env.WECHAT_APPID,
+            secret: process.env.WECHAT_APPSECRET,
+            js_code: loginCode,
+            grant_type: "authorization_code"
+          },
+          timeout: 10000,
+          httpsAgent
+        });
+        if (wxResp.data?.openid) openid = wxResp.data.openid;
+      } catch { /* non-fatal */ }
+    } else if (loginCode && (!process.env.WECHAT_APPID || !process.env.WECHAT_APPSECRET)) {
+      openid = `dev_${crypto.createHash('sha256').update(loginCode).digest('hex').slice(0, 16)}`;
+    }
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    let user = users.find(u => u.phone === phone);
+    let isNewUser = false;
+
+    if (!user) {
+      // 创建新用户：username=手机号, phone=手机号, nickname=喵星人_{尾号4位}
+      user = {
+        username: phone,
+        password: "",
+        nickname: `喵星人_${phone.slice(-4)}`,
+        avatar: "",
+        phone,
+        openid,
+      };
+      users.push(user);
+      isNewUser = true;
+    } else {
+      // 已有用户：更新 openid（如有）
+      if (openid) user.openid = openid;
+    }
+    writeJSON(usersFile, users);
+    res.json({ token: signToken({ username: user.username }), user: publicUser(user), isNewUser });
+  });
+
   app.post("/api/v1/auth/set-password", authRequired, (req, res) => {
     const username = getAuthedUsername(req);
     const currentPassword = String(req.body.currentPassword || "").trim();
@@ -337,6 +445,28 @@ async function startServer() {
     const user = users.find(u => u.username === getAuthedUsername(req));
     if (!user) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
     res.json({ user: publicUser(user), clientType: (req as any).clientType });
+  });
+
+  app.patch("/api/v1/me", authRequired, (req, res) => {
+    const username = getAuthedUsername(req);
+    const nickname = req.body.nickname;
+    const avatar = req.body.avatar;
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const user = users.find(u => u.username === username);
+    if (!user) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+
+    if (typeof nickname === 'string') {
+      const trimmed = nickname.trim();
+      if (trimmed.length < 2 || trimmed.length > 12) {
+        return res.status(400).json({ error: "Nickname must be 2-12 characters", code: "INVALID_NICKNAME_LENGTH" });
+      }
+      user.nickname = trimmed;
+    }
+    if (typeof avatar === 'string') user.avatar = avatar.trim();
+
+    writeJSON(usersFile, users);
+    res.json({ user: publicUser(user) });
   });
 
   // ── 猫咪 CRUD API ──
@@ -389,6 +519,22 @@ async function startServer() {
     id: string; userId: string; catId: string; content: string;
     media?: string; mediaType?: string; createdAt: number;
     likes: number; isLiked: boolean; comments: any[];
+  }
+
+  interface ServerComment {
+    id: string; authorId: string; authorNickname: string; content: string; createdAt: number;
+  }
+
+  // 辅助函数：为日记列表注入点赞/评论交互数据
+  function enrichDiariesWithInteractions(diaries: any[], userId: string): any[] {
+    const allLikes = readJSON<Record<string, string[]>>(diaryLikesFile, {});
+    const allComments = readJSON<Record<string, ServerComment[]>>(diaryCommentsFile, {});
+    return diaries.map(d => ({
+      ...d,
+      likes: (allLikes[d.id] || []).length,
+      isLiked: (allLikes[d.id] || []).includes(userId),
+      comments: allComments[d.id] || [],
+    }));
   }
 
   app.get("/api/diaries/:userId", (req, res) => {
@@ -507,7 +653,8 @@ async function startServer() {
   app.get("/api/v1/diaries", authRequired, (req, res) => {
     const userId = getAuthedUsername(req);
     const all = readJSON<ServerDiary[]>(diariesFile, []);
-    res.json(all.filter(d => d.userId === userId));
+    const own = all.filter(d => d.userId === userId);
+    res.json(enrichDiariesWithInteractions(own, userId));
   });
 
   app.post("/api/v1/diaries", authRequired, (req, res) => {
@@ -526,7 +673,74 @@ async function startServer() {
     const userId = getAuthedUsername(req);
     const all = readJSON<ServerDiary[]>(diariesFile, []);
     writeJSON(diariesFile, all.filter(d => !(d.userId === userId && d.id === req.params.diaryId)));
+    // 清理该日记的点赞和评论
+    const allLikes = readJSON<Record<string, string[]>>(diaryLikesFile, {});
+    const allComments = readJSON<Record<string, ServerComment[]>>(diaryCommentsFile, {});
+    delete allLikes[req.params.diaryId];
+    delete allComments[req.params.diaryId];
+    writeJSON(diaryLikesFile, allLikes);
+    writeJSON(diaryCommentsFile, allComments);
     res.json({ success: true });
+  });
+
+  // ── 日记点赞/评论 API ──
+  app.post("/api/v1/diaries/:diaryId/like", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const { diaryId } = req.params;
+    if (!diaryId) return res.status(400).json({ error: "Missing diaryId", code: "INVALID_PARAMETER" });
+
+    // 验证日记存在
+    const allDiaries = readJSON<ServerDiary[]>(diariesFile, []);
+    if (!allDiaries.find(d => d.id === diaryId)) {
+      return res.status(404).json({ error: "Diary not found", code: "NOT_FOUND" });
+    }
+
+    const allLikes = readJSON<Record<string, string[]>>(diaryLikesFile, {});
+    const likedBy = allLikes[diaryId] || [];
+    const idx = likedBy.indexOf(userId);
+    let liked: boolean;
+    if (idx >= 0) {
+      likedBy.splice(idx, 1);
+      liked = false;
+    } else {
+      likedBy.push(userId);
+      liked = true;
+    }
+    allLikes[diaryId] = likedBy;
+    writeJSON(diaryLikesFile, allLikes);
+    res.json({ liked, likes: likedBy.length });
+  });
+
+  app.post("/api/v1/diaries/:diaryId/comments", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const { diaryId } = req.params;
+    const content = String(req.body.content || "").trim();
+    if (!diaryId) return res.status(400).json({ error: "Missing diaryId", code: "INVALID_PARAMETER" });
+    if (!content) return res.status(400).json({ error: "Missing content", code: "INVALID_PARAMETER" });
+
+    // 验证日记存在
+    const allDiaries = readJSON<ServerDiary[]>(diariesFile, []);
+    if (!allDiaries.find(d => d.id === diaryId)) {
+      return res.status(404).json({ error: "Diary not found", code: "NOT_FOUND" });
+    }
+
+    // 获取用户昵称
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const user = users.find(u => u.username === userId);
+
+    const comment: ServerComment = {
+      id: `cmt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      authorId: userId,
+      authorNickname: user?.nickname || userId,
+      content,
+      createdAt: Date.now(),
+    };
+
+    const allComments = readJSON<Record<string, ServerComment[]>>(diaryCommentsFile, {});
+    if (!allComments[diaryId]) allComments[diaryId] = [];
+    allComments[diaryId].push(comment);
+    writeJSON(diaryCommentsFile, allComments);
+    res.json({ comment });
   });
 
   app.get("/api/v1/letters", authRequired, (req, res) => {
@@ -657,7 +871,7 @@ async function startServer() {
         };
       })
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    res.json(diaries);
+    res.json(enrichDiariesWithInteractions(diaries, userId));
   });
 
   // ── 通知 API ──
