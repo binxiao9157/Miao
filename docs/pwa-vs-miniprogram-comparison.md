@@ -30,26 +30,31 @@
 
 ### 2.1 底部 Tab 栏
 
+两端 Tab 栏设计已统一，顺序和布局完全一致。
+
 | 维度 | PWA | 小程序 |
 |------|-----|--------|
 | Tab 数量 | 5 | 5 |
-| Tab 布局 | 居中浮动毛玻璃圆角条（fixed bottom-4） | 原生 TabBar（底部固定） |
-| Tab 样式 | 首页 Tab 特殊圆形暖色背景突出 | 统一图标+文字 |
-| Tab 切换动画 | motion/react（opacity/zIndex/scale 过渡） | 原生切换无动画 |
-| Tab 状态保持 | IndexedStack 模式（已访问 Tab 保持挂载） | 原生保持页面栈 |
+| Tab 布局 | 浮动圆角毛玻璃条（fixed bottom + 圆角 + backdrop-blur） | 浮动圆角毛玻璃条（fixed bottom + 圆角 + backdrop-filter） |
+| 首页 Tab | 居中，圆形暖色背景突出（`bg-[#D99B7A]` + `rotate-12`） | 居中，圆形暖色背景突出（`margin-top: -24rpx` + 圆形 + `#EFD9CB`） |
+| 非活跃 Tab | 文字隐藏，仅图标 | 文字隐藏（`opacity: 0`），仅图标 |
+| 活跃指示 | 底部圆点 + 图标放大 + 文字显示 | 底部圆点 + 图标放大 + 文字显示 |
+| 首页特殊背景 | `bg-white/20 backdrop-blur-lg`（半透明） | `rgba(255,255,255,0.38) + backdrop-filter:blur`（半透明） |
+| Tab 切换动画 | motion/react（opacity/zIndex/scale 过渡） | CSS transition |
+| Tab 状态保持 | IndexedStack 模式（已访问 Tab 保持挂载） | 小程序原生页面栈保持 |
 | Tab 预加载 | 首次挂载后微任务预取所有 Tab chunk | 小程序预加载机制 |
 
-**Tab 顺序对比**：
+**Tab 顺序（两端一致）**：
 
-| 位置 | PWA | 小程序 |
-|------|-----|--------|
-| 左1 | 📖 日志 `/diary` | 🏠 首页 `/pages/home/index` |
-| 左2 | ✉️ 时光 `/time-letters` | 📖 日志 `/pages/diary/index` |
-| 中 | 🏠 首页 `/`（突出样式） | ⏳ 时光 `/pages/time-letters/index` |
-| 右1 | ⭐ 积分 `/points` | ⭐ 积分 `/pages/points/index` |
-| 右2 | 👤 Miao `/profile` | 👤 我的 `/pages/profile/index` |
+| 位置 | Tab | PWA 路径 | 小程序路径 |
+|------|-----|---------|-----------|
+| 左1 | 📖 日志 | `/diary` | `pages/diary/index` |
+| 左2 | ✉️ 时光 | `/time-letters` | `pages/time-letters/index` |
+| 中 | 🏠 首页（突出样式） | `/` | `pages/home/index` |
+| 右1 | ⭐ 积分 | `/points` | `pages/points/index` |
+| 右2 | 👤 Miao/我的 | `/profile` | `pages/profile/index` |
 
-> **差异**：PWA 首页居中且视觉突出；小程序首页在最左侧。PWA 无独立通知 Tab（通知在 Profile 入口内），小程序也无通知 Tab。
+> **结论**：两端 Tab 栏已完全对齐——5 Tab 顺序一致、首页居中突出、浮动毛玻璃设计、非活跃文字隐藏。差异仅在实现层：PWA 用 motion/react 动画 + IndexedStack 状态保持，小程序用 CSS transition + 原生页面栈。
 
 ### 2.2 页面栈管理
 
