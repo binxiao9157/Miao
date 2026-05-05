@@ -413,6 +413,55 @@ async function startServer() {
     res.json({ token: signToken({ username: user.username }), user: publicUser(user), isNewUser });
   });
 
+  // ── 密码重置：发送验证码 ──
+  app.post("/api/v1/auth/send-reset-code", (req, res) => {
+    const phone = String(req.body.phone || "").trim();
+    if (!phone) return res.status(400).json({ error: "Missing phone number", code: "INVALID_PARAMETER" });
+
+    // 生产环境需要接入短信服务商；开发环境直接返回模拟验证码
+    if (process.env.NODE_ENV !== "production" || process.env.SMS_PROVIDER === "mock") {
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      console.log(`[ResetCode] Dev mock code for ${phone}: ${code}`);
+      return res.json({ success: true, mock: true, code });
+    }
+
+    // TODO: 接入实际短信服务（阿里云 SMS / 腾讯云 SMS）
+    return res.status(501).json({ error: "SMS service not configured", code: "SMS_NOT_CONFIGURED" });
+  });
+
+  // ── 密码重置：验证码校验并重置密码 ──
+  app.post("/api/v1/auth/reset-password", (req, res) => {
+    const phone = String(req.body.phone || "").trim();
+    const code = String(req.body.code || "").trim();
+    const newPassword = String(req.body.newPassword || "").trim();
+
+    if (!phone || !code || !newPassword) {
+      return res.status(400).json({ error: "Missing phone, code, or newPassword", code: "INVALID_PARAMETER" });
+    }
+    if (newPassword.length < 6 || newPassword.length > 20) {
+      return res.status(400).json({ error: "Password length must be 6-20 characters", code: "INVALID_PASSWORD_LENGTH" });
+    }
+
+    // 开发环境：验证码固定为 6 位数字即可通过
+    if (process.env.NODE_ENV !== "production" || process.env.SMS_PROVIDER === "mock") {
+      if (!/^\d{6}$/.test(code)) {
+        return res.status(400).json({ error: "Invalid verification code", code: "INVALID_CODE" });
+      }
+    } else {
+      // TODO: 校验短信验证码
+      return res.status(501).json({ error: "SMS service not configured", code: "SMS_NOT_CONFIGURED" });
+    }
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const user = users.find(u => u.phone === phone);
+    if (!user) return res.status(404).json({ error: "Phone number not registered", code: "PHONE_NOT_FOUND" });
+
+    user.password = newPassword;
+    writeJSON(usersFile, users);
+    console.log(`[ResetPassword] Password reset for phone: ${maskPhone(phone)}`);
+    res.json({ success: true });
+  });
+
   app.post("/api/v1/auth/set-password", authRequired, (req, res) => {
     const username = getAuthedUsername(req);
     const currentPassword = String(req.body.currentPassword || "").trim();
@@ -467,6 +516,75 @@ async function startServer() {
 
     writeJSON(usersFile, users);
     res.json({ user: publicUser(user) });
+  });
+
+  // ── 注销账户：删除用户及关联数据 ──
+  app.delete("/api/v1/me", authRequired, (req, res) => {
+    const username = getAuthedUsername(req);
+
+    const users = readJSON<ServerUser[]>(usersFile, []);
+    const idx = users.findIndex(u => u.username === username);
+    if (idx < 0) return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+    users.splice(idx, 1);
+    writeJSON(usersFile, users);
+
+    // 删除关联的猫咪
+    const cats = readJSON<ServerCat[]>(catsFile, []);
+    writeJSON(catsFile, cats.filter(c => c.userId !== username));
+
+    // 删除关联的日记
+    const diaries = readJSON<any[]>(diariesFile, []);
+    writeJSON(diariesFile, diaries.filter(d => d.userId !== username));
+
+    // 删除关联的信件
+    const letters = readJSON<any[]>(lettersFile, []);
+    writeJSON(lettersFile, letters.filter(l => l.userId !== username));
+
+    // 删除关联的积分
+    const points = readJSON<any[]>(pointsFile, []);
+    writeJSON(pointsFile, points.filter(p => p.userId !== username));
+
+    // 删除好友关系（双向）
+    const friends = readJSON<ServerFriend[]>(friendsFile, []);
+    writeJSON(friendsFile, friends.filter(f => f.userId !== username && f.friendId !== username));
+
+    // 删除关联的通知
+    const notifications = readJSON<ServerNotification[]>(notificationsFile, []);
+    writeJSON(notificationsFile, notifications.filter(n => n.recipientId !== username && n.senderId !== username));
+
+    // 删除关联的邀请
+    const invites = readJSON<ServerFriendInvite[]>(friendInvitesFile, []);
+    writeJSON(friendInvitesFile, invites.filter(i => i.ownerId !== username));
+
+    console.log(`[Account] Deleted user: ${username}`);
+    res.json({ success: true });
+  });
+
+  // ── 用户设置 ──
+  const settingsFile = path.join(dataDir, 'user-settings.json');
+  interface UserSettings { userId: string; notifications?: { friendRequest?: boolean; diaryLike?: boolean; diaryComment?: boolean; letterUnlock?: boolean }; updatedAt?: number }
+
+  app.put("/api/v1/me/settings", authRequired, (req, res) => {
+    const username = getAuthedUsername(req);
+    const allSettings = readJSON<UserSettings[]>(settingsFile, []);
+    let settings = allSettings.find(s => s.userId === username);
+    if (!settings) {
+      settings = { userId: username };
+      allSettings.push(settings);
+    }
+    if (req.body.notifications && typeof req.body.notifications === 'object') {
+      settings.notifications = { ...settings.notifications, ...req.body.notifications };
+    }
+    settings.updatedAt = Date.now();
+    writeJSON(settingsFile, allSettings);
+    res.json({ success: true, settings });
+  });
+
+  app.get("/api/v1/me/settings", authRequired, (req, res) => {
+    const username = getAuthedUsername(req);
+    const allSettings = readJSON<UserSettings[]>(settingsFile, []);
+    const settings = allSettings.find(s => s.userId === username) || { userId: username };
+    res.json(settings);
   });
 
   // ── 猫咪 CRUD API ──
@@ -956,6 +1074,53 @@ async function startServer() {
     notifications.forEach(n => { if (n.recipientId === userId) n.read = true; });
     writeJSON(notificationsFile, notifications);
     res.json({ success: true });
+  });
+
+  // ── 意见反馈 API ──
+  const feedbackFile = path.join(dataDir, 'feedback.json');
+  interface FeedbackEntry { id: string; userId: string; type: string; content?: string; answers?: Record<string, any>; createdAt: number }
+
+  app.post("/api/v1/feedback", authRequired, (req, res) => {
+    const userId = getAuthedUsername(req);
+    const { type, content, answers } = req.body;
+    if (!type) return res.status(400).json({ error: "Missing feedback type", code: "INVALID_PARAMETER" });
+
+    const feedback = readJSON<FeedbackEntry[]>(feedbackFile, []);
+    const entry: FeedbackEntry = {
+      id: crypto.randomBytes(8).toString('hex'),
+      userId,
+      type,
+      content: content || undefined,
+      answers: answers || undefined,
+      createdAt: Date.now(),
+    };
+    feedback.push(entry);
+    writeJSON(feedbackFile, feedback);
+    console.log(`[Feedback] ${type} from ${userId}`);
+    res.json({ success: true, id: entry.id });
+  });
+
+  // ── 文件上传 API（头像等） ──
+  const avatarUploadsDir = path.resolve(__dirname, 'uploads', 'avatars');
+  fs.mkdirSync(avatarUploadsDir, { recursive: true });
+
+  app.post("/api/v1/upload", authRequired, upload.single('file'), (req, res) => {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "No file uploaded", code: "MISSING_FILE" });
+
+    const ext = path.extname(file.originalname || '.jpg').toLowerCase() || '.jpg';
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    if (!allowedExts.includes(ext)) {
+      return res.status(400).json({ error: "Unsupported file type", code: "INVALID_FILE_TYPE" });
+    }
+
+    const filename = `${getAuthedUsername(req)}_${Date.now()}${ext}`;
+    const filePath = path.join(avatarUploadsDir, filename);
+    fs.writeFileSync(filePath, file.buffer);
+
+    const url = `/uploads/avatars/${filename}`;
+    console.log(`[Upload] Avatar saved: ${url}`);
+    res.json({ url });
   });
 
   // Health check endpoint
