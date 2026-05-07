@@ -12,6 +12,11 @@ document.addEventListener('gesturestart', function(event) {
 let lastTouchEnd = 0;
 document.addEventListener('touchend', function(event) {
   const now = (new Date()).getTime();
+  const target = event.target;
+  if (target instanceof Element && target.closest('[data-miao-multitap="true"]')) {
+    lastTouchEnd = now;
+    return;
+  }
   if (now - lastTouchEnd <= 300) {
     event.preventDefault();
   }
