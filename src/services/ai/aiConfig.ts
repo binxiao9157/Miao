@@ -11,7 +11,6 @@ const STORAGE_KEYS = {
   SEED: 'MIAO_AI_SEED',
   PROMPT_EXTEND: 'MIAO_AI_PROMPT_EXTEND',
   MOCK_MODE: 'MIAO_AI_MOCK_MODE',
-  SKIP_IMAGE_STAGE: 'MIAO_AI_SKIP_IMAGE_STAGE',
 } as const;
 
 export const DEFAULT_AI_PROFILES: Record<AIProvider, AIProfile> = {
@@ -24,7 +23,6 @@ export const DEFAULT_AI_PROFILES: Record<AIProvider, AIProfile> = {
     seed: 12345,
     promptExtend: true,
     mockMode: false,
-    skipImageStage: false,
   },
   volcengine: {
     provider: 'volcengine',
@@ -35,7 +33,6 @@ export const DEFAULT_AI_PROFILES: Record<AIProvider, AIProfile> = {
     seed: 12345,
     promptExtend: true,
     mockMode: false,
-    skipImageStage: false,
   },
 };
 
@@ -78,7 +75,6 @@ export const aiConfig = {
       seed: readNumber(STORAGE_KEYS.SEED, defaults.seed),
       promptExtend: readBool(STORAGE_KEYS.PROMPT_EXTEND, defaults.promptExtend),
       mockMode: readBool(STORAGE_KEYS.MOCK_MODE, defaults.mockMode),
-      skipImageStage: readBool(STORAGE_KEYS.SKIP_IMAGE_STAGE, defaults.skipImageStage),
     };
   },
 
@@ -97,10 +93,10 @@ export const aiConfig = {
     localStorage.setItem(STORAGE_KEYS.SEED, String(profile.seed));
     localStorage.setItem(STORAGE_KEYS.PROMPT_EXTEND, String(profile.promptExtend));
     localStorage.setItem(STORAGE_KEYS.MOCK_MODE, String(profile.mockMode));
-    localStorage.setItem(STORAGE_KEYS.SKIP_IMAGE_STAGE, String(profile.skipImageStage));
   },
 
   reset() {
     Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+    localStorage.removeItem('MIAO_AI_SKIP_IMAGE_STAGE');
   },
 };

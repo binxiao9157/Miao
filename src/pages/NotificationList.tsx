@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { useEffect, useState, useCallback } from "react";
 import { storage } from "../services/storage";
 import PageHeader from "../components/PageHeader";
+import { getEffectiveUnlockAt, isTimeLetterUnlocked } from "../utils/timeLetterUnlock";
 
 interface ServerNotification {
   id: string;
@@ -98,16 +99,12 @@ export function computeNotifications(): NotificationItem[] {
   const items: NotificationItem[] = [];
 
   const unlockedLetters = letters.filter(l => {
-    if (!isFastForward) return l.unlockAt <= now;
-    // 加速模式计算逻辑
-    const totalDuration = l.unlockAt - l.createdAt;
-    const scaledDuration = totalDuration / 86400;
-    return (now - l.createdAt) >= scaledDuration;
+    return isTimeLetterUnlocked(l, isFastForward, now);
   });
 
   if (unlockedLetters.length > 0) {
     // 使用最新一封解锁信件的时间戳作为 ID 的一部分，确保新解锁能触发红点
-    const latestUnlock = Math.max(...unlockedLetters.map(l => l.unlockAt));
+    const latestUnlock = Math.max(...unlockedLetters.map(l => getEffectiveUnlockAt(l, isFastForward)));
     const id = `letter_unlocked_${unlockedLetters.length}_${latestUnlock}`;
     items.push({
       id,
@@ -116,7 +113,7 @@ export function computeNotifications(): NotificationItem[] {
       isRead: readIds.includes(id),
       title: '时光信件解锁',
       content: `你有 ${unlockedLetters.length} 封时光信件已解锁，快去看看吧～`,
-      timestamp: unlockedLetters[unlockedLetters.length - 1].unlockAt,
+      timestamp: latestUnlock,
       link: '/time-letters'
     });
   }

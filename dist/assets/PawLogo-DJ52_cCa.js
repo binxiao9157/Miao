@@ -1,0 +1,1 @@
+import{j as r}from"./index-0zsSiN7A.js";function e({size:o=48,className:a="",style:t,id:g="paw-logo"}){return r.jsx("img",{id:g,src:"/logo.png",alt:"Miao Logo",width:o,height:o,style:t,className:`${a} object-contain`,draggable:!1})}export{e as P};

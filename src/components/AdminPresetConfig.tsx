@@ -34,7 +34,6 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
     setProfile(prev => ({
       ...defaults,
       mockMode: prev.mockMode,
-      skipImageStage: prev.skipImageStage,
       resolution: prev.resolution || defaults.resolution,
       duration: prev.duration || defaults.duration,
       seed: prev.seed || defaults.seed,
@@ -157,7 +156,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                         : "text-[#5D4037]/60 hover:bg-black/5"
                     }`}
                   >
-                    {provider === 'dashscope' ? '阿里百练' : '火山引擎'}
+                    {provider === 'dashscope' ? '阿里百炼' : '火山引擎'}
                     {profile.provider === provider && (
                       <motion.div
                         layoutId="admin-provider-bg"
@@ -216,7 +215,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                   />
                 </label>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <label className="flex min-h-11 items-center justify-between gap-1.5 bg-white rounded-[14px] px-2.5 sm:px-3 py-2 text-[11px] leading-tight font-black text-[#5D4037]/70">
                   扩展
                   <input
@@ -232,15 +231,6 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                     type="checkbox"
                     checked={profile.mockMode}
                     onChange={(e) => setProfile(prev => ({ ...prev, mockMode: e.target.checked }))}
-                    className="w-4 h-4 shrink-0 accent-[#FF9D76]"
-                  />
-                </label>
-                <label className="flex min-h-11 items-center justify-between gap-1.5 bg-white rounded-[14px] px-2.5 sm:px-3 py-2 text-[11px] leading-tight font-black text-[#5D4037]/70">
-                  跳首帧
-                  <input
-                    type="checkbox"
-                    checked={profile.skipImageStage}
-                    onChange={(e) => setProfile(prev => ({ ...prev, skipImageStage: e.target.checked }))}
                     className="w-4 h-4 shrink-0 accent-[#FF9D76]"
                   />
                 </label>

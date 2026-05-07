@@ -9,7 +9,6 @@ export interface AIProfile {
   seed: number;
   promptExtend: boolean;
   mockMode: boolean;
-  skipImageStage: boolean;
 }
 
 export interface AITaskResponse {

@@ -35,7 +35,7 @@ export default function SwitchCompanion() {
 
   const handleAddNew = () => {
     if (points >= REDEEM_THRESHOLD) {
-      navigate("/welcome", { state: { isRedemption: true, redemptionAmount: REDEEM_THRESHOLD } });
+      navigate(`/welcome?isRedemption=1&redemptionAmount=${REDEEM_THRESHOLD}`, { state: { isRedemption: true, redemptionAmount: REDEEM_THRESHOLD } });
     }
   };
 

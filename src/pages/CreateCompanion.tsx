@@ -8,9 +8,10 @@ import { useAuthContext } from "../context/AuthContext";
 export default function CreateCompanion() {
   const navigate = useNavigate();
   const location = useLocation();
-  const isRedemption = location.state?.isRedemption || false;
-  const isDebugRedemption = location.state?.isDebugRedemption || false;
-  const redemptionAmount = location.state?.redemptionAmount || 200;
+  const query = new URLSearchParams(location.search);
+  const isRedemption = location.state?.isRedemption ?? query.get("isRedemption") === "1";
+  const isDebugRedemption = location.state?.isDebugRedemption ?? query.get("debug") === "1";
+  const redemptionAmount = Number(location.state?.redemptionAmount ?? query.get("redemptionAmount")) || 200;
   
   const [presets, setPresets] = useState<PresetCat[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
@@ -36,17 +37,24 @@ export default function CreateCompanion() {
     const selectedPreset = presets.find(p => p.id === selectedPresetId);
     if (!selectedPreset) return;
 
+    const draft = {
+      catId: `cat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      image: selectedPreset.imageUrl,
+      name: catName,
+      breed: selectedPreset.name,
+      furColor: "预设",
+      source: "created" as const,
+      isRedemption,
+      isDebugRedemption,
+      redemptionAmount,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    storage.saveGenerationDraft(draft);
+
     // 跳转到生成进度页，执行 I2V 链路
     navigate("/generation-progress", { 
-      state: { 
-        image: selectedPreset.imageUrl, // 直接传递预设图片 URL
-        name: catName, 
-        breed: selectedPreset.name, 
-        furColor: "预设",
-        isRedemption, 
-        isDebugRedemption,
-        redemptionAmount
-      } 
+      state: draft
     });
   };
 

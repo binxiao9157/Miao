@@ -103,6 +103,22 @@ export interface PointsInfo {
   history: PointTransaction[];
 }
 
+export interface GenerationDraft {
+  catId: string;
+  image: string;
+  name?: string;
+  breed?: string;
+  furColor?: string;
+  source?: 'created' | 'uploaded';
+  originalImage?: string;
+  isRedemption?: boolean;
+  isDebugRedemption?: boolean;
+  redemptionAmount?: number;
+  pointsDeducted?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface PresetCat {
   id: string;
   name: string;
@@ -141,6 +157,8 @@ const USER_DATA_KEYS = {
   FRIEND_DIARIES: 'miao_friend_diaries',
   HAS_SUBMITTED_SURVEY: 'miao_has_submitted_survey',
   IS_FAST_FORWARD: 'miao_debug_fast_forward', // 调试加速模式
+  IS_POINTS_CHEAT: 'miao_debug_points_cheat',
+  GENERATION_DRAFT: 'miao_generation_draft',
 };
 
 function getCurrentUsername(): string | null {
@@ -908,6 +926,22 @@ export const storage = {
     return false;
   },
 
+  getGenerationDraft: (): GenerationDraft | null => {
+    return storage.safeParse<GenerationDraft | null>(getUserKey(USER_DATA_KEYS.GENERATION_DRAFT), null);
+  },
+
+  saveGenerationDraft: (draft: GenerationDraft) => {
+    const key = getUserKey(USER_DATA_KEYS.GENERATION_DRAFT);
+    storage.setItem(key, JSON.stringify({ ...draft, updatedAt: Date.now() }));
+    invalidateCache(key);
+  },
+
+  clearGenerationDraft: () => {
+    const key = getUserKey(USER_DATA_KEYS.GENERATION_DRAFT);
+    storage.removeItem(key);
+    invalidateCache(key);
+  },
+
   saveSettings: (settings: AppSettings) => {
     storage.setItem(getUserKey(USER_DATA_KEYS.SETTINGS), JSON.stringify(settings));
   },
@@ -1073,6 +1107,17 @@ export const storage = {
 
   getIsFastForward: (): boolean => {
     return localStorage.getItem(getUserKey(USER_DATA_KEYS.IS_FAST_FORWARD)) === 'true';
+  },
+
+  setIsPointsCheat: (enabled: boolean) => {
+    storage.setItem(getUserKey(USER_DATA_KEYS.IS_POINTS_CHEAT), enabled.toString());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('points-cheat-changed', { detail: { enabled } }));
+    }
+  },
+
+  getIsPointsCheat: (): boolean => {
+    return localStorage.getItem(getUserKey(USER_DATA_KEYS.IS_POINTS_CHEAT)) === 'true';
   },
 
   getLastReadNotificationTime: (): number => {

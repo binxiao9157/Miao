@@ -4,16 +4,17 @@ import { Plus, Lock, Unlock, ArrowLeft, Calendar, Send, Clock, ChevronRight, Mai
 import { storage, TimeLetter, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
+import { formatTimeLetterCountdown, isTimeLetterUnlocked } from "../utils/timeLetterUnlock";
 
 type ViewState = 'list' | 'write' | 'detail';
 
 // 极轻量的局部倒计时组件，隔离重绘压力
 const CountdownTimer = memo(({ unlockAt, createdAt, isFastForward }: { unlockAt: number; createdAt: number; isFastForward?: boolean }) => {
-  const [countdown, setCountdown] = useState(() => formatCountdown(unlockAt, createdAt, isFastForward));
+  const [countdown, setCountdown] = useState(() => formatTimeLetterCountdown({ unlockAt, createdAt }, !!isFastForward));
 
   useEffect(() => {
     const timer = setInterval(() => {
-      const next = formatCountdown(unlockAt, createdAt, isFastForward);
+      const next = formatTimeLetterCountdown({ unlockAt, createdAt }, !!isFastForward);
       setCountdown(next);
       if (next === '已解锁') clearInterval(timer);
     }, isFastForward ? 500 : 10000); // 开启加速模式后刷新频率大幅提升
@@ -150,34 +151,6 @@ const TimeLetterItem = memo(({
 
 TimeLetterItem.displayName = 'TimeLetterItem';
 
-function formatCountdown(unlockAt: number, createdAt: number, isFastForward?: boolean): string {
-  const now = Date.now();
-  let remainingMs = 0;
-
-  if (isFastForward) {
-    // 1天 = 1秒
-    const totalDuration = unlockAt - createdAt;
-    const scaledDuration = totalDuration / 86400;
-    remainingMs = Math.max(0, createdAt + scaledDuration - now);
-  } else {
-    remainingMs = unlockAt - now;
-  }
-  
-  if (remainingMs <= 0) return '已解锁';
-
-  if (isFastForward) {
-    const seconds = Math.ceil(remainingMs / 1000);
-    return `${seconds} 秒`;
-  }
-
-  const days = Math.floor(remainingMs / 86400000);
-  const hours = Math.floor((remainingMs % 86400000) / 3600000);
-  const minutes = Math.floor((remainingMs % 3600000) / 60000);
-  if (days > 0) return `${days} 天 ${hours} 小时`;
-  if (hours > 0) return `${hours} 小时 ${minutes} 分钟`;
-  return `${minutes} 分钟`;
-}
-
 export default function TimeLetters() {
   const location = useLocation();
   const [letters, setLetters] = useState<TimeLetter[]>(() => storage.getTimeLetters());
@@ -214,13 +187,7 @@ export default function TimeLetters() {
 
   const isLetterUnlocked = (letter: TimeLetter) => {
     if (forceUnlockedIds.has(letter.id)) return true;
-    const now = Date.now();
-    if (!isFastForward) return now >= letter.unlockAt;
-    
-    // 加速模式：1天 -> 1秒
-    const totalDuration = letter.unlockAt - letter.createdAt;
-    const scaledDuration = totalDuration / 86400;
-    return (now - letter.createdAt) >= scaledDuration;
+    return isTimeLetterUnlocked(letter, isFastForward);
   };
   
   // Write state

@@ -4,7 +4,7 @@ import { ArrowLeft, Upload, Sparkles, X, Pencil, Check, Maximize2, Loader2 } fro
 import { motion, AnimatePresence } from "motion/react";
 import Cropper from 'react-easy-crop';
 import { VolcanoService, IMAGE_PROMPTS } from "../services/volcanoService";
-import { aiConfig } from "../services/ai/aiConfig";
+import { storage } from "../services/storage";
 
 export default function UploadMaterial() {
   const navigate = useNavigate();
@@ -21,9 +21,10 @@ export default function UploadMaterial() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const isRedemption = location.state?.isRedemption || false;
-  const isDebugRedemption = location.state?.isDebugRedemption || false;
-  const redemptionAmount = location.state?.redemptionAmount || 200;
+  const query = new URLSearchParams(location.search);
+  const isRedemption = location.state?.isRedemption ?? query.get("isRedemption") === "1";
+  const isDebugRedemption = location.state?.isDebugRedemption ?? query.get("debug") === "1";
+  const redemptionAmount = Number(location.state?.redemptionAmount ?? query.get("redemptionAmount")) || 200;
 
   useEffect(() => {
     if (location.state?.image) {
@@ -148,22 +149,6 @@ export default function UploadMaterial() {
       return;
     }
 
-    const profile = aiConfig.getProfile();
-    if (profile.skipImageStage) {
-      navigate("/generation-progress", {
-        state: {
-          image: selectedImage,
-          name: nickname,
-          isRedemption,
-          isDebugRedemption,
-          redemptionAmount,
-          originalImage: selectedImage,
-          skippedImageStage: true
-        }
-      });
-      return;
-    }
-    
     setIsDrawing(true);
     try {
       // Stage 1: Qwen Image Generation (using VolcanoService)
@@ -212,16 +197,22 @@ export default function UploadMaterial() {
 
   const handleConfirmAndGenerateVideo = () => {
     if (!firstFrameUrl) return;
+    const draft = {
+      catId: `cat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      image: firstFrameUrl,
+      name: nickname,
+      source: "uploaded" as const,
+      originalImage: selectedImage || undefined,
+      isRedemption,
+      isDebugRedemption,
+      redemptionAmount,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    storage.saveGenerationDraft(draft);
     // Stage 3: Wan Video Generation (handled in GenerationProgress)
     navigate("/generation-progress", { 
-      state: { 
-        image: firstFrameUrl, 
-        name: nickname, 
-        isRedemption, 
-        isDebugRedemption, 
-        redemptionAmount,
-        originalImage: selectedImage // Keep original for reference
-      } 
+      state: draft
     });
     setFirstFrameUrl(null);
   };
