@@ -1,4 +1,4 @@
-const CACHE_NAME = 'miao-v6';
+const CACHE_NAME = 'miao-v7';
 // 预缓存列表：应用 shell 资源
 const STATIC_ASSETS = [
   '/',

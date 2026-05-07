@@ -236,49 +236,6 @@ export default function AdminSettings() {
           </div>
         </section>
 
-        <section className="miao-card p-5 rounded-[32px] mb-5 bg-white">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-11 h-11 bg-[#FF9D76]/10 text-[#FF9D76] rounded-2xl flex items-center justify-center shadow-sm shrink-0">
-              <Bug size={22} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-[17px] font-black text-on-surface leading-none tracking-normal">调试工具</h2>
-              <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-2">Debug Tools</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => {
-                const next = !isPointsCheat;
-                setIsPointsCheat(next);
-                storage.setIsPointsCheat(next);
-              }}
-              className={`min-h-20 rounded-[22px] p-4 text-left active:scale-[0.98] transition-all border ${
-                isPointsCheat ? "bg-[#FF9D76] text-white border-[#FF9D76]" : "bg-surface-container text-[#5D4037] border-outline-variant/40"
-              }`}
-            >
-              <Star size={20} className="mb-2" />
-              <p className="text-sm font-black">积分调试</p>
-              <p className="text-[10px] font-bold opacity-70 mt-1">{isPointsCheat ? "已开启" : "已关闭"}</p>
-            </button>
-            <button
-              onClick={() => {
-                const next = !isFastForward;
-                setIsFastForward(next);
-                storage.setIsFastForward(next);
-              }}
-              className={`min-h-20 rounded-[22px] p-4 text-left active:scale-[0.98] transition-all border ${
-                isFastForward ? "bg-[#FF9D76] text-white border-[#FF9D76]" : "bg-surface-container text-[#5D4037] border-outline-variant/40"
-              }`}
-            >
-              <FastForward size={20} className="mb-2" />
-              <p className="text-sm font-black">时光快进</p>
-              <p className="text-[10px] font-bold opacity-70 mt-1">{isFastForward ? "已开启" : "已关闭"}</p>
-            </button>
-          </div>
-        </section>
-
         <section className="miao-card p-5 rounded-[32px] mb-5">
           <h2 className="text-[17px] font-black text-on-surface mb-4 tracking-normal">新增预设</h2>
           <div className="flex gap-4">
@@ -341,6 +298,64 @@ export default function AdminSettings() {
               </button>
             </div>
           ))}
+        </section>
+
+        <section className="miao-card p-5 rounded-[32px] mt-5 mb-5 bg-white">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-11 h-11 bg-[#FF9D76]/10 text-[#FF9D76] rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+              <Bug size={22} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-[17px] font-black text-on-surface leading-none tracking-normal">调试工具</h2>
+              <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-2">5连击隐藏入口进入</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="flex min-h-16 items-center justify-between gap-3 rounded-[22px] bg-surface-container px-4 py-3 border border-outline-variant/40 shadow-sm">
+              <span className="flex items-center gap-3 min-w-0">
+                <span className="w-10 h-10 rounded-2xl bg-white text-[#FF9D76] flex items-center justify-center shrink-0 shadow-sm">
+                  <Star size={18} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-black text-[#5D4037] tracking-normal">积分作弊</span>
+                  <span className="block text-[10px] font-bold text-[#5D4037]/45 mt-1">{isPointsCheat ? "已开启" : "已关闭"}</span>
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={isPointsCheat}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setIsPointsCheat(next);
+                  storage.setIsPointsCheat(next);
+                }}
+                className="w-5 h-5 shrink-0 accent-[#FF9D76]"
+              />
+            </label>
+
+            <label className="flex min-h-16 items-center justify-between gap-3 rounded-[22px] bg-surface-container px-4 py-3 border border-outline-variant/40 shadow-sm">
+              <span className="flex items-center gap-3 min-w-0">
+                <span className="w-10 h-10 rounded-2xl bg-white text-[#FF9D76] flex items-center justify-center shrink-0 shadow-sm">
+                  <FastForward size={18} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-black text-[#5D4037] tracking-normal">时光快进</span>
+                  <span className="block text-[10px] font-bold text-[#5D4037]/45 mt-1">{isFastForward ? "已开启" : "已关闭"}</span>
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={isFastForward}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setIsFastForward(next);
+                  storage.setIsFastForward(next);
+                }}
+                className="w-5 h-5 shrink-0 accent-[#FF9D76]"
+              />
+            </label>
+          </div>
         </section>
       </main>
 

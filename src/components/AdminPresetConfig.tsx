@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2, Cpu } from "lucide-react";
+import { X, Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2, Cpu, Bug, FastForward, Star } from "lucide-react";
 import { storage, PresetCat } from "../services/storage";
 import { LayoutGroup, motion } from "motion/react";
 import { aiConfig, DEFAULT_AI_PROFILES } from "../services/ai/aiConfig";
@@ -15,6 +15,8 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
   const [newImageUrl, setNewImageUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [profile, setProfile] = useState<AIProfile>(DEFAULT_AI_PROFILES.dashscope);
+  const [isPointsCheat, setIsPointsCheat] = useState(() => storage.getIsPointsCheat());
+  const [isFastForward, setIsFastForward] = useState(() => storage.getIsFastForward());
   const modelInputClass = "w-full min-w-0 px-3 py-2.5 bg-white rounded-[14px] text-[11px] sm:text-sm leading-tight font-extrabold text-[#5D4037] outline-none focus:ring-2 focus:ring-[#FF9D76]/20 font-mono tracking-normal";
   const compactInputClass = "w-full min-w-0 px-2.5 sm:px-3 py-2.5 bg-white rounded-[14px] text-sm font-extrabold text-[#5D4037] outline-none focus:ring-2 focus:ring-[#FF9D76]/20";
 
@@ -304,6 +306,54 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                 </button>
               </div>
             ))}
+          </div>
+
+          {/* 调试工具：保留旧弹窗入口时也和正式后台页一致 */}
+          <div className="bg-white p-3.5 sm:p-5 rounded-[20px] sm:rounded-3xl border border-gray-100 space-y-3.5 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-[#FF9D76]/10 text-[#FF9D76] rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                <Bug size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[15px] font-black text-[#5D4037]">调试工具</p>
+                <p className="text-[9px] text-[#5D4037]/40 font-bold uppercase tracking-widest">5连击隐藏入口进入</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="flex min-h-13 items-center justify-between gap-2 bg-gray-50 rounded-[16px] px-3 py-2.5 text-[12px] leading-tight font-black text-[#5D4037]/75">
+                <span className="flex items-center gap-2 min-w-0">
+                  <Star size={16} className="text-[#FF9D76] shrink-0" />
+                  <span className="truncate">积分作弊</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={isPointsCheat}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setIsPointsCheat(next);
+                    storage.setIsPointsCheat(next);
+                  }}
+                  className="w-4 h-4 shrink-0 accent-[#FF9D76]"
+                />
+              </label>
+              <label className="flex min-h-13 items-center justify-between gap-2 bg-gray-50 rounded-[16px] px-3 py-2.5 text-[12px] leading-tight font-black text-[#5D4037]/75">
+                <span className="flex items-center gap-2 min-w-0">
+                  <FastForward size={16} className="text-[#FF9D76] shrink-0" />
+                  <span className="truncate">时光快进</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={isFastForward}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setIsFastForward(next);
+                    storage.setIsFastForward(next);
+                  }}
+                  className="w-4 h-4 shrink-0 accent-[#FF9D76]"
+                />
+              </label>
+            </div>
           </div>
         </div>
 
