@@ -26,9 +26,19 @@ export default function PageHeader({ title, subtitle, action, dark, onBack, onTi
             <ArrowLeft size={24} />
           </button>
         )}
-        <div 
-          className="flex flex-col justify-center cursor-pointer active:opacity-70 select-none"
-          onClick={onTitleClick}
+        <div
+          className={`flex flex-col justify-center select-none ${onTitleClick ? 'cursor-pointer active:opacity-70' : ''}`}
+          data-miao-multitap={onTitleClick ? 'true' : undefined}
+          role={onTitleClick ? 'button' : undefined}
+          tabIndex={onTitleClick ? 0 : undefined}
+          onPointerUp={onTitleClick}
+          onKeyDown={(event) => {
+            if (!onTitleClick) return;
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onTitleClick();
+            }
+          }}
         >
           <h1 className={`text-3xl font-black tracking-tight leading-none ${dark ? 'text-white' : 'text-on-surface'}`}>{title}</h1>
           <p className={`text-[10px] font-bold uppercase tracking-widest mt-2 leading-none ${dark ? 'text-white/60' : 'text-on-surface-variant'}`}>{subtitle}</p>

@@ -380,7 +380,8 @@ export default function Profile() {
 
       <footer className="mt-12 text-center pb-10">
         <button
-          onClick={handleAdminTap}
+          onPointerUp={handleAdminTap}
+          data-miao-multitap="true"
           className="px-6 py-3 text-[10px] font-bold text-on-surface-variant opacity-30 uppercase tracking-widest cursor-pointer select-none active:scale-95 transition-transform"
         >
           MIAO SANCTUARY

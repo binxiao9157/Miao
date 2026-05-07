@@ -218,12 +218,12 @@ function hasMeaningfulCatDifference(a: CatInfo, b: CatInfo): boolean {
   });
 }
 
-function syncCatToServer(userId: string, cat: CatInfo) {
-  fetch('/api/cats', {
+function syncCatToServer(userId: string, cat: CatInfo): Promise<void> {
+  return fetch('/api/cats', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, cat: { ...cat, placeholderImage: undefined, anchorFrame: undefined } }),
-  }).catch(() => {});
+  }).then(() => undefined).catch(() => undefined);
 }
 
 function deleteCatFromServer(userId: string, catId: string) {
