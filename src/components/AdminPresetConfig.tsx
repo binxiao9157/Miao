@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2, Cpu } from "lucide-react";
 import { storage, PresetCat } from "../services/storage";
-import { motion } from "motion/react";
+import { LayoutGroup, motion } from "motion/react";
 import { aiConfig, DEFAULT_AI_PROFILES } from "../services/ai/aiConfig";
 import { AIProfile, AIProvider } from "../services/ai/types";
 
@@ -15,8 +15,8 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
   const [newImageUrl, setNewImageUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [profile, setProfile] = useState<AIProfile>(DEFAULT_AI_PROFILES.dashscope);
-  const modelInputClass = "w-full min-w-0 px-3 py-2.5 bg-white rounded-[14px] text-[11px] sm:text-sm leading-tight font-extrabold text-[#5D4037] outline-none focus:ring-2 focus:ring-blue-200 font-mono tracking-normal";
-  const compactInputClass = "w-full min-w-0 px-2.5 sm:px-3 py-2.5 bg-white rounded-[14px] text-sm font-extrabold text-[#5D4037] outline-none focus:ring-2 focus:ring-blue-200";
+  const modelInputClass = "w-full min-w-0 px-3 py-2.5 bg-white rounded-[14px] text-[11px] sm:text-sm leading-tight font-extrabold text-[#5D4037] outline-none focus:ring-2 focus:ring-[#FF9D76]/20 font-mono tracking-normal";
+  const compactInputClass = "w-full min-w-0 px-2.5 sm:px-3 py-2.5 bg-white rounded-[14px] text-sm font-extrabold text-[#5D4037] outline-none focus:ring-2 focus:ring-[#FF9D76]/20";
 
   useEffect(() => {
     setPresets(storage.getPresetCats());
@@ -34,7 +34,6 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
     setProfile(prev => ({
       ...defaults,
       mockMode: prev.mockMode,
-      skipImageStage: prev.skipImageStage,
       resolution: prev.resolution || defaults.resolution,
       duration: prev.duration || defaults.duration,
       seed: prev.seed || defaults.seed,
@@ -108,11 +107,19 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
   };
 
   return (
-    <div className="backdrop-overlay flex items-end sm:items-center justify-center !p-2 sm:!p-4">
+    <div
+      className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center overflow-hidden"
+      style={{
+        paddingTop: 'max(0.5rem, env(safe-area-inset-top))',
+        paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
+        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+        paddingLeft: 'max(0.5rem, env(safe-area-inset-left))'
+      }}
+    >
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-white rounded-[24px] sm:rounded-[32px] w-full max-w-[440px] sm:max-w-lg h-[calc(100dvh-1rem)] sm:h-auto sm:max-h-[86dvh] flex flex-col overflow-hidden shadow-2xl"
+        className="bg-white rounded-[24px] sm:rounded-[32px] w-full max-w-[430px] sm:max-w-lg h-full sm:h-auto max-h-full sm:max-h-[86dvh] flex flex-col overflow-hidden shadow-2xl"
       >
         <div className="px-4 py-3 sm:p-6 border-b flex items-center justify-between bg-gray-50 shrink-0">
           <div className="min-w-0">
@@ -124,11 +131,11 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-3.5 py-4 sm:p-6 space-y-4 sm:space-y-6 no-scrollbar overscroll-contain">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3.5 py-4 sm:p-6 space-y-4 sm:space-y-6 no-scrollbar overscroll-contain">
           {/* AI 模型配置 */}
-          <div className="bg-blue-50/70 p-3.5 sm:p-5 rounded-[20px] sm:rounded-3xl border border-blue-100 space-y-3.5 sm:space-y-4">
+          <div className="bg-[#FF9D76]/5 p-3.5 sm:p-5 rounded-[20px] sm:rounded-3xl border border-[#FF9D76]/15 space-y-3.5 sm:space-y-4 overflow-hidden">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-white text-blue-500 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+              <div className="w-9 h-9 bg-white text-[#FF9D76] rounded-2xl flex items-center justify-center shadow-sm shrink-0">
                 <Cpu size={18} />
               </div>
               <div className="min-w-0">
@@ -137,20 +144,29 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {(['dashscope', 'volcengine'] as AIProvider[]).map(provider => (
-                <button
-                  key={provider}
-                  onClick={() => handleProviderChange(provider)}
-                  className={`py-2.5 rounded-[18px] text-xs font-black transition-all ${
-                    profile.provider === provider
-                      ? "bg-blue-500 text-white shadow-md shadow-blue-500/20"
-                      : "bg-white text-[#5D4037]/60"
-                  }`}
-                >
-                  {provider === 'dashscope' ? '阿里百练' : '火山引擎'}
-                </button>
-              ))}
+            <div className="bg-[#FF9D76]/10 p-1.5 rounded-full grid grid-cols-2 relative overflow-hidden">
+              <LayoutGroup id="admin-provider-tabs">
+                {(['dashscope', 'volcengine'] as AIProvider[]).map(provider => (
+                  <button
+                    key={provider}
+                    onClick={() => handleProviderChange(provider)}
+                    className={`py-2.5 rounded-full text-xs font-black transition-all relative z-10 ${
+                      profile.provider === provider
+                        ? "text-white"
+                        : "text-[#5D4037]/60 hover:bg-black/5"
+                    }`}
+                  >
+                    {provider === 'dashscope' ? '阿里百炼' : '火山引擎'}
+                    {profile.provider === provider && (
+                      <motion.div
+                        layoutId="admin-provider-bg"
+                        className="absolute inset-0 bg-[#FF9D76] rounded-full -z-10 shadow-sm"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                  </button>
+                ))}
+              </LayoutGroup>
             </div>
 
             <div className="grid grid-cols-1 gap-3">
@@ -199,14 +215,14 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                   />
                 </label>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <label className="flex min-h-11 items-center justify-between gap-1.5 bg-white rounded-[14px] px-2.5 sm:px-3 py-2 text-[11px] leading-tight font-black text-[#5D4037]/70">
                   扩展
                   <input
                     type="checkbox"
                     checked={profile.promptExtend}
                     onChange={(e) => setProfile(prev => ({ ...prev, promptExtend: e.target.checked }))}
-                    className="w-4 h-4 shrink-0 accent-blue-500"
+                    className="w-4 h-4 shrink-0 accent-[#FF9D76]"
                   />
                 </label>
                 <label className="flex min-h-11 items-center justify-between gap-1.5 bg-white rounded-[14px] px-2.5 sm:px-3 py-2 text-[11px] leading-tight font-black text-[#5D4037]/70">
@@ -215,16 +231,7 @@ export default function AdminPresetConfig({ onClose }: AdminPresetConfigProps) {
                     type="checkbox"
                     checked={profile.mockMode}
                     onChange={(e) => setProfile(prev => ({ ...prev, mockMode: e.target.checked }))}
-                    className="w-4 h-4 shrink-0 accent-blue-500"
-                  />
-                </label>
-                <label className="flex min-h-11 items-center justify-between gap-1.5 bg-white rounded-[14px] px-2.5 sm:px-3 py-2 text-[11px] leading-tight font-black text-[#5D4037]/70">
-                  跳首帧
-                  <input
-                    type="checkbox"
-                    checked={profile.skipImageStage}
-                    onChange={(e) => setProfile(prev => ({ ...prev, skipImageStage: e.target.checked }))}
-                    className="w-4 h-4 shrink-0 accent-blue-500"
+                    className="w-4 h-4 shrink-0 accent-[#FF9D76]"
                   />
                 </label>
               </div>

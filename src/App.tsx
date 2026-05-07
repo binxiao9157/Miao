@@ -28,6 +28,7 @@ const EditProfile = lazyRetry(() => import("./pages/EditProfile"));
 const ChangePassword = lazyRetry(() => import("./pages/ChangePassword"));
 const Notifications = lazyRetry(() => import("./pages/Notifications"));
 const PrivacyPolicy = lazyRetry(() => import("./pages/PrivacyPolicy"));
+const PrivacySettings = lazyRetry(() => import("./pages/PrivacySettings"));
 const SwitchCompanion = lazyRetry(() => import("./pages/SwitchCompanion"));
 const UploadMaterial = lazyRetry(() => import("./pages/UploadMaterial"));
 const GenerationProgress = lazyRetry(() => import("./pages/GenerationProgress"));
@@ -38,6 +39,7 @@ const EmptyCatPage = lazyRetry(() => import("./pages/EmptyCatPage"));
 const AccompanyMilestonePage = lazyRetry(() => import("./pages/AccompanyMilestonePage"));
 const AddFriendQR = lazyRetry(() => import("./pages/AddFriendQR"));
 const ScanFriend = lazyRetry(() => import("./pages/ScanFriend"));
+const SetNickname = lazyRetry(() => import("./pages/SetNickname"));
 const Download = lazyRetry(() => import("./pages/Download"));
 const Feedback = lazyRetry(() => import("./pages/Feedback"));
 const AdminSettings = lazyRetry(() => import("./pages/AdminSettings"));
@@ -164,6 +166,8 @@ function AppRoutes() {
         <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
         <Route path="/notification-settings" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/privacy-settings" element={<ProtectedRoute><PrivacySettings /></ProtectedRoute>} />
+        <Route path="/set-nickname" element={<ProtectedRoute><SetNickname /></ProtectedRoute>} />
         <Route path="/switch-companion" element={<ProtectedRoute><SwitchCompanion /></ProtectedRoute>} />
         <Route path="/add-friend-qr" element={<ProtectedRoute><AddFriendQR /></ProtectedRoute>} />
         <Route path="/scan-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />

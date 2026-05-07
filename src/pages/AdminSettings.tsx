@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Cpu, Image as ImageIcon, Loader2, Plus, Save, Trash2, Upload, RotateCcw } from "lucide-react";
+import { Bug, Cpu, FastForward, Image as ImageIcon, Loader2, Plus, Save, Star, Trash2, Upload, RotateCcw } from "lucide-react";
 import { LayoutGroup, motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
 import { aiConfig, DEFAULT_AI_PROFILES } from "../services/ai/aiConfig";
@@ -15,6 +15,8 @@ export default function AdminSettings() {
   const [isUploading, setIsUploading] = useState(false);
   const [profile, setProfile] = useState<AIProfile>(DEFAULT_AI_PROFILES.dashscope);
   const [showResetToast, setShowResetToast] = useState(false);
+  const [isPointsCheat, setIsPointsCheat] = useState(() => storage.getIsPointsCheat());
+  const [isFastForward, setIsFastForward] = useState(() => storage.getIsFastForward());
 
   const fieldLabelClass = "text-[10px] font-black text-on-surface-variant/55 uppercase tracking-[0.16em] ml-1";
   const modelInputClass = "w-full min-w-0 h-12 px-4 bg-white rounded-[18px] text-[13px] sm:text-sm leading-none font-semibold text-[#5D4037] outline-none focus:ring-2 focus:ring-[#FF9D76]/20 font-mono tracking-normal shadow-sm";
@@ -31,7 +33,6 @@ export default function AdminSettings() {
     setProfile(prev => ({
       ...defaults,
       mockMode: prev.mockMode,
-      skipImageStage: prev.skipImageStage,
       resolution: prev.resolution || defaults.resolution,
       duration: prev.duration || defaults.duration,
       seed: prev.seed || defaults.seed,
@@ -151,7 +152,7 @@ export default function AdminSettings() {
                       : "text-[#5D4037]/60 hover:bg-black/5"
                   }`}
                 >
-                  {provider === "dashscope" ? "阿里百练" : "火山引擎"}
+                  {provider === "dashscope" ? "阿里百炼" : "火山引擎"}
                   {profile.provider === provider && (
                     <motion.div
                       layoutId="admin-page-provider-bg"
@@ -212,7 +213,7 @@ export default function AdminSettings() {
               </label>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <label className={switchClass}>
                 扩展
                 <input
@@ -231,16 +232,50 @@ export default function AdminSettings() {
                   className="w-4 h-4 shrink-0 accent-[#FF9D76]"
                 />
               </label>
-              <label className={switchClass}>
-                跳首帧
-                <input
-                  type="checkbox"
-                  checked={profile.skipImageStage}
-                  onChange={(e) => setProfile(prev => ({ ...prev, skipImageStage: e.target.checked }))}
-                  className="w-4 h-4 shrink-0 accent-[#FF9D76]"
-                />
-              </label>
             </div>
+          </div>
+        </section>
+
+        <section className="miao-card p-5 rounded-[32px] mb-5 bg-white">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-11 h-11 bg-[#FF9D76]/10 text-[#FF9D76] rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+              <Bug size={22} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-[17px] font-black text-on-surface leading-none tracking-normal">调试工具</h2>
+              <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-2">Debug Tools</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => {
+                const next = !isPointsCheat;
+                setIsPointsCheat(next);
+                storage.setIsPointsCheat(next);
+              }}
+              className={`min-h-20 rounded-[22px] p-4 text-left active:scale-[0.98] transition-all border ${
+                isPointsCheat ? "bg-[#FF9D76] text-white border-[#FF9D76]" : "bg-surface-container text-[#5D4037] border-outline-variant/40"
+              }`}
+            >
+              <Star size={20} className="mb-2" />
+              <p className="text-sm font-black">积分调试</p>
+              <p className="text-[10px] font-bold opacity-70 mt-1">{isPointsCheat ? "已开启" : "已关闭"}</p>
+            </button>
+            <button
+              onClick={() => {
+                const next = !isFastForward;
+                setIsFastForward(next);
+                storage.setIsFastForward(next);
+              }}
+              className={`min-h-20 rounded-[22px] p-4 text-left active:scale-[0.98] transition-all border ${
+                isFastForward ? "bg-[#FF9D76] text-white border-[#FF9D76]" : "bg-surface-container text-[#5D4037] border-outline-variant/40"
+              }`}
+            >
+              <FastForward size={20} className="mb-2" />
+              <p className="text-sm font-black">时光快进</p>
+              <p className="text-[10px] font-bold opacity-70 mt-1">{isFastForward ? "已开启" : "已关闭"}</p>
+            </button>
           </div>
         </section>
 

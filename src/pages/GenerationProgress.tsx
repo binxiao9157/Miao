@@ -5,7 +5,7 @@ import axios from "axios";
 import { Sparkles, Loader2, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
 import { VolcanoService, ACTION_PROMPTS } from "../services/volcanoService";
 import { FileManager } from "../services/fileManager";
-import { storage } from "../services/storage";
+import { GenerationDraft, storage } from "../services/storage";
 import { useAuthContext } from "../context/AuthContext";
 // 移除旧的视频帧提取工具，统一使用首帧确认图
 
@@ -16,10 +16,13 @@ export default function GenerationProgress() {
   const i2vAbortRef = useRef<AbortController | null>(null);
 
   const { refreshCatStatus } = useAuthContext();
-  const { image, name, breed, furColor, isRedemption, isDebugRedemption, redemptionAmount } = location.state || {};
+  const routeDraft = location.state as Partial<GenerationDraft> | null;
+  const storedDraft = storage.getGenerationDraft();
+  const draft = (routeDraft?.image ? routeDraft : storedDraft) || null;
+  const { image, name, breed, furColor, isRedemption, isDebugRedemption, redemptionAmount } = draft || {};
 
   // 1. 深度排查猫咪对象初始化逻辑：强制生成绝对唯一的新 ID
-  const [newCatId] = useState(() => `cat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+  const [newCatId] = useState(() => draft?.catId || `cat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
 
   const [status, setStatus] = useState<string>("正在感知灵魂印记...");
   const [error, setError] = useState<string | null>(null);
@@ -64,17 +67,20 @@ export default function GenerationProgress() {
 
   const handleRetry = () => {
     resetGenerationState();
-    const target = image ? "/upload-material" : "/create-companion";
-    navigate(target, { state: { image, name, breed, furColor }, replace: true });
+    storage.clearGenerationDraft();
+    const target = draft?.source === "created" ? "/create-companion" : "/upload-material";
+    navigate(target, { state: { image: draft?.originalImage || image, name, breed, furColor, isRedemption, isDebugRedemption, redemptionAmount }, replace: true });
   };
 
   const startI2VPhase = async (img: string, abortSignal: AbortSignal) => {
-    let pointsDeducted = 0;
+    let pointsDeducted = draft?.pointsDeducted && isRedemption && !isDebugRedemption
+      ? redemptionAmount || 200
+      : 0;
     try {
       setPhase('i2v');
 
       // 4. 检查积分扣除状态：在确认生成第一段视频前就扣分
-      if (isRedemption && !isDebugRedemption) {
+      if (isRedemption && !isDebugRedemption && !draft?.pointsDeducted) {
         const required = redemptionAmount || 200;
         const success = storage.deductPoints(required, "解锁新伙伴");
         if (!success) {
@@ -82,6 +88,14 @@ export default function GenerationProgress() {
           throw new Error(`积分不足，需要 ${required} 积分，当前仅有 ${currentPoints.total} 积分`);
         }
         pointsDeducted = required;
+        storage.saveGenerationDraft({
+          ...(draft || {}),
+          catId: newCatId,
+          image: img,
+          pointsDeducted: true,
+          createdAt: draft?.createdAt || Date.now(),
+          updatedAt: Date.now(),
+        });
       }
       
       let optimizedImg = img;
@@ -161,16 +175,27 @@ export default function GenerationProgress() {
       const saved = storage.getCatById(newCatId);
       if (!saved) throw new Error('猫咪数据保存失败');
       storage.setActiveCatId(newCatId);
+      storage.clearGenerationDraft();
       refreshCatStatus();
 
       setPhase('confirm');
       setStatus("生成成功！");
     } catch (err: any) {
+      if (err.message === "任务轮询已中止" || err.message === "任务中止") return;
       // 生成失败则退还积分
       if (pointsDeducted > 0) {
         storage.addPoints(pointsDeducted, "生成失败退还");
+        if (draft) {
+          storage.saveGenerationDraft({
+            ...draft,
+            catId: newCatId,
+            image: draft.image || img,
+            pointsDeducted: false,
+            createdAt: draft.createdAt || Date.now(),
+            updatedAt: Date.now(),
+          });
+        }
       }
-      if (err.message === "任务轮询已中止" || err.message === "任务中止") return;
       console.error("生成过程出错:", err);
       setError(err.message || "生成失败");
     }
@@ -240,9 +265,19 @@ export default function GenerationProgress() {
     };
     checkConnectivity();
 
-    if (!image && (!breed || !furColor)) {
+    if (!draft?.image && !image && (!breed || !furColor)) {
       navigate("/create-companion", { replace: true });
       return;
+    }
+
+    if (draft?.image) {
+      storage.saveGenerationDraft({
+        ...(draft as GenerationDraft),
+        catId: newCatId,
+        image: draft.image,
+        createdAt: draft.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      });
     }
 
     const abortController = new AbortController();

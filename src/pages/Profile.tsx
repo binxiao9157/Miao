@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from "motion/react";
 import InstallPromptBanner from "../components/InstallPromptBanner";
 import PageHeader from "../components/PageHeader";
 
+const ADMIN_TAP_WINDOW_MS = 3000;
+
 export default function Profile() {
   const navigate = useNavigate();
   const { user, logout } = useAuthContext();
@@ -95,14 +97,42 @@ export default function Profile() {
     navigate("/login", { replace: true });
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
+    try {
+      const token = storage.getToken();
+      await fetch("/api/v1/me", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Client-Type": "pwa",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+    } catch {
+      // 服务端注销失败时仍清理本地，保持与小程序一致的容错策略。
+    }
     storage.clearAll(); // 物理删除当前用户的所有数据
     logout(); // 内存清理
     navigate("/register", { replace: true });
   };
 
   const handleClearCache = () => {
-    localStorage.clear();
+    const preservePatterns = [
+      "miao_users", "miao_current_user", "miao_auth_token", "miao_last_username",
+      "miao_cat_list", "miao_active_cat_id", "miao_friends", "miao_diaries",
+      "miao_time_letters", "miao_points", "miao_settings", "miao_friend_diaries",
+      "miao_has_submitted_survey", "miao_debug_fast_forward", "miao_debug_points_cheat",
+      "miao_generation_draft", "user_avatar_key", "miao_login_time", "miao_last_active_time",
+      "miao_last_cat_image", "miao_last_cat_breed", "app_preset_cats",
+      "miao_last_read_notifications", "miao_read_notification_ids", "miao_privacy_settings",
+      "MIAO_AI_PROVIDER", "DASHSCOPE_IMAGE_MODEL", "DASHSCOPE_VIDEO_MODEL",
+      "VOLC_IMAGE_MODEL", "VOLC_VIDEO_MODEL", "MIAO_AI_RESOLUTION", "MIAO_AI_DURATION",
+      "MIAO_AI_SEED", "MIAO_AI_PROMPT_EXTEND", "MIAO_AI_MOCK_MODE",
+    ];
+    Object.keys(localStorage).forEach((key) => {
+      const shouldPreserve = preservePatterns.some(pattern => key.includes(pattern));
+      if (!shouldPreserve) localStorage.removeItem(key);
+    });
     setShowCacheToast(true);
     setTimeout(() => setShowCacheToast(false), 2000);
   };
@@ -110,6 +140,7 @@ export default function Profile() {
   const menuItems = [
     { icon: UserIcon, label: "个人资料设置", path: "/edit-profile", color: "bg-blue-50 text-blue-500" },
     { icon: Bell, label: "通知设置", path: "/notification-settings", color: "bg-orange-50 text-orange-500" },
+    { icon: Shield, label: "隐私设置", path: "/privacy-settings", color: "bg-teal-50 text-teal-500" },
     { icon: FileText, label: "意见反馈", path: "/feedback", color: "bg-purple-50 text-purple-500" },
   ];
 
@@ -129,7 +160,7 @@ export default function Profile() {
 
     adminTapTimerRef.current = window.setTimeout(() => {
       adminTapCountRef.current = 0;
-    }, 2000);
+    }, ADMIN_TAP_WINDOW_MS);
   };
 
   useEffect(() => {
@@ -143,7 +174,6 @@ export default function Profile() {
       <PageHeader 
         title="Miao" 
         subtitle="MIAO SANCTUARY" 
-        onTitleClick={handleAdminTap}
         action={
           <div className="flex gap-2">
             <button 

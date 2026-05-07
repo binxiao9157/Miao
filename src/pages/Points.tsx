@@ -4,22 +4,15 @@ import { useNavigate } from "react-router-dom";
 import { storage, PointsInfo, PointTransaction } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
-import FloatingDebugPanel from "../components/FloatingDebugPanel";
 
 export default function Points() {
   const [points, setPoints] = useState(0);
   const [pointsInfo, setPointsInfo] = useState<PointsInfo | null>(null);
-  const [isDebugMode, setIsDebugMode] = useState(false);
+  const [isPointsCheat, setIsPointsCheat] = useState(() => storage.getIsPointsCheat());
   const [showHistory, setShowHistory] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const navigate = useNavigate();
   const REDEEM_THRESHOLD = storage.getUnlockThreshold();
   const ownedCatsCount = storage.getCatList().length;
-
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
 
   useEffect(() => {
     const fetchPoints = () => {
@@ -39,10 +32,13 @@ export default function Points() {
     // 页面可见时刷新一次，覆盖同 tab 内变更
     const onVisible = () => { if (document.visibilityState === 'visible') fetchPoints(); };
     document.addEventListener('visibilitychange', onVisible);
+    const onPointsCheatChanged = () => setIsPointsCheat(storage.getIsPointsCheat());
+    window.addEventListener('points-cheat-changed', onPointsCheatChanged);
     return () => {
       clearTimeout(timer);
       window.removeEventListener('storage', onStorage);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('points-cheat-changed', onPointsCheatChanged);
     };
   }, []);
 
@@ -57,7 +53,8 @@ export default function Points() {
     { id: 3, title: '单日登录时长超10分钟', reward: 10, completed: onlineCompleted, description: '累计在线时间达到10分钟' },
   ];
 
-  const effectivePoints = isDebugMode ? Math.max(points, REDEEM_THRESHOLD) : points;
+  const effectivePoints = isPointsCheat ? Math.max(points, REDEEM_THRESHOLD) : points;
+  const redemptionUrl = `/welcome?isRedemption=1&redemptionAmount=${REDEEM_THRESHOLD}${isPointsCheat ? "&debug=1" : ""}`;
 
   return (
     <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
@@ -157,7 +154,7 @@ export default function Points() {
 
           <button 
             disabled={effectivePoints < REDEEM_THRESHOLD}
-            onClick={() => navigate("/welcome", { state: { isRedemption: true, isDebugRedemption: isDebugMode, redemptionAmount: REDEEM_THRESHOLD } })}
+            onClick={() => navigate(redemptionUrl, { state: { isRedemption: true, isDebugRedemption: isPointsCheat, redemptionAmount: REDEEM_THRESHOLD } })}
             className={`w-full py-3 text-sm font-bold rounded-2xl transition-all active:scale-95 ${
               effectivePoints < REDEEM_THRESHOLD 
                 ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
@@ -214,13 +211,6 @@ export default function Points() {
         )}
       </AnimatePresence>
 
-      <FloatingDebugPanel 
-        isDebugMode={isDebugMode}
-        setIsDebugMode={setIsDebugMode}
-        setPoints={setPoints}
-        setPointsInfo={setPointsInfo}
-        showToast={showToast}
-      />
     </div>
   );
 }
