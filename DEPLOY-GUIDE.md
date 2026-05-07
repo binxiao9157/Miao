@@ -645,8 +645,19 @@ cd /home/miao/app
 
 PREV_COMMIT=$(git rev-parse HEAD)
 
+BACKUP_DIR="/home/miao/app/.deploy-backups/public_$(date +%Y%m%d_%H%M%S)"
+TRACKED_PUBLIC_PATHS=(public logo.png)
+
+if ! git diff --quiet -- "${TRACKED_PUBLIC_PATHS[@]}"; then
+    echo "==> Backing up public/logo changes to $BACKUP_DIR ..."
+    mkdir -p "$BACKUP_DIR"
+    [ -d public ] && cp -a public "$BACKUP_DIR/"
+    [ -f logo.png ] && cp -a logo.png "$BACKUP_DIR/"
+    git restore --staged --worktree -- "${TRACKED_PUBLIC_PATHS[@]}"
+fi
+
 echo "==> Pulling latest code (SSH)..."
-git pull origin main
+git pull --ff-only origin main
 
 echo "==> Installing dependencies..."
 npm install

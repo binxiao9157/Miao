@@ -60,13 +60,26 @@ cd ~/app
 PREV_COMMIT=$(git rev-parse HEAD)
 echo "==> 当前版本: $PREV_COMMIT"
 
+# 部署机上 public/logo 可能被手工替换过；先备份，再恢复为 Git 干净状态，
+# 否则 git pull 遇到同名文件更新会因本地改动中止。
+BACKUP_DIR="$HOME/app/.deploy-backups/public_$(date +%Y%m%d_%H%M%S)"
+TRACKED_PUBLIC_PATHS=(public logo.png)
+
+if ! git diff --quiet -- "${TRACKED_PUBLIC_PATHS[@]}"; then
+    echo "==> 检测到 public/logo 本地改动，备份到 $BACKUP_DIR ..."
+    mkdir -p "$BACKUP_DIR"
+    [ -d public ] && cp -a public "$BACKUP_DIR/"
+    [ -f logo.png ] && cp -a logo.png "$BACKUP_DIR/"
+    git restore --staged --worktree -- "${TRACKED_PUBLIC_PATHS[@]}"
+fi
+
 # ============================================================
 # 拉取最新代码
 # ============================================================
 echo "==> 拉取最新代码..."
-git fetch origin
+git fetch origin GITHUB_HEAD_REF
 git checkout GITHUB_HEAD_REF || git checkout main
-git pull origin GITHUB_HEAD_REF || git pull origin main
+git pull --ff-only origin GITHUB_HEAD_REF || git pull --ff-only origin main
 
 # ============================================================
 # 安装依赖
@@ -119,6 +132,8 @@ echo "健康检查: $HEALTH_RESPONSE"
 echo ""
 echo "==> 部署完成！"
 DEPLOY_EOF
+)
+DEPLOY_SCRIPT_CONTENT="${DEPLOY_SCRIPT_CONTENT//GITHUB_HEAD_REF/$GIT_BRANCH}"
 
 # ============================================================
 # 第三步：上传部署脚本到服务器
