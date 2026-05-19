@@ -30,6 +30,13 @@ export interface CatInfo {
     feeding?: string;
     teasing?: string;
   };
+  frameAnimations?: Record<string, {
+    frames: string[];
+    fps: number;
+    format: 'webp' | 'png';
+    generatedAt: number;
+    sourceVideo?: string;
+  }>;
   remoteVideoUrl?: string;
   placeholderImage?: string;
   anchorFrame?: string;
@@ -184,11 +191,23 @@ function normalizeCatVideoUrls(cat: CatInfo): CatInfo {
         Object.entries(cat.videoPaths).map(([action, url]) => [action, normalizePlayableVideoUrl(url)])
       )
     : cat.videoPaths;
+  const frameAnimations = cat.frameAnimations
+    ? Object.fromEntries(
+        Object.entries(cat.frameAnimations).map(([action, animation]) => [
+          action,
+          {
+            ...animation,
+            frames: animation.frames.map(frame => normalizePlayableVideoUrl(frame) || frame),
+          },
+        ])
+      )
+    : cat.frameAnimations;
 
   return {
     ...cat,
     videoPath: normalizePlayableVideoUrl(cat.videoPath),
     videoPaths,
+    frameAnimations,
     remoteVideoUrl: normalizePlayableVideoUrl(cat.remoteVideoUrl),
   };
 }
@@ -215,6 +234,10 @@ function mergeCat(local?: CatInfo, remote?: CatInfo): CatInfo {
     videoPaths: {
       ...(other.videoPaths || {}),
       ...(base.videoPaths || {}),
+    },
+    frameAnimations: {
+      ...(other.frameAnimations || {}),
+      ...(base.frameAnimations || {}),
     },
     videoPath: base.videoPath || other.videoPath,
     remoteVideoUrl: base.remoteVideoUrl || other.remoteVideoUrl,

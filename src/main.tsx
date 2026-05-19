@@ -23,7 +23,11 @@ document.addEventListener('touchend', function(event) {
   lastTouchEnd = now;
 }, false);
 
-if ('serviceWorker' in navigator) {
+const isDesktopPetEntry =
+  new URLSearchParams(window.location.search).get('desktopPet') === '1' ||
+  window.location.pathname === '/desktop-pet';
+
+if ('serviceWorker' in navigator && !isDesktopPetEntry) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js').then(reg => {
       console.log('SW registered:', reg);

@@ -43,6 +43,7 @@ const SetNickname = lazyRetry(() => import("./pages/SetNickname"));
 const Download = lazyRetry(() => import("./pages/Download"));
 const Feedback = lazyRetry(() => import("./pages/Feedback"));
 const AdminSettings = lazyRetry(() => import("./pages/AdminSettings"));
+const DesktopPet = lazyRetry(() => import("./pages/DesktopPet"));
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 import SplashScreen from "./components/SplashScreen";
@@ -116,6 +117,10 @@ function AppRoutes() {
   const { isAuthenticated, isInitializing, hasCat } = useAuthContext();
   const location = useLocation(); // Force re-render on route change
 
+  if (new URLSearchParams(location.search).get("desktopPet") === "1") {
+    return <DesktopPet />;
+  }
+
   if (isInitializing) return null;
 
   return (
@@ -174,6 +179,7 @@ function AppRoutes() {
         <Route path="/join-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />
         <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
         <Route path="/admin-settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
+        <Route path="/desktop-pet" element={<DesktopPet />} />
   
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />

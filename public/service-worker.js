@@ -1,9 +1,12 @@
-const CACHE_NAME = 'miao-v7';
+const CACHE_NAME = 'miao-v8';
 // 预缓存列表：应用 shell 资源
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/icon-180.png',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 // 处理 Range 请求的辅助函数 (关键：解决视频播放问题)
@@ -122,8 +125,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Vite 哈希资源（/assets/xxx.hash.js|css）：缓存优先，首次访问后缓存
-  if (url.pathname.startsWith('/assets/') && url.pathname.match(/\.[a-f0-9]{8}\.(js|css)$/)) {
+  // 3. Vite 构建资源（/assets/Name-hash.js|css）：缓存优先，首次访问后缓存
+  if (url.pathname.startsWith('/assets/') && url.pathname.match(/\.(js|css)$/)) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(event.request);
