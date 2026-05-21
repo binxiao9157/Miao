@@ -8,14 +8,8 @@ import crypto from "crypto";
 import multer from "multer";
 import { fileURLToPath } from 'url';
 import FormData from 'form-data';
-import { spawn } from "child_process";
-import ffmpegStaticPath from "ffmpeg-static";
 
 dotenv.config();
-// Local development machines may have HTTP(S)_PROXY configured. Several AI
-// providers reject proxied JSON requests with an empty 400 response, so bypass
-// environment proxies for server-side axios calls by default.
-axios.defaults.proxy = false;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,25 +65,11 @@ async function startServer() {
     fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
   }
 
-  function timingSafeStringEqual(a: string, b: string) {
-    const aBuffer = Buffer.from(a);
-    const bBuffer = Buffer.from(b);
-    if (aBuffer.length !== bBuffer.length) return false;
-    return crypto.timingSafeEqual(aBuffer, bBuffer);
-  }
-
   interface ServerUser { username: string; nickname: string; avatar: string; password: string; phone?: string; openid?: string; unionid?: string; }
   interface ServerCat {
     id: string; userId: string; name: string; breed: string; color: string;
-    avatar: string; source: string; createdAt?: number; updatedAt?: number;
+    avatar: string; source: string; createdAt?: number;
     videoPath?: string; videoPaths?: Record<string, string>; remoteVideoUrl?: string;
-    frameAnimations?: Record<string, {
-      frames: string[];
-      fps: number;
-      format: "webp" | "png";
-      generatedAt: number;
-      sourceVideo?: string;
-    }>;
     placeholderImage?: string; anchorFrame?: string; isUnlocking?: boolean;
   }
   interface ServerFriend {
@@ -179,38 +159,6 @@ async function startServer() {
   };
 
   const getAuthedUsername = (req: express.Request) => (req as any).auth?.username as string;
-
-  const getBearerToken = (req: express.Request) => {
-    const raw = String(req.headers.authorization || '');
-    return raw.startsWith('Bearer ') ? raw.slice(7).trim() : '';
-  };
-
-  const isLocalDesktopRequest = (req: express.Request) => {
-    const candidates = [
-      req.ip,
-      req.socket.remoteAddress,
-    ].filter(Boolean);
-    return candidates.some((address) =>
-      address === '::1' ||
-      address === '127.0.0.1' ||
-      address === 'localhost' ||
-      address === '::ffff:127.0.0.1'
-    );
-  };
-
-  const getDesktopToken = () =>
-    String(process.env.MIAO_DESKTOP_TOKEN || process.env.MIAO_DESKTOP_ACCESS_TOKEN || '').trim();
-
-  const hasValidDesktopToken = (req: express.Request) => {
-    const expected = getDesktopToken();
-    if (!expected) return false;
-    const provided = String(
-      req.headers['x-miao-desktop-token'] ||
-      getBearerToken(req) ||
-      ''
-    ).trim();
-    return Boolean(provided) && timingSafeStringEqual(provided, expected);
-  };
 
   const getUserPublicProfile = (username: string) => {
     const users = readJSON<ServerUser[]>(usersFile, []);
@@ -2130,105 +2078,7 @@ async function startServer() {
 
   // ── 视频持久化：将临时 URL 下载到服务器本地，返回永久可访问的 URL ──
   const uploadsDir = path.resolve(__dirname, 'uploads', 'videos');
-  const frameUploadsDir = path.resolve(__dirname, 'uploads', 'frames');
   fs.mkdirSync(uploadsDir, { recursive: true });
-  fs.mkdirSync(frameUploadsDir, { recursive: true });
-  const DESKTOP_FRAME_ACTIONS = new Set(['idle', 'tail', 'rubbing', 'blink']);
-  const DESKTOP_FRAME_TIMEOUT_MS = Math.max(Number(process.env.MIAO_DESKTOP_FRAME_TIMEOUT_MS || 45000), 5000);
-  const DESKTOP_FRAME_MAX_CONCURRENT = Math.max(Number(process.env.MIAO_DESKTOP_FRAME_MAX_CONCURRENT || 1), 1);
-  const DESKTOP_FRAME_KEEP_PER_ACTION = Math.max(Number(process.env.MIAO_DESKTOP_FRAME_KEEP_PER_ACTION || 2), 1);
-  let desktopFrameJobs = 0;
-
-  const sanitizePathSegment = (value: string) =>
-    String(value || '').replace(/[^\w.-]/g, '_').slice(0, 96) || 'item';
-
-  function resolveLocalUploadPath(url: string): string | null {
-    if (!url) return null;
-    let pathname = url;
-    try {
-      if (/^https?:\/\//.test(url)) pathname = new URL(url).pathname;
-    } catch {}
-    if (!pathname.startsWith('/uploads/')) return null;
-    const localPath = path.resolve(__dirname, pathname.replace(/^\//, ''));
-    const uploadsRoot = path.resolve(__dirname, 'uploads');
-    if (!localPath.startsWith(uploadsRoot + path.sep)) return null;
-    return fs.existsSync(localPath) ? localPath : null;
-  }
-
-  function runCommand(command: string, args: string[], timeoutMs = DESKTOP_FRAME_TIMEOUT_MS) {
-    return new Promise<void>((resolve, reject) => {
-      const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'] });
-      let stderr = '';
-      let settled = false;
-      const timeout = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        child.kill('SIGKILL');
-        reject(new Error(`${command} timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-      const finish = (error?: Error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        if (error) reject(error);
-        else resolve();
-      };
-      child.stderr.on('data', chunk => {
-        stderr += chunk.toString();
-      });
-      child.on('error', finish);
-      child.on('close', code => {
-        if (code === 0) {
-          finish();
-          return;
-        }
-        finish(new Error(stderr || `${command} exited with code ${code}`));
-      });
-    });
-  }
-
-  function removeFrameDirectoryFromUrl(frameUrl?: string) {
-    if (!frameUrl) return;
-    let pathname = frameUrl;
-    try {
-      if (/^https?:\/\//.test(frameUrl)) pathname = new URL(frameUrl).pathname;
-    } catch {}
-    if (!pathname.startsWith('/uploads/frames/')) return;
-    const localPath = path.resolve(__dirname, pathname.replace(/^\//, ''));
-    if (!localPath.startsWith(frameUploadsDir + path.sep)) return;
-    fs.rmSync(path.dirname(localPath), { recursive: true, force: true });
-  }
-
-  function cleanupFrameGenerations(catId: string, action: string, keepFrameUrls: string[]) {
-    const catFrameRoot = path.join(frameUploadsDir, sanitizePathSegment(catId));
-    if (!fs.existsSync(catFrameRoot)) return;
-    const keepDirs = new Set(
-      keepFrameUrls.map((url) => {
-        let pathname = url;
-        try {
-          if (/^https?:\/\//.test(url)) pathname = new URL(url).pathname;
-        } catch {}
-        const localPath = path.resolve(__dirname, pathname.replace(/^\//, ''));
-        return path.dirname(localPath);
-      })
-    );
-    const prefix = `${sanitizePathSegment(action)}_`;
-    const entries = fs.readdirSync(catFrameRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix))
-      .map((entry) => {
-        const fullPath = path.join(catFrameRoot, entry.name);
-        return {
-          fullPath,
-          mtimeMs: fs.statSync(fullPath).mtimeMs,
-        };
-      })
-      .sort((a, b) => b.mtimeMs - a.mtimeMs);
-    entries.slice(DESKTOP_FRAME_KEEP_PER_ACTION).forEach((entry) => {
-      if (!keepDirs.has(entry.fullPath)) {
-        fs.rmSync(entry.fullPath, { recursive: true, force: true });
-      }
-    });
-  }
 
   const persistVideoHandler: express.RequestHandler = async (req, res) => {
     const { videoUrl, catId, action } = req.body;
@@ -2245,16 +2095,14 @@ async function startServer() {
         timeout: 120000,
       });
 
-      const safeCatId = sanitizePathSegment(catId);
-      const safeAction = sanitizePathSegment(action);
-      const catDir = path.join(uploadsDir, safeCatId);
+      const catDir = path.join(uploadsDir, catId);
       fs.mkdirSync(catDir, { recursive: true });
 
-      const filename = `${safeAction}_${Date.now()}.mp4`;
+      const filename = `${action}_${Date.now()}.mp4`;
       const filePath = path.join(catDir, filename);
       fs.writeFileSync(filePath, Buffer.from(response.data));
 
-      const permanentUrl = `/uploads/videos/${safeCatId}/${filename}`;
+      const permanentUrl = `/uploads/videos/${catId}/${filename}`;
       console.log(`[Persist] Saved ${action} video for cat ${catId}: ${permanentUrl}`);
       res.json({ url: permanentUrl });
     } catch (error: any) {
@@ -2266,234 +2114,10 @@ async function startServer() {
   app.post("/api/persist-video", persistVideoHandler);
   app.post("/api/v1/assets/persist-video", authRequired, persistVideoHandler);
 
-  const getDesktopRequestContext = (req: express.Request, res: express.Response) => {
-    const bearerToken = getBearerToken(req);
-    const jwtAuth = bearerToken ? verifyToken(bearerToken) : null;
-    const validDesktopToken = hasValidDesktopToken(req);
-    const localRequest = isLocalDesktopRequest(req);
-    const localFallbackAllowed = localRequest;
-
-    if (!jwtAuth && !validDesktopToken && !localFallbackAllowed) {
-      res.status(401).json({
-        error: "Desktop access is not authorized",
-        code: "DESKTOP_UNAUTHORIZED"
-      });
-      return null;
-    }
-
-    const username = String(
-      jwtAuth?.username ||
-      req.query.username ||
-      req.body?.username ||
-      process.env.MIAO_DESKTOP_USERNAME ||
-      process.env.MIAO_DESKTOP_USER ||
-      ""
-    ).trim();
-    if (!username) {
-      res.status(400).json({
-        error: "Missing desktop username",
-        code: "DESKTOP_USERNAME_REQUIRED"
-      });
-      return null;
-    }
-
-    return { username, jwtAuthed: Boolean(jwtAuth), validDesktopToken, localRequest };
-  };
-
-  app.post("/api/desktop/frame-animation", async (req, res) => {
-    const desktopContext = getDesktopRequestContext(req, res);
-    if (!desktopContext) return;
-    const username = desktopContext.username;
-    const catId = String(req.body?.catId || "").trim();
-    const action = String(req.body?.action || "idle").trim();
-    const fps = Math.min(Math.max(Number(req.body?.fps || 10), 4), 16);
-    const maxFrames = Math.min(Math.max(Number(req.body?.maxFrames || 90), 12), 180);
-    const width = Math.min(Math.max(Number(req.body?.width || 360), 180), 720);
-
-    if (!catId || !action) {
-      return res.status(400).json({ error: "Missing catId or action" });
-    }
-    if (!DESKTOP_FRAME_ACTIONS.has(action)) {
-      return res.status(400).json({ error: "Unsupported desktop action", action });
-    }
-    if (!ffmpegStaticPath) {
-      return res.status(500).json({ error: "ffmpeg binary is unavailable" });
-    }
-    if (desktopFrameJobs >= DESKTOP_FRAME_MAX_CONCURRENT) {
-      return res.status(429).json({
-        error: "Desktop frame builder is busy",
-        code: "DESKTOP_FRAME_BUSY"
-      });
-    }
-
-    const cats = readJSON<ServerCat[]>(catsFile, []);
-    const index = cats.findIndex(cat => cat.userId === username && cat.id === catId);
-    if (index < 0) {
-      return res.status(404).json({ error: "Cat not found" });
-    }
-
-    const cat = cats[index];
-    const sourceVideo = cat.videoPaths?.[action] ||
-      (action === "idle" ? cat.videoPath || cat.remoteVideoUrl : "");
-    const inputPath = resolveLocalUploadPath(sourceVideo || "");
-    if (!inputPath) {
-      return res.status(400).json({
-        error: "Frame animation currently requires a persisted local upload video",
-        sourceVideo,
-      });
-    }
-
-    const safeCatId = sanitizePathSegment(catId);
-    const safeAction = sanitizePathSegment(action);
-    const previousFrameUrl = cat.frameAnimations?.[action]?.frames?.[0];
-    const frameId = `${safeAction}_${Date.now()}`;
-    const frameDir = path.join(frameUploadsDir, safeCatId, frameId);
-    fs.mkdirSync(frameDir, { recursive: true });
-
-    desktopFrameJobs += 1;
-    try {
-      // PNG is used for discrete desktop-pet frame sequences. FFmpeg's WebP
-      // encoder writes an animated WebP container for multi-frame output, which
-      // appears as a single file and is not suitable for frame-by-frame playback.
-      const outputPattern = path.join(frameDir, "frame_%04d.png");
-      await runCommand(ffmpegStaticPath, [
-        "-y",
-        "-i", inputPath,
-        "-vf", `fps=${fps},scale=${width}:-1:flags=lanczos`,
-        "-vframes", String(maxFrames),
-        "-compression_level", "6",
-        outputPattern,
-      ], DESKTOP_FRAME_TIMEOUT_MS);
-
-      const frames = fs.readdirSync(frameDir)
-        .filter(file => file.endsWith(".png"))
-        .sort()
-        .map(file => `/uploads/frames/${safeCatId}/${frameId}/${file}`);
-
-      if (frames.length === 0) {
-        throw new Error("No frames generated");
-      }
-
-      const frameAnimations = {
-        ...(cat.frameAnimations || {}),
-        [action]: {
-          frames,
-          fps,
-          format: "png" as const,
-          generatedAt: Date.now(),
-          sourceVideo,
-        },
-      };
-      cats[index] = {
-        ...cat,
-        frameAnimations,
-        updatedAt: Date.now(),
-      };
-      writeJSON(catsFile, cats);
-      removeFrameDirectoryFromUrl(previousFrameUrl);
-      cleanupFrameGenerations(catId, action, frames);
-
-      res.json({
-        cat: cats[index],
-        animation: frameAnimations[action],
-      });
-    } catch (error: any) {
-      fs.rmSync(frameDir, { recursive: true, force: true });
-      console.error("[Desktop Frame] Failed to build frame animation:", error.message);
-      res.status(500).json({ error: "Failed to build frame animation", message: error.message });
-    } finally {
-      desktopFrameJobs = Math.max(desktopFrameJobs - 1, 0);
-    }
-  });
-
-  const getDesktopCats = (username?: string) => {
-    const cats = readJSON<ServerCat[]>(catsFile, []);
-    const candidates = username ? cats.filter(cat => cat.userId === username) : cats;
-    return candidates
-      .filter(item => item && item.id)
-      .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
-  };
-
-  app.get("/api/desktop/cats", (req, res) => {
-    const desktopContext = getDesktopRequestContext(req, res);
-    if (!desktopContext) return;
-    const username = desktopContext.username;
-    const cats = getDesktopCats(username || undefined).map((cat) => {
-      const { userId, ...publicCat } = cat;
-      return { ...publicCat, ownerId: userId };
-    });
-
-    res.json({ cats });
-  });
-
-  app.get("/api/desktop/active-cat", (req, res) => {
-    const desktopContext = getDesktopRequestContext(req, res);
-    if (!desktopContext) return;
-    const username = desktopContext.username;
-    const catId = String(req.query.catId || "").trim();
-    const cats = getDesktopCats(username || undefined);
-    const cat = catId
-      ? cats.find(item => item.id === catId)
-      : cats[0];
-
-    if (!cat) {
-      return res.status(404).json({
-        error: "No cat found",
-        code: "DESKTOP_CAT_NOT_FOUND"
-      });
-    }
-
-    const { userId, ...publicCat } = cat;
-    res.json({ cat: publicCat, userId });
-  });
-
   app.use('/uploads', express.static(path.resolve(__dirname, 'uploads'), {
     maxAge: '30d',
     immutable: true,
   }));
-
-  const desktopPetAssetCandidates = [
-    process.env.MIAO_DESKTOP_PETS_DIR,
-    path.resolve(__dirname, 'public', 'desktop-pets', 'pets'),
-    path.resolve(__dirname, 'dist', 'desktop-pets', 'pets'),
-    // Backward compatibility for local workspaces created before the assets
-    // were moved into this repository.
-    path.resolve(__dirname, '..', 'pic', 'pets', 'pets'),
-  ].filter(Boolean) as string[];
-  const desktopPetsAssetsDir = desktopPetAssetCandidates.find((candidate) => fs.existsSync(candidate)) ||
-    desktopPetAssetCandidates[0];
-  const listDesktopPets = () => {
-    if (!fs.existsSync(desktopPetsAssetsDir)) return [];
-    return fs.readdirSync(desktopPetsAssetsDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => {
-        const manifestPath = path.join(desktopPetsAssetsDir, entry.name, 'pet.json');
-        if (!fs.existsSync(manifestPath)) return null;
-        try {
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-          return {
-            id: String(manifest.id || entry.name),
-            displayName: String(manifest.displayName || manifest.id || entry.name),
-            description: manifest.description ? String(manifest.description) : '',
-          };
-        } catch {
-          return null;
-        }
-      })
-      .filter(Boolean);
-  };
-
-  app.get('/api/desktop/pets', (_req, res) => {
-    res.json({ pets: listDesktopPets() });
-  });
-
-  if (fs.existsSync(desktopPetsAssetsDir)) {
-    app.use('/desktop-pet-assets/pets', express.static(desktopPetsAssetsDir, {
-      maxAge: '1h',
-    }));
-  } else {
-    console.warn(`[Desktop Pet] Sprite assets directory not found: ${desktopPetsAssetsDir}`);
-  }
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
