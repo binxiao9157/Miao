@@ -370,16 +370,32 @@ export default function CatPlayer() {
           )}
         </ AnimatePresence>
 
-        {/* 悬浮互动爱心动画 */}
+      </div>
+
+      {/* 悬浮互动绝对飞行爱心动画（固定在视口顶层，坐标系完全一致） */}
+      <div className="fixed inset-0 pointer-events-none z-[60] overflow-hidden">
         <AnimatePresence>
           {hearts.map(h => (
             <motion.div
               key={h.id}
-              initial={{ opacity: 1, scale: 0.6, y: h.y - 12, x: h.x - 12 }}
-              animate={{ opacity: 0, scale: 1.6, y: h.y - 150, x: h.x + ((h.id % 60) - 30) }}
+              initial={{ 
+                opacity: 1, 
+                scale: 0.4, 
+                rotate: 0,
+                x: h.x - 20, 
+                y: h.y - 20 
+              }}
+              animate={{ 
+                opacity: [1, 0.9, 0], 
+                scale: [0.4, 1.4, 2.4], 
+                rotate: (h.id % 60) - 30, // 随机左右旋转
+                x: h.x - 20 + ((h.id % 120) - 60), // 随时间左右摇摆漂移
+                y: h.y - 240 // 向上飘得更高更平滑
+              }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 1.2, ease: "easeOut" }}
-              className="absolute pointer-events-none z-40 text-red-400 text-3xl select-none"
+              transition={{ duration: 1.1, ease: "easeOut" }}
+              className="absolute text-red-500 text-4xl select-none filter drop-shadow-[0_4px_12px_rgba(239,68,68,0.4)]"
+              style={{ left: 0, top: 0 }}
             >
               💖
             </motion.div>

@@ -11,8 +11,8 @@ import FormData from 'form-data';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = process.cwd();
+const __filename = path.resolve(__dirname, 'server.ts');
 
 async function startServer() {
   const app = express();
