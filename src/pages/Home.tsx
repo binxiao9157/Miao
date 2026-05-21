@@ -18,6 +18,7 @@ export default function Home() {
   const [bubbleText, setBubbleText] = useState<string | null>(null);
   const [bubbleId, setBubbleId] = useState<number>(0);
   const [points, setPoints] = useState<number>(0);
+  const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([]);
   const [showPointToast, setShowPointToast] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false); 
@@ -263,6 +264,25 @@ export default function Home() {
     pointToastTimerRef.current = setTimeout(() => setShowPointToast(null), 3000);
   };
 
+  const triggerHeartAt = (x: number, y: number) => {
+    const hId = Date.now() + Math.random();
+    setHearts(prev => [...prev, { id: hId, x, y }]);
+    
+    // Select an adorable sound/state feedback phrase
+    const sounds = ["喵呜~", "咕噜咕噜...", "啊咪~", "蹭蹭你~", "么么哒~", "喵~"];
+    const sound = sounds[Math.floor(Math.random() * sounds.length)];
+    
+    // Reward points standard feedback
+    const earned = Math.floor(Math.random() * 5) + 3;
+    storage.addPoints(earned, "贴贴猫咪伙伴粉红回馈");
+    setPoints(storage.getPoints().total);
+    triggerPointToast(`${sound} 积分 +${earned} 💖`);
+
+    setTimeout(() => {
+      setHearts(prev => prev.filter(h => h.id !== hId));
+    }, 1200);
+  };
+
   const handleInteraction = (actionName: string) => {
     const p = storage.getPoints();
     const today = new Date().toISOString().slice(0, 10);
@@ -404,35 +424,32 @@ export default function Home() {
     }
   }, [isVideoReady, visibleLayer]);
 
-  const handleLongPressStart = () => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    touchStartPos.current = {
+      x: e.clientX,
+      y: e.clientY
+    };
+    
     isLongPressTriggered.current = false;
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
     longPressTimer.current = setTimeout(() => {
       isLongPressTriggered.current = true;
+      triggerHeartAt(e.clientX, e.clientY);
       triggerInteraction('逗猫棒玩耍', '小羽毛，抓不到～', 'blink');
     }, 600);
   };
 
-  const handleLongPressEnd = () => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
     }
-  };
-
-  const handleTouchStart = (e: TouchEvent) => {
-    touchStartPos.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY
-    };
-    handleLongPressStart();
-  };
-
-  const handleTouchEnd = (e: TouchEvent) => {
-    handleLongPressEnd();
     if (!touchStartPos.current) return;
 
     const touchEndPos = {
-      x: e.changedTouches[0].clientX,
-      y: e.changedTouches[0].clientY
+      x: e.clientX,
+      y: e.clientY
     };
 
     const dx = touchEndPos.x - touchStartPos.current.x;
@@ -457,9 +474,12 @@ export default function Home() {
     if (absDx > 50 || absDy > 50) {
       // Swipe detected
       e.preventDefault(); // 阻止默认行为
+      triggerHeartAt(e.clientX, e.clientY);
       triggerInteraction('踩奶互动', '踩奶中，好舒服～', 'rubbing');
       wakeupUI();
     } else if (absDx < 10 && absDy < 10) {
+      triggerHeartAt(e.clientX, e.clientY);
+
       if (now - lastTapTime.current < 300) {
         // Double tap
         if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
@@ -627,9 +647,9 @@ export default function Home() {
 
         {/* 交互层 */}
         <div 
-          className="absolute inset-0 z-30 touch-none"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
+          className="absolute inset-0 z-30 touch-none cursor-pointer"
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
           onContextMenu={(e) => e.preventDefault()}
         />
       </div>
@@ -712,6 +732,37 @@ export default function Home() {
           </motion.div>
         </div>
       )}
+
+      {/* 悬浮互动绝对飞行爱心动画（固定在视口顶层，坐标系完全一致） */}
+      <div className="fixed inset-0 pointer-events-none z-[60] overflow-hidden">
+        <AnimatePresence>
+          {hearts.map(h => (
+            <motion.div
+              key={h.id}
+              initial={{ 
+                opacity: 1, 
+                scale: 0.4, 
+                rotate: 0,
+                x: h.x - 20, 
+                y: h.y - 20 
+              }}
+              animate={{ 
+                opacity: [1, 0.9, 0], 
+                scale: [0.4, 1.4, 2.4], 
+                rotate: (h.id % 60) - 30, // 随机左右旋转
+                x: h.x - 20 + ((h.id % 120) - 60), // 随时间左右摇摆漂移
+                y: h.y - 240 // 向上飘得更高更平滑
+              }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.1, ease: "easeOut" }}
+              className="absolute text-red-500 text-4xl select-none filter drop-shadow-[0_4px_12px_rgba(239,68,68,0.4)]"
+              style={{ left: 0, top: 0 }}
+            >
+              💖
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
