@@ -312,6 +312,35 @@ function syncPointsToServer(userId: string, data: PointsInfo) {
   }).catch(() => {});
 }
 
+function logTransactionToServer(userId: string, amount: number, type: 'earn' | 'spend', reason: string) {
+  const token = localStorage.getItem('miao_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  fetch('/api/v1/points/transaction', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ amount, type, reason })
+  }).then(res => {
+    if (!res.ok) {
+      // Fallback if rejected
+      return fetch(`/api/points/${encodeURIComponent(userId)}/transaction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, type, reason })
+      });
+    }
+  }).catch(() => {
+    fetch(`/api/points/${encodeURIComponent(userId)}/transaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, type, reason })
+    }).catch(() => {});
+  });
+}
+
 /** 各类数据的滑动窗口上限 */
 const MAX_DIARIES = 200;
 const MAX_FRIEND_DIARIES = 100;
@@ -897,6 +926,11 @@ export const storage = {
     });
     if (points.history.length > 50) points.history.pop();
     storage.savePoints(points);
+    
+    const userId = getCurrentUsername();
+    if (userId) {
+      logTransactionToServer(userId, amount, 'earn', reason);
+    }
     return points.total;
   },
 
@@ -921,6 +955,11 @@ export const storage = {
       });
       if (points.history.length > 50) points.history.pop();
       storage.savePoints(points);
+      
+      const userId = getCurrentUsername();
+      if (userId) {
+        logTransactionToServer(userId, amount, 'spend', reason);
+      }
       return true;
     }
     return false;

@@ -135,17 +135,28 @@ export default function GenerationProgress() {
       }
 
       // 第一阶段：生成核心待机视频 (0-100%)
-      setStatus("正在编织它的动作姿态...");
-      setProgress(10);
-      
-      const idleTask = await VolcanoService.submitTask(optimizedImg, ACTION_PROMPTS.idle);
+      const recoveryKey = `miao_restore_task_${newCatId}`;
+      let taskId = localStorage.getItem(recoveryKey);
+
+      if (!taskId) {
+        setStatus("正在编织它的动作姿态...");
+        setProgress(10);
+        const idleTask = await VolcanoService.submitTask(optimizedImg, ACTION_PROMPTS.idle);
+        taskId = idleTask.id;
+        localStorage.setItem(recoveryKey, taskId);
+      } else {
+        console.log("[Recovery] Found active task ID in localStorage, resuming poll:", taskId);
+        setStatus("正在重连次元通道以恢复生成进度...");
+      }
       setProgress(30);
       
       const url = await VolcanoService.pollTaskResult(
-        idleTask.id,
+        taskId,
         (s) => setStatus(getImmersiveStatus(progress)),
         abortSignal
       );
+      
+      localStorage.removeItem(recoveryKey);
       
       console.log("Idle video generated:", url);
       setIdleVideoUrl(url);
@@ -182,6 +193,8 @@ export default function GenerationProgress() {
       setStatus("生成成功！");
     } catch (err: any) {
       if (err.message === "任务轮询已中止" || err.message === "任务中止") return;
+      const recoveryKey = `miao_restore_task_${newCatId}`;
+      localStorage.removeItem(recoveryKey);
       // 生成失败则退还积分
       if (pointsDeducted > 0) {
         storage.addPoints(pointsDeducted, "生成失败退还");

@@ -129,6 +129,27 @@ export default function Diary() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleAutoWriteDiary = () => {
+    if (!activeCat) {
+      alert("请先选择或培育一只活跃的喵咪伙伴！");
+      return;
+    }
+    
+    const breed = activeCat.breed || "可爱的小猫";
+    const name = activeCat.name || "咪咪";
+    const furColor = activeCat.color || "软萌";
+    
+    const catDiaries = [
+      `今天，我的${furColor}${breed}「${name}」特别乖。清晨第一缕阳光洒进来时，它就用温热湿漉漉的小鼻子贴我的脸，一串咕噜咕噜轻快的低吟像个小马达，仿佛在小声撒娇。真的是超级治愈的一天～🌸`,
+      `「${name}」（一只能干的${furColor}${breed}）下午不知道怎么就疯玩起来！紧紧抱着它的毛绒玩具在客厅地毯上连续翻滚，最后呼的一下侧躺在软毯上。我伸手揉摸它的肚子，它就轻轻抱紧我的手，眼睛弯成好看的心状。🐾`,
+      `夕阳斜照风铃响，我和${breed}「${name}」慵懒地靠在地毯一角。它蜷曲起毛茸茸的身板打瞌睡，耳朵随着声音偶尔抖一抖。陪伴无声，但在流泻的日子里，心已经溢满温暖。✨`,
+      `新伙伴「${name}」今天解锁了超神逗比神态！我看书的时候，它冷不丁一跃趴伏在书页正下方，仰着肥美的小下巴圆鼓鼓对准我叫，像在严正抗议我太冷漠。罢了罢了，这本先合上，先揉乱你毛发！😸`
+    ];
+    
+    const chosen = catDiaries[Math.floor(Math.random() * catDiaries.length)];
+    setNewContent(chosen);
+  };
+
   const handlePost = async () => {
     if ((!newContent.trim() && !selectedMedia) || isLoading) return;
 
@@ -631,6 +652,15 @@ export default function Diary() {
                     title="上传视频"
                   >
                     <Video size={24} />
+                  </button>
+                  <button 
+                    onClick={handleAutoWriteDiary}
+                    className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center transition-all active:scale-90"
+                    style={{ color: '#FF9D76' }}
+                    title="喵咪智写"
+                    type="button"
+                  >
+                    <Sparkles size={24} className="animate-pulse" />
                   </button>
                   <input 
                     type="file" 

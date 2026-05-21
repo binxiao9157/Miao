@@ -14,11 +14,39 @@ export default function CatPlayer() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(true);
+  const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
 
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showToast, setShowToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerHeartEffect = (e?: React.MouseEvent) => {
+    // Earn interaction reward points (3 to 7 pts)
+    const earned = Math.floor(Math.random() * 5) + 3;
+    storage.addPoints(earned, "贴贴猫咪伙伴粉红回馈");
+    
+    const hId = Date.now() + Math.random();
+    const x = e ? e.clientX : window.innerWidth / 2;
+    const y = e ? e.clientY : window.innerHeight / 2 - 100;
+    
+    setHearts(prev => [...prev, { id: hId, x, y }]);
+    setShowToast(`贴贴成功喵！积分 +${earned} 💖`);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setShowToast(null), 2500);
+
+    setTimeout(() => {
+      setHearts(prev => prev.filter(h => h.id !== hId));
+    }, 1200);
+  };
+
+  const addDebugPoints = () => {
+    storage.addPoints(1000, "测试高速体验");
+    setShowToast("成功注入 1000 调试积分！⚡");
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setShowToast(null), 2500);
+  };
 
   useEffect(() => {
     const list = storage.getCatList();
@@ -224,13 +252,55 @@ export default function CatPlayer() {
           <h1 className="text-white font-black text-lg">{cat.name}</h1>
           <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">AI 生成数字形象</p>
         </div>
-        <div className="w-10" /> {/* 占位 */}
+        <button 
+          onClick={() => setShowDebug(!showDebug)} 
+          className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white text-xs font-black"
+          title="开发者选项"
+        >
+          Dev
+        </button>
       </header>
+
+      {/* 开发者调试面板 */}
+      <AnimatePresence>
+        {showDebug && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute left-6 right-6 z-[40] bg-zinc-950/95 backdrop-blur-xl rounded-[28px] p-6 shadow-2xl border border-white/10"
+            style={{ top: 'calc(80px + env(safe-area-inset-top))' }}
+          >
+            <h4 className="text-sm font-bold text-white mb-1">🛠️ 调试面板</h4>
+            <p className="text-[10px] text-white/60 mb-4 font-mono">Bypass constraints and fast-forward testing</p>
+            <div className="flex flex-wrap gap-2">
+              <button 
+                onClick={addDebugPoints}
+                className="px-4 py-2 bg-[#FF9D76] text-white text-xs font-black rounded-xl active:scale-95 transition-transform"
+              >
+                ⚡ 满血+1000积分
+              </button>
+              <button 
+                onClick={() => {
+                  storage.clearGenerationDraft();
+                  setShowToast("方案和草稿已重置");
+                }}
+                className="px-4 py-2 bg-white/10 text-white text-xs font-black rounded-xl active:scale-95 transition-transform"
+              >
+                🔄 重置草稿
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 视频播放器 */}
       <div 
-        className="flex-grow flex items-center justify-center relative bg-black overflow-hidden"
-        onClick={togglePlay}
+        className="flex-grow flex items-center justify-center relative bg-black overflow-hidden cursor-pointer"
+        onClick={(e) => {
+          triggerHeartEffect(e);
+          togglePlay();
+        }}
       >
         {/* 背景补位：使用模糊的头像或视频首帧填充 */}
         <div className="absolute inset-0 z-0">
@@ -298,6 +368,22 @@ export default function CatPlayer() {
               </div>
             </motion.div>
           )}
+        </ AnimatePresence>
+
+        {/* 悬浮互动爱心动画 */}
+        <AnimatePresence>
+          {hearts.map(h => (
+            <motion.div
+              key={h.id}
+              initial={{ opacity: 1, scale: 0.6, y: h.y - 12, x: h.x - 12 }}
+              animate={{ opacity: 0, scale: 1.6, y: h.y - 150, x: h.x + ((h.id % 60) - 30) }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.2, ease: "easeOut" }}
+              className="absolute pointer-events-none z-40 text-red-400 text-3xl select-none"
+            >
+              💖
+            </motion.div>
+          ))}
         </AnimatePresence>
       </div>
 
@@ -319,11 +405,15 @@ export default function CatPlayer() {
           </div>
 
           <div className="flex flex-col gap-6">
-            <button className="flex flex-col items-center gap-1">
-              <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20">
-                <Heart size={24} />
+            <button 
+              onClick={(e) => triggerHeartEffect(e)}
+              className="flex flex-col items-center gap-1 hover:scale-110 active:scale-90 transition-transform"
+              title="贴贴猫咪"
+            >
+              <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-red-400 border border-white/20 shadow-lg">
+                <Heart size={24} fill="currentColor" />
               </div>
-              <span className="text-[10px] text-white font-bold">喜欢</span>
+              <span className="text-[10px] text-white font-bold">贴贴/互动</span>
             </button>
             <button className="flex flex-col items-center gap-1">
               <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20">
