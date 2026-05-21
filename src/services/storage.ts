@@ -312,6 +312,78 @@ function syncPointsToServer(userId: string, data: PointsInfo) {
   }).catch(() => {});
 }
 
+interface OfflineTransaction {
+  id: string;
+  userId: string;
+  amount: number;
+  type: 'earn' | 'spend';
+  reason: string;
+}
+
+function getOfflineQueue(): OfflineTransaction[] {
+  try {
+    const raw = localStorage.getItem('miao_offline_txs');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue: OfflineTransaction[]) {
+  try {
+    localStorage.setItem('miao_offline_txs', JSON.stringify(queue));
+  } catch {}
+}
+
+let isSyncingOffline = false;
+async function syncOfflineTransactions() {
+  if (isSyncingOffline) return;
+  const queue = getOfflineQueue();
+  if (queue.length === 0) return;
+
+  isSyncingOffline = true;
+  const token = localStorage.getItem('miao_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const remaining: OfflineTransaction[] = [];
+
+  for (const tx of queue) {
+    try {
+      let success = false;
+      let res = await fetch('/api/v1/points/transaction', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ amount: tx.amount, type: tx.type, reason: tx.reason })
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        success = true;
+      } else {
+        const fallbackRes = await fetch(`/api/points/${encodeURIComponent(tx.userId)}/transaction`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: tx.amount, type: tx.type, reason: tx.reason })
+        }).catch(() => null);
+        if (fallbackRes && fallbackRes.ok) {
+          success = true;
+        }
+      }
+
+      if (!success) {
+        remaining.push(tx);
+      }
+    } catch {
+      remaining.push(tx);
+    }
+  }
+
+  saveOfflineQueue(remaining);
+  isSyncingOffline = false;
+}
+
 function logTransactionToServer(userId: string, amount: number, type: 'earn' | 'spend', reason: string) {
   const token = localStorage.getItem('miao_auth_token');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -324,12 +396,28 @@ function logTransactionToServer(userId: string, amount: number, type: 'earn' | '
     headers,
     body: JSON.stringify({ amount, type, reason })
   }).then(res => {
-    if (!res.ok) {
-      // Fallback if rejected
-      return fetch(`/api/points/${encodeURIComponent(userId)}/transaction`, {
+    if (res.ok) {
+      // Success triggers queued transaction flushing
+      syncOfflineTransactions();
+    } else {
+      // Fallback
+      fetch(`/api/points/${encodeURIComponent(userId)}/transaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount, type, reason })
+      }).then(fallbackRes => {
+        if (fallbackRes.ok) {
+          syncOfflineTransactions();
+        } else {
+          // Add to offline queue
+          const queue = getOfflineQueue();
+          queue.push({ id: 'otx_' + Date.now() + Math.random().toString(36).substring(2, 5), userId, amount, type, reason });
+          saveOfflineQueue(queue);
+        }
+      }).catch(() => {
+        const queue = getOfflineQueue();
+        queue.push({ id: 'otx_' + Date.now() + Math.random().toString(36).substring(2, 5), userId, amount, type, reason });
+        saveOfflineQueue(queue);
       });
     }
   }).catch(() => {
@@ -337,8 +425,28 @@ function logTransactionToServer(userId: string, amount: number, type: 'earn' | '
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount, type, reason })
-    }).catch(() => {});
+    }).then(res => {
+      if (res.ok) {
+        syncOfflineTransactions();
+      } else {
+        const queue = getOfflineQueue();
+        queue.push({ id: 'otx_' + Date.now() + Math.random().toString(36).substring(2, 5), userId, amount, type, reason });
+        saveOfflineQueue(queue);
+      }
+    }).catch(() => {
+      const queue = getOfflineQueue();
+      queue.push({ id: 'otx_' + Date.now() + Math.random().toString(36).substring(2, 5), userId, amount, type, reason });
+      saveOfflineQueue(queue);
+    });
   });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    syncOfflineTransactions();
+  });
+  // Trigger transaction sync shortly after startup
+  setTimeout(syncOfflineTransactions, 2500);
 }
 
 /** 各类数据的滑动窗口上限 */
