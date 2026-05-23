@@ -81,6 +81,15 @@ This is the current server route surface. It is a compatibility contract for inc
 | POST | `/api/v1/feedback` | Bearer token | Save feedback. |
 | POST | `/api/v1/upload` | Bearer token | Upload avatar or image file. |
 
+## Admin
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/stats` | `X-Admin-Token` | Load admin dashboard metrics, users, and feedback. |
+| POST | `/api/v1/admin/users/:userId/points` | `X-Admin-Token` | Adjust a user's points balance. |
+| DELETE | `/api/v1/admin/users/:userId` | `X-Admin-Token` | Delete a user and related data. |
+| DELETE | `/api/v1/admin/feedback/:id` | `X-Admin-Token` | Delete a feedback entry. |
+
 ## AI, Proxies, Assets, Health
 
 | Method | Path | Auth | Purpose |

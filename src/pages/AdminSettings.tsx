@@ -9,41 +9,9 @@ import { LayoutGroup, motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
 import { aiConfig, DEFAULT_AI_PROFILES } from "../services/ai/aiConfig";
 import { AIProfile, AIProvider } from "../services/ai/types";
+import { adminService, AdminStats, AdminUser, isAdminUnlockCode } from "../services/adminService";
 import { PresetCat, storage } from "../services/storage";
-
-interface AdminUser {
-  username: string;
-  nickname: string;
-  avatar: string;
-  phone: string;
-  catsCount: number;
-  diariesCount: number;
-  points: number;
-  createdAt: number;
-}
-
-interface AdminFeedback {
-  id: string;
-  userId: string;
-  type: string;
-  content?: string;
-  answers?: Record<string, any>;
-  createdAt: number;
-  userNickname: string;
-  userAvatar: string;
-}
-
-interface AdminStats {
-  summary: {
-    totalUsers: number;
-    totalCats: number;
-    totalDiaries: number;
-    totalFeedbacks: number;
-    totalPoints: number;
-  };
-  users: AdminUser[];
-  feedbacks: AdminFeedback[];
-}
+import { useTimedMessage } from "../hooks/useTimedMessage";
 
 export default function AdminSettings() {
   const navigate = useNavigate();
@@ -71,7 +39,7 @@ export default function AdminSettings() {
 
   // AI profile state
   const [profile, setProfile] = useState<AIProfile>(DEFAULT_AI_PROFILES.dashscope);
-  const [showToast, setShowToast] = useState<string | null>(null);
+  const { message: showToast, show: triggerToast } = useTimedMessage(2500);
 
   // Debug settings
   const [isPointsCheat, setIsPointsCheat] = useState(() => storage.getIsPointsCheat());
@@ -102,13 +70,8 @@ export default function AdminSettings() {
     }
   }, [isAdminUnlocked]);
 
-  const triggerToast = (msg: string) => {
-    setShowToast(msg);
-    setTimeout(() => setShowToast(null), 2500);
-  };
-
   const handleUnlock = () => {
-    if (pinInput.trim() === "miao_admin_8888" || pinInput.trim() === "888888") {
+    if (isAdminUnlockCode(pinInput)) {
       setIsAdminUnlocked(true);
       sessionStorage.setItem("miao_admin_authorized", "true");
       setAuthError("");
@@ -120,21 +83,7 @@ export default function AdminSettings() {
   const fetchAdminStats = async () => {
     setIsLoadingStats(true);
     try {
-      const token = localStorage.getItem("miao_auth_token");
-      const resp = await fetch("/api/v1/admin/stats", {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "X-Admin-Token": "miao_admin_8888"
-        }
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.success) {
-          setStats(data);
-        }
-      } else {
-        console.error("Failed to load admin metrics:", resp.status);
-      }
+      setStats(await adminService.fetchStats());
     } catch (err) {
       console.error("Error fetching stats:", err);
     } finally {
@@ -198,31 +147,16 @@ export default function AdminSettings() {
     if (!editingUserPoints) return;
     setIsAdjustingPoints(true);
     try {
-      const token = localStorage.getItem("miao_auth_token");
-      const resp = await fetch(`/api/v1/admin/users/${editingUserPoints.username}/points`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-          "X-Admin-Token": "miao_admin_8888"
-        },
-        body: JSON.stringify({
-          amount: Number(pointsAdjustAmount),
-          type: pointsAdjustType,
-          reason: pointsAdjustReason
-        })
+      await adminService.adjustUserPoints(editingUserPoints.username, {
+        amount: Number(pointsAdjustAmount),
+        type: pointsAdjustType,
+        reason: pointsAdjustReason
       });
-
-      if (resp.ok) {
-        triggerToast(`成功为 ${editingUserPoints.nickname} ${pointsAdjustType === "earn" ? "赠送" : "扣除"} ${pointsAdjustAmount} 积分！`);
-        setEditingUserPoints(null);
-        fetchAdminStats(); // Refresh board
-      } else {
-        const errData = await resp.json();
-        alert(`调整失败: ${errData.error || "未知服务端错误"}`);
-      }
+      triggerToast(`成功为 ${editingUserPoints.nickname} ${pointsAdjustType === "earn" ? "赠送" : "扣除"} ${pointsAdjustAmount} 积分！`);
+      setEditingUserPoints(null);
+      fetchAdminStats(); // Refresh board
     } catch (err: any) {
-      alert(`网络异常: ${err.message}`);
+      alert(`调整失败: ${err.message}`);
     } finally {
       setIsAdjustingPoints(false);
     }
@@ -235,45 +169,22 @@ export default function AdminSettings() {
     }
 
     try {
-      const token = localStorage.getItem("miao_auth_token");
-      const resp = await fetch(`/api/v1/admin/users/${encodeURIComponent(username)}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "X-Admin-Token": "miao_admin_8888"
-        }
-      });
-
-      if (resp.ok) {
-        triggerToast(`已成功清除违规用户 ${nickname}`);
-        fetchAdminStats();
-      } else {
-        const errData = await resp.json();
-        alert(`清除失败: ${errData.error || "拒绝访问"}`);
-      }
-    } catch {
-      alert("通信失败");
+      await adminService.deleteUser(username);
+      triggerToast(`已成功清除违规用户 ${nickname}`);
+      fetchAdminStats();
+    } catch (err: any) {
+      alert(`清除失败: ${err.message || "拒绝访问"}`);
     }
   };
 
   // Purge/Archive feedback logs
   const handleFeedbackDelete = async (id: string) => {
     try {
-      const token = localStorage.getItem("miao_auth_token");
-      const resp = await fetch(`/api/v1/admin/feedback/${id}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "X-Admin-Token": "miao_admin_8888"
-        }
-      });
-
-      if (resp.ok) {
-        triggerToast("该意见反馈已成功归档和清除！");
-        fetchAdminStats();
-      }
-    } catch {
-      alert("操作失败");
+      await adminService.deleteFeedback(id);
+      triggerToast("该意见反馈已成功归档和清除！");
+      fetchAdminStats();
+    } catch (err: any) {
+      alert(`操作失败: ${err.message || "未知错误"}`);
     }
   };
 

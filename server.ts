@@ -1191,10 +1191,11 @@ async function startServer() {
   });
 
   // ── 管理员认证中间件 ──
+  const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "miao_admin_8888";
   const adminAuth: express.RequestHandler = (req, res, next) => {
-    const adminToken = req.headers['x-admin-token'];
+    const adminToken = String(req.headers['x-admin-token'] || '');
     // 强制使用专属系统的管理员保密令牌 (不信赖数据库中任何名义是 admin 的普通账号)
-    const isValidToken = adminToken === 'miao_admin_8888';
+    const isValidToken = adminToken === ADMIN_TOKEN;
 
     if (!isValidToken) {
       return res.status(403).json({ error: "Access Denied: Admin secret validation failed", code: "FORBIDDEN" });

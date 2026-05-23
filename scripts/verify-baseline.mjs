@@ -52,6 +52,7 @@ const requiredServerRoutes = [
   "/api/v1/cats",
   "/api/v1/diaries",
   "/api/v1/ai/tasks",
+  "/api/v1/admin/stats",
   "/api/ai/generate-image",
   "/api/ai/generate-video",
 ];
