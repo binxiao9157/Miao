@@ -8,6 +8,9 @@ import crypto from "crypto";
 import multer from "multer";
 import { fileURLToPath } from 'url';
 import FormData from 'form-data';
+import { clientTypeMiddleware } from "./server/middleware/clientType";
+import { createTokenService } from "./server/utils/authToken";
+import { ensureDirectory, readJSON, writeJSON } from "./server/utils/jsonStore";
 
 dotenv.config();
 
@@ -21,17 +24,7 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
-  app.use((req, res, next) => {
-    const headerType = String(req.headers['x-client-type'] || '').toLowerCase();
-    const ua = String(req.headers['user-agent'] || '').toLowerCase();
-    const referer = String(req.headers.referer || '').toLowerCase();
-    const clientType =
-      headerType ||
-      (ua.includes('miniprogram') || referer.includes('servicewechat.com') ? 'wechat-miniprogram' : 'pwa');
-    (req as any).clientType = clientType;
-    res.setHeader('X-Detected-Client-Type', clientType);
-    next();
-  });
+  app.use(clientTypeMiddleware);
 
   const httpsAgent = new https.Agent({
     keepAlive: true,
@@ -42,7 +35,7 @@ async function startServer() {
 
   // ── JSON 文件数据库 ──
   const dataDir = path.resolve(__dirname, 'data');
-  fs.mkdirSync(dataDir, { recursive: true });
+  ensureDirectory(dataDir);
 
   const usersFile = path.join(dataDir, 'users.json');
   const catsFile = path.join(dataDir, 'cats.json');
@@ -55,37 +48,7 @@ async function startServer() {
   const diaryLikesFile = path.join(dataDir, 'diary-likes.json');
   const diaryCommentsFile = path.join(dataDir, 'diary-comments.json');
 
-  function readJSON<T>(file: string, fallback: T): T {
-    try {
-      if (!fs.existsSync(file)) return fallback;
-      return JSON.parse(fs.readFileSync(file, 'utf-8'));
-    } catch (e) {
-      console.error(`读取 JSON 文件失败: ${file}`, e);
-      return fallback;
-    }
-  }
-  function writeJSON(file: string, data: any) {
-    const tempFile = `${file}.tmp`;
-    try {
-      fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
-      fs.renameSync(tempFile, file);
-    } catch (error) {
-      console.error(`原子写入 JSON 文件失败: ${file}`, error);
-      try {
-        if (fs.existsSync(tempFile)) {
-          fs.unlinkSync(tempFile);
-        }
-      } catch {}
-      // fallback to standard write if rename fails due to cross-device issues
-      try {
-        fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
-      } catch (err) {
-        console.error(`二次降级写入也失败: ${file}`, err);
-      }
-    }
-  }
-
-  interface ServerUser { username: string; nickname: string; avatar: string; password: string; phone?: string; openid?: string; unionid?: string; }
+  interface ServerUser { username: string; nickname: string; avatar: string; password: string; phone?: string; openid?: string; unionid?: string; createdAt?: number; }
   interface ServerCat {
     id: string; userId: string; name: string; breed: string; color: string;
     avatar: string; source: string; createdAt?: number;
@@ -105,8 +68,10 @@ async function startServer() {
     title: string; content: string; catAvatar?: string; createdAt: number; read: boolean;
   }
 
-  const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || "miao-dev-secret-change-me";
-  const tokenTtlMs = Number(process.env.SESSION_TTL_MS || 30 * 24 * 60 * 60 * 1000);
+  const { signToken, verifyToken } = createTokenService({
+    secret: process.env.JWT_SECRET || process.env.SESSION_SECRET || "miao-dev-secret-change-me",
+    ttlMs: Number(process.env.SESSION_TTL_MS || 30 * 24 * 60 * 60 * 1000),
+  });
 
   // ── 微信 access_token 缓存（用于 getPhoneNumber 接口）──
   let cachedAccessToken: { token: string; expiresAt: number } | null = null;
@@ -128,31 +93,6 @@ async function startServer() {
     };
     return cachedAccessToken.token;
   }
-
-  const base64url = (input: Buffer | string) =>
-    Buffer.from(input).toString('base64url');
-
-  const signToken = (payload: Record<string, any>) => {
-    const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-    const body = base64url(JSON.stringify({ ...payload, exp: Date.now() + tokenTtlMs }));
-    const sig = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
-    return `${header}.${body}.${sig}`;
-  };
-
-  const verifyToken = (token: string): { username: string } | null => {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const expected = crypto.createHmac('sha256', JWT_SECRET).update(`${parts[0]}.${parts[1]}`).digest('base64url');
-    if (expected.length !== parts[2].length) return null;
-    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(parts[2]))) return null;
-    try {
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
-      if (!payload?.username || Number(payload.exp || 0) < Date.now()) return null;
-      return { username: payload.username };
-    } catch {
-      return null;
-    }
-  };
 
   const maskPhone = (phone?: string) => {
     if (!phone) return undefined;
@@ -227,11 +167,16 @@ async function startServer() {
     const avatar = (req.body.avatar || "").trim();
     if (!username || !password) return res.status(400).json({ error: "Missing username or password" });
 
+    const normalized = username.toLowerCase();
+    if (['admin', 'system', 'root', 'administrator', 'manager', 'miao'].includes(normalized)) {
+      return res.status(403).json({ error: "Reserved username: This name is reserved for system administration" });
+    }
+
     const users = readJSON<ServerUser[]>(usersFile, []);
     if (users.find(u => u.username === username)) {
       return res.status(409).json({ error: "Username already exists" });
     }
-    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '' };
+    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
     users.push(user);
     writeJSON(usersFile, users);
     console.log(`[Auth] Registered user: ${username}`);
@@ -257,11 +202,16 @@ async function startServer() {
     const avatar = (req.body.avatar || "").trim();
     if (!username || !password) return res.status(400).json({ error: "Missing username or password", code: "INVALID_PARAMETER" });
 
+    const normalized = username.toLowerCase();
+    if (['admin', 'system', 'root', 'administrator', 'manager', 'miao'].includes(normalized)) {
+      return res.status(430).json({ error: "Reserved username: This name is reserved for system administration", code: "RESERVED_USERNAME" });
+    }
+
     const users = readJSON<ServerUser[]>(usersFile, []);
     if (users.find(u => u.username === username)) {
       return res.status(409).json({ error: "Username already exists", code: "USERNAME_EXISTS" });
     }
-    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '' };
+    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
     users.push(user);
     writeJSON(usersFile, users);
     res.json({ token: signToken({ username: user.username }), user: publicUser(user) });
@@ -1238,6 +1188,190 @@ async function startServer() {
     writeJSON(feedbackFile, feedback);
     console.log(`[Feedback] ${type} from ${userId}`);
     res.json({ success: true, id: entry.id });
+  });
+
+  // ── 管理员认证中间件 ──
+  const adminAuth: express.RequestHandler = (req, res, next) => {
+    const adminToken = req.headers['x-admin-token'];
+    // 强制使用专属系统的管理员保密令牌 (不信赖数据库中任何名义是 admin 的普通账号)
+    const isValidToken = adminToken === 'miao_admin_8888';
+
+    if (!isValidToken) {
+      return res.status(403).json({ error: "Access Denied: Admin secret validation failed", code: "FORBIDDEN" });
+    }
+    next();
+  };
+
+  // ── 管理员专用数据监控与管理 API ──
+  app.get("/api/v1/admin/stats", adminAuth, (req, res) => {
+    try {
+      const users = readJSON<ServerUser[]>(usersFile, []);
+      const cats = readJSON<any[]>(catsFile, []);
+      const diaries = readJSON<any[]>(diariesFile, []);
+      const points = readJSON<ServerPoints[]>(pointsFile, []);
+      const feedbacks = readJSON<any[]>(feedbackFile, []);
+
+      // 提取用户积分详情
+      const userPointsMap: Record<string, number> = {};
+      points.forEach(p => {
+        if (p.userId && p.data) {
+          userPointsMap[p.userId] = p.data.total || 0;
+        }
+      });
+
+      // 统计用户多维度行为
+      const usersData = users.map(u => {
+        const userCats = cats.filter(c => c.userId === u.username);
+        const userDiaries = diaries.filter(d => d.userId === u.username);
+        const uPoints = typeof userPointsMap[u.username] === 'number' ? userPointsMap[u.username] : 100;
+        
+        return {
+          username: u.username,
+          nickname: u.nickname,
+          avatar: u.avatar || "",
+          phone: u.phone || "",
+          catsCount: userCats.length,
+          diariesCount: userDiaries.length,
+          points: uPoints,
+          createdAt: (u as any).createdAt || (Date.now() - (Math.floor(Math.random() * 5)) * 86400000) // 兜底注册时间
+        };
+      });
+
+      res.json({
+        success: true,
+        summary: {
+          totalUsers: users.length,
+          totalCats: cats.length,
+          totalDiaries: diaries.length,
+          totalFeedbacks: feedbacks.length,
+          totalPoints: Object.values(userPointsMap).reduce((acc, curr) => acc + curr, 0)
+        },
+        users: usersData,
+        feedbacks: feedbacks.map(f => {
+          const u = users.find(usr => usr.username === f.userId);
+          return {
+            ...f,
+            userNickname: u ? u.nickname : f.userId,
+            userAvatar: u ? u.avatar : ""
+          };
+        })
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 管理员调整用户积分账户
+  app.post("/api/v1/admin/users/:userId/points", adminAuth, (req, res) => {
+    try {
+      const { amount, type, reason } = req.body;
+      const targetUser = req.params.userId;
+      if (typeof amount !== 'number' || !['earn', 'spend'].includes(type)) {
+        return res.status(400).json({ error: "Invalid parameters", code: "INVALID_PARAMETERS" });
+      }
+
+      const users = readJSON<ServerUser[]>(usersFile, []);
+      const userExists = users.some(u => u.username === targetUser);
+      if (!userExists) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const all = readJSON<ServerPoints[]>(pointsFile, []);
+      let userPoints = all.find(p => p.userId === targetUser);
+      if (!userPoints) {
+        userPoints = {
+          userId: targetUser,
+          data: {
+            total: 100,
+            lastLoginDate: null,
+            dailyInteractionPoints: 0,
+            lastInteractionDate: null,
+            onlineMinutes: 0,
+            lastOnlineUpdate: Date.now(),
+            history: []
+          }
+        };
+        all.push(userPoints);
+      }
+
+      if (type === 'spend' && userPoints.data.total < amount) {
+        return res.status(400).json({ error: "Insufficient user points" });
+      }
+
+      if (type === 'earn') {
+        userPoints.data.total += amount;
+      } else {
+        userPoints.data.total -= amount;
+      }
+
+      const txId = 'tx_admin_' + Date.now() + Math.random().toString(36).substring(2, 6);
+      const transaction = {
+        id: txId,
+        type,
+        amount,
+        reason: reason || "管理后台调整",
+        timestamp: Date.now()
+      };
+
+      if (!userPoints.data.history) userPoints.data.history = [];
+      userPoints.data.history.unshift(transaction);
+      userPoints.data.updatedAt = Date.now();
+
+      writeJSON(pointsFile, all);
+
+      res.json({ success: true, total: userPoints.data.total, transaction });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 管理员安全软删除或清除用户和其关联的数据
+  app.delete("/api/v1/admin/users/:userId", adminAuth, (req, res) => {
+    try {
+      const targetUser = req.params.userId;
+      if (targetUser === 'admin') {
+        return res.status(400).json({ error: "Cannot delete built-in system administrator" });
+      }
+
+      const users = readJSON<ServerUser[]>(usersFile, []);
+      const filteredUsers = users.filter(u => u.username !== targetUser);
+
+      if (filteredUsers.length === users.length) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      writeJSON(usersFile, filteredUsers);
+
+      // 安全层：级联清除
+      const cats = readJSON<any[]>(catsFile, []);
+      writeJSON(catsFile, cats.filter(c => c.userId !== targetUser));
+
+      const diaries = readJSON<any[]>(diariesFile, []);
+      writeJSON(diariesFile, diaries.filter(d => d.userId !== targetUser));
+
+      const points = readJSON<any[]>(pointsFile, []);
+      writeJSON(pointsFile, points.filter(p => p.userId !== targetUser));
+
+      const feedbacks = readJSON<any[]>(feedbackFile, []);
+      writeJSON(feedbackFile, feedbacks.filter(f => f.userId !== targetUser));
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 管理员归档或删除无用的意见反馈
+  app.delete("/api/v1/admin/feedback/:id", adminAuth, (req, res) => {
+    try {
+      const id = req.params.id;
+      const feedbacks = readJSON<any[]>(feedbackFile, []);
+      const filtered = feedbacks.filter(f => f.id !== id);
+      writeJSON(feedbackFile, filtered);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // ── 文件上传 API（头像等） ──
@@ -2217,17 +2351,40 @@ async function startServer() {
     }
   });
 
+  const parseSafeRemoteUrl = (rawUrl: unknown): string | null => {
+    if (!rawUrl || typeof rawUrl !== 'string') return null;
+    try {
+      const parsed = new URL(rawUrl);
+      const hostname = parsed.hostname.toLowerCase();
+      const blockedHosts = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']);
+      const isBlockedPrivateHost =
+        blockedHosts.has(hostname) ||
+        hostname.startsWith('10.') ||
+        hostname.startsWith('192.168.') ||
+        /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname) ||
+        hostname.startsWith('169.254.');
+
+      if (!['http:', 'https:'].includes(parsed.protocol) || isBlockedPrivateHost) {
+        return null;
+      }
+
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  };
+
   // Generic resource proxy to bypass CORS for assets (images/videos)
   app.get("/api/proxy-resource", async (req, res) => {
-    const { url } = req.query;
-    if (!url || typeof url !== 'string') {
-      return res.status(400).send("Missing url parameter");
+    const safeUrl = parseSafeRemoteUrl(req.query.url);
+    if (!safeUrl) {
+      return res.status(400).send("Invalid url parameter");
     }
 
     try {
       const response = await axios({
         method: 'get',
-        url: url,
+        url: safeUrl,
         responseType: 'stream',
         httpsAgent,
         timeout: 60000
@@ -2247,8 +2404,9 @@ async function startServer() {
   // Keep existing proxy-video for compatibility but reuse logic or just keep it
   app.get("/api/proxy-video", async (req, res) => {
     // Redirection to the generic one or just keep it
-    const { url } = req.query;
-    res.redirect(`/api/proxy-resource?url=${encodeURIComponent(url as string)}`);
+    const safeUrl = parseSafeRemoteUrl(req.query.url);
+    if (!safeUrl) return res.status(400).send("Invalid url parameter");
+    res.redirect(`/api/proxy-resource?url=${encodeURIComponent(safeUrl)}`);
   });
 
   // ── 视频持久化：将临时 URL 下载到服务器本地，返回永久可访问的 URL ──
@@ -2260,11 +2418,15 @@ async function startServer() {
     if (!videoUrl || !catId || !action) {
       return res.status(400).json({ error: "Missing videoUrl, catId, or action" });
     }
+    const safeVideoUrl = parseSafeRemoteUrl(videoUrl);
+    if (!safeVideoUrl) {
+      return res.status(400).json({ error: "Invalid videoUrl" });
+    }
 
     try {
       const response = await axios({
         method: 'get',
-        url: videoUrl,
+        url: safeVideoUrl,
         responseType: 'arraybuffer',
         httpsAgent,
         timeout: 120000,

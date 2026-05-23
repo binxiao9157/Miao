@@ -1,4 +1,5 @@
 import { FriendDiaryEntry, FriendInfo, storage } from "./storage";
+import { requestJson } from "./httpClient";
 
 export interface FriendInvite {
   code: string;
@@ -13,25 +14,6 @@ export interface FriendInvite {
     nickname: string;
     avatar: string;
   };
-}
-
-async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const token = storage.getToken();
-  const resp = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Client-Type": "pwa",
-      "X-Client-Version": "1.0.0",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    throw new Error(data.message || data.error || `HTTP ${resp.status}`);
-  }
-  return data as T;
 }
 
 function extractInviteCode(raw: string): string {
@@ -56,39 +38,43 @@ export const friendService = {
   },
 
   async createInvite(cat: { id?: string; name?: string; avatar?: string }): Promise<FriendInvite> {
-    const data = await request<{ invite: FriendInvite }>("/api/v1/friend-invites", {
+    const data = await requestJson<{ invite: FriendInvite }>("/api/v1/friend-invites", {
       method: "POST",
       body: JSON.stringify({
         catId: cat.id || "",
         catName: cat.name || "",
         catAvatar: cat.avatar || "",
       }),
-    });
+    }, { clientVersion: "1.0.0" });
     return data.invite;
   },
 
   async getInvite(code: string): Promise<FriendInvite> {
-    const data = await request<{ invite: FriendInvite }>(`/api/v1/friend-invites/${encodeURIComponent(code)}`);
+    const data = await requestJson<{ invite: FriendInvite }>(
+      `/api/v1/friend-invites/${encodeURIComponent(code)}`,
+      {},
+      { clientVersion: "1.0.0" }
+    );
     return data.invite;
   },
 
   async acceptInvite(code: string): Promise<FriendInfo> {
-    const data = await request<{ friend: FriendInfo }>("/api/v1/friends/accept", {
+    const data = await requestJson<{ friend: FriendInfo }>("/api/v1/friends/accept", {
       method: "POST",
       body: JSON.stringify({ code }),
-    });
+    }, { clientVersion: "1.0.0" });
     if (data.friend) storage.addFriend(data.friend);
     return data.friend;
   },
 
   async syncFriends(): Promise<FriendInfo[]> {
-    const friends = await request<FriendInfo[]>("/api/v1/friends");
+    const friends = await requestJson<FriendInfo[]>("/api/v1/friends", {}, { clientVersion: "1.0.0" });
     storage.saveFriends(friends);
     return friends;
   },
 
   async syncFriendDiaries(): Promise<FriendDiaryEntry[]> {
-    const diaries = await request<FriendDiaryEntry[]>("/api/v1/friends/diaries");
+    const diaries = await requestJson<FriendDiaryEntry[]>("/api/v1/friends/diaries", {}, { clientVersion: "1.0.0" });
     storage.saveFriendDiaries(diaries);
     return diaries;
   },

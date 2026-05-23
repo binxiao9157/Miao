@@ -1,4 +1,5 @@
 import { mediaStorage } from "./mediaStorage";
+import { buildJsonHeaders } from "./httpClient";
 
 /**
  * 本地存储服务，模拟移动端的 SharedPreferences/MMKV
@@ -342,11 +343,8 @@ async function syncOfflineTransactions() {
   if (queue.length === 0) return;
 
   isSyncingOffline = true;
-  const token = localStorage.getItem('miao_auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  const authHeaders = buildJsonHeaders();
+  const legacyHeaders = buildJsonHeaders({ auth: false });
 
   const remaining: OfflineTransaction[] = [];
 
@@ -355,7 +353,7 @@ async function syncOfflineTransactions() {
       let success = false;
       let res = await fetch('/api/v1/points/transaction', {
         method: 'POST',
-        headers,
+        headers: authHeaders,
         body: JSON.stringify({ amount: tx.amount, type: tx.type, reason: tx.reason })
       }).catch(() => null);
 
@@ -364,7 +362,7 @@ async function syncOfflineTransactions() {
       } else {
         const fallbackRes = await fetch(`/api/points/${encodeURIComponent(tx.userId)}/transaction`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: legacyHeaders,
           body: JSON.stringify({ amount: tx.amount, type: tx.type, reason: tx.reason })
         }).catch(() => null);
         if (fallbackRes && fallbackRes.ok) {
@@ -385,15 +383,12 @@ async function syncOfflineTransactions() {
 }
 
 function logTransactionToServer(userId: string, amount: number, type: 'earn' | 'spend', reason: string) {
-  const token = localStorage.getItem('miao_auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  const authHeaders = buildJsonHeaders();
+  const legacyHeaders = buildJsonHeaders({ auth: false });
   
   fetch('/api/v1/points/transaction', {
     method: 'POST',
-    headers,
+    headers: authHeaders,
     body: JSON.stringify({ amount, type, reason })
   }).then(res => {
     if (res.ok) {
@@ -403,7 +398,7 @@ function logTransactionToServer(userId: string, amount: number, type: 'earn' | '
       // Fallback
       fetch(`/api/points/${encodeURIComponent(userId)}/transaction`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: legacyHeaders,
         body: JSON.stringify({ amount, type, reason })
       }).then(fallbackRes => {
         if (fallbackRes.ok) {
@@ -423,7 +418,7 @@ function logTransactionToServer(userId: string, amount: number, type: 'earn' | '
   }).catch(() => {
     fetch(`/api/points/${encodeURIComponent(userId)}/transaction`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: legacyHeaders,
       body: JSON.stringify({ amount, type, reason })
     }).then(res => {
       if (res.ok) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'miao-v7';
+const CACHE_NAME = 'miao-v8';
 // 预缓存列表：应用 shell 资源
 const STATIC_ASSETS = [
   '/',
@@ -63,11 +63,12 @@ const cacheFirst = async (request) => {
 };
 
 // 网络优先策略 (用于 GET API 数据；POST 请求已在 fetch handler 入口处放行)
-const networkFirst = async (request) => {
+const networkFirst = async (request, options = {}) => {
   const cache = await caches.open(CACHE_NAME);
+  const cacheResponse = options.cacheResponse !== false;
   try {
     const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
+    if (cacheResponse && networkResponse.ok) {
       // 限制缓存大小：跳过超过 50MB 的响应，避免耗尽用户存储配额
       const contentLength = networkResponse.headers.get('Content-Length');
       const MAX_CACHE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -118,7 +119,7 @@ self.addEventListener('fetch', (event) => {
 
   // 2. API 数据：网络优先
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(event.request));
+    event.respondWith(networkFirst(event.request, { cacheResponse: false }));
     return;
   }
 

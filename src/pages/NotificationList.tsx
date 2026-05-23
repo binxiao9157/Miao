@@ -3,6 +3,7 @@ import { Settings, Mail, Star, Bell, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState, useCallback } from "react";
 import { storage } from "../services/storage";
+import { requestJson } from "../services/httpClient";
 import PageHeader from "../components/PageHeader";
 import { getEffectiveUnlockAt, isTimeLetterUnlocked } from "../utils/timeLetterUnlock";
 
@@ -53,26 +54,9 @@ const formatNotificationTime = (timestamp: number) => {
   return `${date.getMonth() + 1}月${date.getDate()}日`;
 };
 
-/** 从 localStorage 同步计算通知列表 */
-async function requestApi<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const token = storage.getToken();
-  const resp = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Client-Type": "pwa",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error((data as any).error || `HTTP ${resp.status}`);
-  return data as T;
-}
-
 async function fetchServerNotifications(): Promise<NotificationItem[]> {
   try {
-    const list = await requestApi<ServerNotification[]>("/api/v1/notifications");
+    const list = await requestJson<ServerNotification[]>("/api/v1/notifications");
     return (list || []).map((n) => ({
       id: `server_${n.id}`,
       serverId: n.id,
@@ -175,7 +159,7 @@ export default function NotificationList() {
     // 标记已读
     storage.markNotificationAsRead(item.id);
     if (item.source === 'server' && item.serverId) {
-      requestApi(`/api/v1/notifications/${item.serverId}/read`, { method: 'PUT' }).catch(() => {});
+      requestJson(`/api/v1/notifications/${item.serverId}/read`, { method: 'PUT' }).catch(() => {});
     }
 
     // 执行跳转

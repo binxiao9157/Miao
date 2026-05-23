@@ -5,6 +5,7 @@ import { storage, TimeLetter, CatInfo } from "../services/storage";
 import { motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
 import { formatTimeLetterCountdown, isTimeLetterUnlocked } from "../utils/timeLetterUnlock";
+import { useTimedMessage } from "../hooks/useTimedMessage";
 
 type ViewState = 'list' | 'write' | 'detail';
 
@@ -156,7 +157,7 @@ export default function TimeLetters() {
   const [letters, setLetters] = useState<TimeLetter[]>(() => storage.getTimeLetters());
   const [view, setView] = useState<ViewState>('list');
   const [selectedLetter, setSelectedLetter] = useState<TimeLetter | null>(null);
-  const [showToast, setShowToast] = useState<string | null>(null);
+  const { message: showToast, show: triggerToast } = useTimedMessage();
   const [letterToDelete, setLetterToDelete] = useState<TimeLetter | null>(null);
   
   // Debug State
@@ -214,11 +215,6 @@ export default function TimeLetters() {
       setLetters(storage.getTimeLetters());
     }
   }, [location.pathname]);
-
-  const triggerToast = useCallback((msg: string) => {
-    setShowToast(msg);
-    setTimeout(() => setShowToast(null), 3000);
-  }, []);
 
   const handleSaveLetter = useCallback(() => {
     if (!selectedCatId) {
