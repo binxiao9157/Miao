@@ -2392,7 +2392,11 @@ async function startServer() {
       });
 
       // Forward content type
-      res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
+      const contentType = response.headers['content-type'];
+      res.setHeader(
+        'Content-Type',
+        typeof contentType === 'string' ? contentType : 'application/octet-stream'
+      );
       res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all origins for the proxy
       
       response.data.pipe(res);
