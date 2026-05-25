@@ -1,17 +1,29 @@
 import { storage, CatInfo } from './storage';
 
 async function persistVideoUrl(url: string, catId: string, action: string): Promise<string> {
+  if (url.startsWith('/uploads/') || url.includes('/uploads/videos/')) return url;
+
   try {
     const resp = await fetch('/api/persist-video', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ videoUrl: url, catId, action }),
     });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) {
+      let message = `HTTP ${resp.status}`;
+      try {
+        const data = await resp.json();
+        message = data.message || data.error || message;
+      } catch {
+        // Keep the HTTP status message if the response is not JSON.
+      }
+      throw new Error(message);
+    }
     const data = await resp.json();
-    return data.url || url;
-  } catch {
-    return url;
+    if (!data.url) throw new Error('服务端未返回可播放视频地址');
+    return data.url;
+  } catch (error: any) {
+    throw new Error(`视频保存失败：${error?.message || '无法下载生成结果'}`);
   }
 }
 
@@ -105,7 +117,8 @@ export class FileManager {
   public static async updateCatVideos(
     catId: string,
     newVideoUrls: { [key: string]: string },
-    isUnlocking: boolean = false
+    isUnlocking: boolean = false,
+    actionGenerationError?: string | null
   ): Promise<void> {
     const cat = storage.getCatById(catId);
     if (!cat) return;
@@ -125,7 +138,11 @@ export class FileManager {
         ...cat.videoPaths,
         ...persistedUrls
       },
-      isUnlocking
+      isUnlocking,
+      actionGenerationError:
+        actionGenerationError === undefined
+          ? cat.actionGenerationError
+          : actionGenerationError || undefined
     };
 
     storage.saveCatInfo(updatedCat);

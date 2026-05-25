@@ -1833,10 +1833,7 @@ async function startServer() {
   };
 
   const generateDashScopeVideo = async (body: any) => {
-    if (!ARK_API_KEY || ARK_API_KEY.trim() === "") {
-      console.warn("[Server] DASHSCOPE_API_KEY is missing, falling back to secure mock generation");
-      return { id: `mock-server-task-video-${Date.now()}`, status: 'pending', provider: 'dashscope' };
-    }
+    ensureDashScopeApiKey();
     const { parameters: clientParams } = body;
     const firstFrame = body.first_frame || body.image_base64;
     const lastFrame = body.last_frame || firstFrame;
@@ -1877,8 +1874,8 @@ async function startServer() {
       if (taskId) return { id: taskId, status: 'pending', provider: 'dashscope' };
       throw new Error("提交视频任务后未获取到 task_id. 响应: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[VolcanoService Fallback] DashScope Video creation error, falling back:", e.message);
-      return { id: `mock-server-task-video-${Date.now()}`, status: 'pending', provider: 'dashscope' };
+      console.error("[DashScope Video] creation error:", JSON.stringify(e.response?.data || e.message));
+      throw e;
     }
   };
 
@@ -1892,8 +1889,9 @@ async function startServer() {
       throw err;
     }
     if (!VOLC_CONFIG.API_KEY || VOLC_CONFIG.API_KEY.trim() === "") {
-      console.warn("[Server] VOLC_API_KEY is missing, falling back to secure mock generation");
-      return { id: `mock-server-task-video-${Date.now()}`, status: 'pending', provider: 'volcengine' };
+      const err: any = new Error("服务器未配置 VOLC_API_KEY，请在 Miao_remote/.env 中配置有效的火山引擎 API Key 后重启服务。");
+      err.response = { status: 500, data: { code: "MISSING_VOLC_API_KEY", message: err.message } };
+      throw err;
     }
 
     const normalizeImageUrl = (source: string) => {
@@ -1924,46 +1922,62 @@ async function startServer() {
           type: "image_url",
           image_url: { url: firstFrameUrl },
           role: "first_frame"
-        },
-        {
-          type: "image_url",
-          image_url: { url: lastFrameUrl },
-          role: "last_frame"
         }
       ];
 
+      // Seedance first-frame and first+last-frame modes are mutually exclusive.
+      // For the initial idle clip the two frames are identical, so submit only a first-frame request.
+      if (lastFrameUrl !== firstFrameUrl) {
+        contentArray.push({
+          type: "image_url",
+          image_url: { url: lastFrameUrl },
+          role: "last_frame"
+        });
+      }
+
       let finalDuration = 5;
       const parsedDuration = Number(clientParams?.duration || body.duration || 5);
-      if (parsedDuration > 7) {
-        finalDuration = 10;
+      if (Number.isFinite(parsedDuration)) {
+        finalDuration = Math.min(12, Math.max(4, Math.round(parsedDuration)));
+      }
+
+      const normalizeVolcResolution = (value: unknown) => {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (normalized === '480p' || normalized === '720p' || normalized === '1080p') {
+          return normalized;
+        }
+        if (normalized === '480') return '480p';
+        if (normalized === '720') return '720p';
+        if (normalized === '1080') return '1080p';
+        return '480p';
+      };
+
+      const validRatios = new Set(["16:9", "9:16", "3:4", "4:3", "1:1", "21:9", "adaptive"]);
+      const requestedRatio = clientParams?.ratio || body.ratio;
+      let finalRatio = "9:16";
+      if (requestedRatio && validRatios.has(requestedRatio)) {
+        finalRatio = requestedRatio;
       } else {
-        finalDuration = 5;
+        finalRatio = lastFrameUrl !== firstFrameUrl ? "adaptive" : "9:16";
       }
 
       const requestBody: any = {
         model: body.model || VOLC_CONFIG.VIDEO_MODEL,
         content: contentArray,
+        resolution: normalizeVolcResolution(clientParams?.resolution || body.resolution),
+        ratio: finalRatio,
         duration: finalDuration,
-        parameters: {
-          size: clientParams?.resolution === "480P" || clientParams?.resolution === "480p" ? "720x1280" : (clientParams?.size || "720x1280"),
-          seed: clientParams?.seed || 12345,
-          duration: finalDuration
-        }
+        seed: Number.isFinite(Number(clientParams?.seed || body.seed))
+          ? Number(clientParams?.seed || body.seed)
+          : 12345,
+        watermark: false,
       };
-
-      const validRatios = new Set(["16:9", "9:16", "3:4", "4:3", "1:1"]);
-      const requestedRatio = clientParams?.ratio || body.ratio;
-      if (requestedRatio && validRatios.has(requestedRatio)) {
-        requestBody.ratio = requestedRatio;
-      } else {
-        requestBody.ratio = "9:16";
-      }
 
       if (clientParams?.audio === true || body.generate_audio === true) {
         requestBody.generate_audio = true;
       }
 
-      if (negative_prompt) requestBody.parameters.negative_prompt = negative_prompt;
+      if (negative_prompt) requestBody.negative_prompt = negative_prompt;
 
       let response;
       let retries = 2;
@@ -1995,8 +2009,8 @@ async function startServer() {
       if (taskId) return { ...response.data, id: taskId, status: 'pending', provider: 'volcengine' };
       throw new Error("提交火山视频任务后未获取到 task_id. 响应: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[VolcanoService Fallback] Volc Video creation error, response data:", JSON.stringify(e.response?.data || e.message));
-      return { id: `mock-server-task-video-${Date.now()}`, status: 'pending', provider: 'volcengine' };
+      console.error("[Volc Video] creation error:", JSON.stringify(e.response?.data || e.message));
+      throw e;
     }
   };
 
@@ -2053,9 +2067,8 @@ async function startServer() {
         });
       } else {
         const catVideos = [
-          'https://assets.mixkit.co/videos/preview/mixkit-playful-cat-lying-on-its-back-44330-large.mp4',
-          'https://assets.mixkit.co/videos/preview/mixkit-beautiful-tabby-cat-in-soft-cinematic-lighting-close-up-51203-large.mp4',
-          'https://assets.mixkit.co/videos/preview/mixkit-cute-cat-curled-up-sleeping-comfortably-44329-large.mp4'
+          'https://www.w3schools.com/html/mov_bbb.mp4',
+          'https://www.w3schools.com/html/movie.mp4'
         ];
         // Select one based on the taskId characters sum
         const charSum = Array.from(taskId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
@@ -2453,17 +2466,26 @@ async function startServer() {
       });
 
       // Forward content type
-      const contentType = response.headers['content-type'];
-      res.setHeader(
-        'Content-Type',
-        typeof contentType === 'string' ? contentType : 'application/octet-stream'
-      );
+      res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
       res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all origins for the proxy
       
       response.data.pipe(res);
     } catch (error: any) {
-      console.error("Resource proxy error:", error.message, error.response?.status, error.response?.statusText);
-      res.status(500).send("Failed to proxy resource");
+      const targetHost = new URL(safeUrl).hostname;
+      console.error("Resource proxy error:", {
+        host: targetHost,
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+      });
+      res.status(502).json({
+        error: "Failed to proxy resource",
+        message: error.response?.status === 403
+          ? "远程视频地址拒绝代理访问，可能是临时签名过期或禁止转存。"
+          : error.message,
+        upstreamStatus: error.response?.status,
+        host: targetHost,
+      });
     }
   });
 
@@ -2516,8 +2538,22 @@ async function startServer() {
       console.log(`[Persist] Saved ${action} video for cat ${catId}: ${permanentUrl}`);
       res.json({ url: permanentUrl });
     } catch (error: any) {
-      console.error(`[Persist] Failed to download video:`, error.message, error.response?.status, error.response?.statusText);
-      res.status(500).json({ error: "Failed to persist video", originalUrl: videoUrl });
+      const targetHost = new URL(safeVideoUrl).hostname;
+      const upstreamStatus = error.response?.status;
+      console.error(`[Persist] Failed to download video:`, {
+        host: targetHost,
+        message: error.message,
+        status: upstreamStatus,
+        statusText: error.response?.statusText,
+      });
+      res.status(502).json({
+        error: "Failed to persist video",
+        message: upstreamStatus === 403
+          ? "生成服务返回的视频地址拒绝服务端下载，无法保存为本地可播放文件。"
+          : error.message,
+        upstreamStatus,
+        host: targetHost,
+      });
     }
   };
 

@@ -32,6 +32,7 @@ export interface CatInfo {
   placeholderImage?: string;
   anchorFrame?: string;
   isUnlocking?: boolean;
+  actionGenerationError?: string;
 }
 
 export interface AppSettings {

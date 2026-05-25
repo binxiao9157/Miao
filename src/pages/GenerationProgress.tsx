@@ -14,7 +14,8 @@ function extractLastFrame(videoUrl: string): Promise<string> {
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous';
     // Use proxied URL to bypass CORS!
-    video.src = `/api/proxy-video?url=${encodeURIComponent(videoUrl)}`;
+    const isLocalVideo = videoUrl.startsWith('/uploads/') || videoUrl.startsWith(window.location.origin + '/uploads/');
+    video.src = isLocalVideo ? videoUrl : `/api/proxy-video?url=${encodeURIComponent(videoUrl)}`;
     video.muted = true;
     video.playsInline = true;
     
@@ -210,12 +211,12 @@ export default function GenerationProgress() {
       setProgress(100);
 
       // 废除“从生成视频中提取帧”的旧逻辑，统一使用用户刚才确认的那张 image
-      setStatus("正在开启次元通道...");
+      setStatus("正在保存可播放视频...");
       
       const anchorFrame = optimizedImg; // 直接使用确认过的首帧图
 
-      // 物理入库，确保跳转首页时数据已存在
-      await FileManager.downloadVideos(
+      // 物理入库，确保跳转首页时使用本地持久化地址，而不是服务商临时地址
+      const savedPaths = await FileManager.downloadVideos(
         { v1_approach: url }, 
         newCatId, 
         name || breed || "我的 AI 猫咪", 
@@ -228,6 +229,9 @@ export default function GenerationProgress() {
           anchorFrame: anchorFrame 
         }
       );
+      if (savedPaths.v1_approach) {
+        setIdleVideoUrl(savedPaths.v1_approach);
+      }
       
       // 校验入库成功后再激活
       const saved = storage.getCatById(newCatId);
@@ -276,7 +280,7 @@ export default function GenerationProgress() {
     navigate("/", { replace: true });
 
     // 标记为正在解锁
-    await FileManager.updateCatVideos(newCatId, {}, true);
+    await FileManager.updateCatVideos(newCatId, {}, true, null);
 
     // 后台静默发起剩余任务 (串行执行以避免 429 报错，同步阻塞串联Waterfall)
     (async () => {
@@ -330,7 +334,8 @@ export default function GenerationProgress() {
         await FileManager.updateCatVideos(newCatId, {}, false);
       } catch (e) {
         console.error("后台/串联视频生成任务总体异常:", e);
-        await FileManager.updateCatVideos(newCatId, {}, false);
+        const message = e instanceof Error ? e.message : '更多动作生成失败，请稍后重试';
+        await FileManager.updateCatVideos(newCatId, {}, false, message);
       }
     })();
   };
@@ -578,7 +583,8 @@ export default function GenerationProgress() {
                 onError={(e) => {
                   console.error("Video playback error (direct), trying proxy...", e);
                   // If direct URL fails, try proxy as fallback
-                  if (idleVideoUrl && !videoRef.current?.src.includes('/api/proxy-video')) {
+                  const isLocalVideo = idleVideoUrl?.startsWith('/uploads/') || idleVideoUrl?.startsWith(window.location.origin + '/uploads/');
+                  if (idleVideoUrl && !isLocalVideo && !videoRef.current?.src.includes('/api/proxy-video')) {
                     const proxiedUrl = `/api/proxy-video?url=${encodeURIComponent(idleVideoUrl)}`;
                     if (videoRef.current) videoRef.current.src = proxiedUrl;
                   } else {

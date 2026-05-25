@@ -176,8 +176,18 @@ export default function Home() {
         const updatedCat = storage.getActiveCat();
         if (updatedCat) {
           setCat(updatedCat);
+          if (updatedCat.actionGenerationError && updatedCat.actionGenerationError !== cat?.actionGenerationError) {
+            showFloatingBubble(updatedCat.actionGenerationError, 12000);
+          }
           // 如果是解锁完成，显示一个气泡提示
-          if (cat && Object.keys(updatedCat.videoPaths || {}).length > Object.keys(cat.videoPaths || {}).length) {
+          if (
+            cat &&
+            !updatedCat.isUnlocking &&
+            updatedCat.videoPaths?.v2_wait &&
+            updatedCat.videoPaths?.v3_return &&
+            updatedCat.videoPaths?.v4_fetch &&
+            Object.keys(updatedCat.videoPaths || {}).length > Object.keys(cat.videoPaths || {}).length
+          ) {
             showFloatingBubble("完整的毛球互动剧情流已解锁！快来点击屏幕和猫咪玩游戏吧～");
           }
         }
