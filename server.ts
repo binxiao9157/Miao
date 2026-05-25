@@ -1895,19 +1895,28 @@ async function startServer() {
     }
 
     const normalizeImageUrl = (source: string) => {
-      let cleanBase64 = source.replace(/\s/g, '');
-      if (cleanBase64.startsWith('http')) {
-        return cleanBase64;
+      if (!source) return '';
+      const clean = source.trim();
+      if (clean.startsWith('http://') || clean.startsWith('https://')) {
+        return clean;
       }
+      if (clean.startsWith('/') || clean.startsWith('fileid://')) {
+        return clean;
+      }
+      if (clean.startsWith('data:')) {
+        return clean.replace(/\s/g, '');
+      }
+      // Handle raw base64 or base64 format with header
       let mimeType = 'image/png';
-      if (cleanBase64.includes('base64,')) {
-        const parts = cleanBase64.split('base64,');
+      if (clean.includes('base64,')) {
+        const parts = clean.split('base64,');
         const header = parts[0];
-        cleanBase64 = parts[1];
+        const cleanBase = parts[1].replace(/\s/g, '');
         const match = header.match(/data:([^;]+);/);
         if (match) mimeType = match[1];
+        return `data:${mimeType};base64,${cleanBase}`;
       }
-      return `data:${mimeType};base64,${cleanBase64}`;
+      return `data:${mimeType};base64,${clean.replace(/\s/g, '')}`;
     };
 
     try {
@@ -1952,13 +1961,13 @@ async function startServer() {
         return '480p';
       };
 
-      const validRatios = new Set(["16:9", "9:16", "3:4", "4:3", "1:1", "21:9", "adaptive"]);
+      const validRatios = new Set(["16:9", "9:16", "3:4", "4:3", "1:1", "21:9"]);
       const requestedRatio = clientParams?.ratio || body.ratio;
       let finalRatio = "9:16";
       if (requestedRatio && validRatios.has(requestedRatio)) {
         finalRatio = requestedRatio;
       } else {
-        finalRatio = lastFrameUrl !== firstFrameUrl ? "adaptive" : "9:16";
+        finalRatio = "9:16";
       }
 
       const requestBody: any = {
@@ -1970,7 +1979,6 @@ async function startServer() {
         seed: Number.isFinite(Number(clientParams?.seed || body.seed))
           ? Number(clientParams?.seed || body.seed)
           : 12345,
-        watermark: false,
       };
 
       if (clientParams?.audio === true || body.generate_audio === true) {
@@ -2442,17 +2450,52 @@ async function startServer() {
     }
   };
 
-  // Generic resource proxy to bypass CORS for assets (images/videos)
-  app.get("/api/proxy-resource", async (req, res) => {
-    const safeUrl = parseSafeRemoteUrl(req.query.url);
+  const getRawUrlFromRequest = (req: express.Request): string | null => {
+    const originalUrl = req.originalUrl || req.url || '';
+    
+    // Prioritize extracting everything after "url=" in originalUrl to avoid truncation on & query parameters
+    const urlParamIndex = originalUrl.indexOf("url=");
+    if (urlParamIndex !== -1) {
+      const remaining = originalUrl.substring(urlParamIndex + 4);
+      try {
+        return decodeURIComponent(remaining);
+      } catch (e) {
+        return remaining;
+      }
+    }
+
+    if (typeof req.query.url === 'string') {
+      return req.query.url;
+    }
+
+    return null;
+  };
+
+  const ensureUrlEncoding = (urlStr: string): string => {
+    try {
+      const parsed = new URL(urlStr);
+      if (parsed.search) {
+        parsed.search = parsed.search.replace(/\+/g, '%2B');
+      }
+      return parsed.toString();
+    } catch {
+      return urlStr;
+    }
+  };
+
+  const handleProxyRequest = async (req: express.Request, res: express.Response) => {
+    const rawUrl = getRawUrlFromRequest(req);
+    const safeUrl = parseSafeRemoteUrl(rawUrl);
     if (!safeUrl) {
       return res.status(400).send("Invalid url parameter");
     }
 
+    const finalUrl = ensureUrlEncoding(safeUrl);
+
     try {
       const response = await axios({
         method: 'get',
-        url: safeUrl,
+        url: finalUrl,
         responseType: 'stream',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -2475,7 +2518,10 @@ async function startServer() {
       
       response.data.pipe(res);
     } catch (error: any) {
-      const targetHost = new URL(safeUrl).hostname;
+      let targetHost = "Unknown";
+      try {
+        targetHost = new URL(finalUrl).hostname;
+      } catch {}
       console.error("Resource proxy error:", {
         host: targetHost,
         message: error.message,
@@ -2491,15 +2537,13 @@ async function startServer() {
         host: targetHost,
       });
     }
-  });
+  };
+
+  // Generic resource proxy to bypass CORS for assets (images/videos)
+  app.get("/api/proxy-resource", handleProxyRequest);
 
   // Keep existing proxy-video for compatibility but reuse logic or just keep it
-  app.get("/api/proxy-video", async (req, res) => {
-    // Redirection to the generic one or just keep it
-    const safeUrl = parseSafeRemoteUrl(req.query.url);
-    if (!safeUrl) return res.status(400).send("Invalid url parameter");
-    res.redirect(`/api/proxy-resource?url=${encodeURIComponent(safeUrl)}`);
-  });
+  app.get("/api/proxy-video", handleProxyRequest);
 
   // ── 视频持久化：将临时 URL 下载到服务器本地，返回永久可访问的 URL ──
   const uploadsDir = path.resolve(__dirname, 'uploads', 'videos');
@@ -2514,11 +2558,12 @@ async function startServer() {
     if (!safeVideoUrl) {
       return res.status(400).json({ error: "Invalid videoUrl" });
     }
+    const finalVideoUrl = ensureUrlEncoding(safeVideoUrl);
 
     try {
       const response = await axios({
         method: 'get',
-        url: safeVideoUrl,
+        url: finalVideoUrl,
         responseType: 'arraybuffer',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
