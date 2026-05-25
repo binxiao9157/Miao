@@ -298,7 +298,7 @@ export default function GenerationProgress() {
         }
 
         console.log(`[Waterfall] Step 2: Generating V2 (期待)...`);
-        const taskV2 = await VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS.v2_wait, 2, v1LastFrame, undefined);
+        const taskV2 = await VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS.v2_wait, 2, v1LastFrame, v1LastFrame);
         const urlV2 = await VolcanoService.pollTaskResult(taskV2.id);
         console.log("[Waterfall] V2 URL generated:", urlV2);
         
