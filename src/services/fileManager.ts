@@ -87,9 +87,9 @@ export class FileManager {
       avatar: avatarUrl,
       source: metadata?.source === 'created' ? 'created' : 'uploaded',
       createdAt: Date.now(), // 记录领养时间
-      videoPath: finalPaths.idle || finalPaths.petting || Object.values(finalPaths)[0], 
+      videoPath: finalPaths.v1_approach || Object.values(finalPaths)[0], 
       videoPaths: finalPaths,
-      remoteVideoUrl: finalPaths.idle || finalPaths.petting || Object.values(finalPaths)[0],
+      remoteVideoUrl: finalPaths.v1_approach || Object.values(finalPaths)[0],
       placeholderImage: compressedPlaceholder,
       anchorFrame: compressedAnchor,
     };
@@ -138,8 +138,8 @@ export class FileManager {
    * 模拟下载单个视频 (保持兼容)
    */
   public static async downloadVideo(videoUrl: string, taskId: string, catName: string, avatarUrl: string): Promise<string> {
-    const paths = await this.downloadVideos({ longPress: videoUrl }, taskId, catName, avatarUrl);
-    return paths.longPress;
+    const paths = await this.downloadVideos({ v1_approach: videoUrl }, taskId, catName, avatarUrl);
+    return paths.v1_approach;
   }
 
   /**

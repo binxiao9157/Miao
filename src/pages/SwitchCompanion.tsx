@@ -34,9 +34,12 @@ export default function SwitchCompanion() {
   };
 
   const handleAddNew = () => {
-    if (points >= REDEEM_THRESHOLD) {
-      navigate(`/welcome?isRedemption=1&redemptionAmount=${REDEEM_THRESHOLD}`, { state: { isRedemption: true, redemptionAmount: REDEEM_THRESHOLD } });
+    if (points < REDEEM_THRESHOLD) {
+      const gap = REDEEM_THRESHOLD - points;
+      storage.addPoints(gap, "公测专享福利积分补给 🎁");
+      setPoints(REDEEM_THRESHOLD);
     }
+    navigate(`/welcome?isRedemption=1&redemptionAmount=${REDEEM_THRESHOLD}`, { state: { isRedemption: true, redemptionAmount: REDEEM_THRESHOLD } });
   };
 
   const handleDeleteCat = (cat: CatInfo, e: React.MouseEvent) => {
@@ -128,30 +131,25 @@ export default function SwitchCompanion() {
           {/* 添加新伙伴按钮 */}
           <button 
             onClick={handleAddNew}
-            disabled={points < REDEEM_THRESHOLD}
-            className={`flex flex-col items-center justify-center p-4 rounded-[32px] border-2 border-dashed transition-all ${
-              points >= REDEEM_THRESHOLD 
-                ? "bg-primary/5 border-primary/30 text-primary active:bg-primary/10" 
-                : "bg-surface-container-low border-outline-variant/30 text-on-surface-variant opacity-40 grayscale"
-            }`}
+            className="flex flex-col items-center justify-center p-4 rounded-[32px] border-2 border-dashed transition-all bg-primary/5 border-primary/30 text-primary active:bg-primary/10 shadow-sm"
           >
-            <div className="w-12 h-12 rounded-full bg-current/10 flex items-center justify-center mb-3">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
               <Plus size={24} />
             </div>
-            <span className="text-xs font-bold">添加新伙伴</span>
-            <div className="mt-2 flex items-center gap-1 opacity-80">
+            <span className="text-xs font-bold font-sans">添加新伙伴</span>
+            <div className="mt-2 flex items-center gap-1 opacity-80 bg-primary/10 px-2 py-0.5 rounded-full">
               <Coins size={10} />
-              <span className="text-[10px] font-bold">{REDEEM_THRESHOLD} 积分</span>
+              <span className="text-[10px] font-black">{REDEEM_THRESHOLD} 积分</span>
             </div>
           </button>
         </div>
 
         {points < REDEEM_THRESHOLD && (
           <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
-            <p className="text-xs text-primary font-medium text-center leading-relaxed">
-              积分不足喵～ 还需要 {(REDEEM_THRESHOLD - points)} 积分即可开启一段新的缘分。
+            <p className="text-xs text-primary font-semibold text-center leading-relaxed">
+              💡 公测贴心福利：检测到当前积分余额不足解锁。
               <br/>
-              可以通过每日登录、互动、在线时长来获取积分。
+              点击上方【添加新伙伴】，系统将<b>直接为您补发 {REDEEM_THRESHOLD - points} 积分</b>免费开启创造之旅！
             </p>
           </div>
         )}

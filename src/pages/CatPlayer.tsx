@@ -315,7 +315,7 @@ export default function CatPlayer() {
 
         <video 
           ref={videoRef}
-          src={cat.videoPaths?.idle || cat.videoPaths?.petting || cat.videoPath || cat.remoteVideoUrl}
+          src={cat.videoPaths?.v1_approach || cat.videoPaths?.v2_wait || cat.videoPath || cat.remoteVideoUrl}
           autoPlay
           loop
           muted

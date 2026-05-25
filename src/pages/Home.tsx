@@ -13,7 +13,13 @@ export default function Home() {
   const location = useLocation();
   const { user, refreshCatStatus } = useAuthContext();
   const [cat, setCat] = useState<CatInfo | null>(null);
-  const [visibleLayer, setVisibleLayer] = useState<string>('idle');
+  const v1_url = cat?.videoPaths?.v1_approach || cat?.videoPath || cat?.remoteVideoUrl || '';
+  const v2_url = cat?.videoPaths?.v2_wait || '';
+  const v3_url = cat?.videoPaths?.v3_return || '';
+  const v4_url = cat?.videoPaths?.v4_fetch || '';
+
+  const [playbackState, setPlaybackState] = useState<'READY' | 'PLAYING_V1' | 'LOOPING_V2' | 'PLAYING_V3' | 'PLAYING_V4'>('READY');
+  const [v2LoopCount, setV2LoopCount] = useState<number>(0);
   const hasPlayedEntry = useRef(false);
   const [bubbleText, setBubbleText] = useState<string | null>(null);
   const [bubbleId, setBubbleId] = useState<number>(0);
@@ -34,17 +40,10 @@ export default function Home() {
   const bubbleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const onlineTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const idleVideoRef = useRef<HTMLVideoElement>(null);
-  const doubleClickVideoRef = useRef<HTMLVideoElement>(null);
-  const swipeVideoRef = useRef<HTMLVideoElement>(null);
-  const longPressVideoRef = useRef<HTMLVideoElement>(null);
-
-  const actionRefs = useMemo<{ [key: string]: RefObject<HTMLVideoElement | null> }>(() => ({
-    tail: doubleClickVideoRef,
-    rubbing: swipeVideoRef,
-    blink: longPressVideoRef,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), []);
+  const v1Ref = useRef<HTMLVideoElement>(null);
+  const v2Ref = useRef<HTMLVideoElement>(null);
+  const v3Ref = useRef<HTMLVideoElement>(null);
+  const v4Ref = useRef<HTMLVideoElement>(null);
   
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
@@ -179,7 +178,7 @@ export default function Home() {
           setCat(updatedCat);
           // 如果是解锁完成，显示一个气泡提示
           if (cat && Object.keys(updatedCat.videoPaths || {}).length > Object.keys(cat.videoPaths || {}).length) {
-            showFloatingBubble("新动作已解锁！快来试试双击、滑动或长按吧～");
+            showFloatingBubble("完整的毛球互动剧情流已解锁！快来点击屏幕和猫咪玩游戏吧～");
           }
         }
       }
@@ -197,35 +196,9 @@ export default function Home() {
         setCat(info);
         setIsInitialized(false);
         setIsVideoReady(false);
-        setVisibleLayer('idle');
+        setPlaybackState('READY');
+        setV2LoopCount(0);
         hasPlayedEntry.current = false;
-      }
-
-      // 延迟加载互动视频，防止首次切换卡顿
-      setTimeout(() => {
-        setCanLoadActions(true);
-      }, 500);
-
-      if (!hasPlayedEntry.current) {
-        hasPlayedEntry.current = true;
-        const playEntryVideo = async () => {
-          try {
-            setTimeout(() => {
-              const hasRubbing = cat?.videoPaths?.rubbing && (actionRefs['rubbing'] as React.RefObject<HTMLVideoElement | null>)?.current;
-              if (hasRubbing) {
-                const video = (actionRefs['rubbing'] as React.RefObject<HTMLVideoElement | null>).current!;
-                video.currentTime = 0;
-                video.play().catch(e => console.log("Entry video play failed:", e));
-              } else if (idleVideoRef.current) {
-                idleVideoRef.current.currentTime = 0;
-                idleVideoRef.current.play().catch(e => console.log("Idle video play failed:", e));
-              }
-            }, 100);
-          } catch (err) {
-            console.error("Entry video play failed:", err);
-          }
-        };
-        playEntryVideo();
       }
 
       showGreetingOnce();
@@ -238,18 +211,11 @@ export default function Home() {
           navigate(location.pathname, { replace: true, state: {} });
         }, 800);
       }
-
-      // 新增：处理从任务页面跳转过来的互动引导逻辑
-      if (location.state?.triggerInteraction === 'feather') {
-        setTimeout(() => {
-          triggerInteraction('逗猫棒玩耍', '小羽毛，抓不到～', 'blink');
-          // 清除 state，防止刷新页面再次触发
-          navigate(location.pathname, { replace: true, state: {} });
-        }, 1200);
-      }
     } else {
-      if (idleVideoRef.current) idleVideoRef.current.pause();
-      (Object.values(actionRefs) as React.RefObject<HTMLVideoElement | null>[]).forEach(ref => ref.current?.pause());
+      v1Ref.current?.pause();
+      v2Ref.current?.pause();
+      v3Ref.current?.pause();
+      v4Ref.current?.pause();
       if (bubbleTimerRef.current) {
         clearTimeout(bubbleTimerRef.current);
         setBubbleText(null);
@@ -309,44 +275,14 @@ export default function Home() {
     }
   };
 
-  const triggerInteraction = (actionName: string, bubbleText: string, actionKey?: string) => {
-    const videoCount = Object.keys(cat?.videoPaths || {}).length;
-    const isUnlocked = actionKey === 'idle' || (cat?.videoPaths && actionKey && cat.videoPaths[actionKey as keyof typeof cat.videoPaths]);
-
-    if (!isUnlocked && actionKey !== 'idle') {
-      if (cat?.isUnlocking) {
-        showFloatingBubble("新动作正在生成中，请耐心等候哦～");
-      } else {
-        showFloatingBubble("该动作尚未解锁哦～");
-      }
-      return;
-    }
-
-    showFloatingBubble(bubbleText);
-    handleInteraction(actionName);
-    
-    const hasMultiVideo = cat?.videoPaths && actionKey && cat.videoPaths[actionKey as keyof typeof cat.videoPaths];
-
-    if (hasMultiVideo && actionKey && actionRefs[actionKey]?.current) {
-      const video = actionRefs[actionKey].current;
-      if (video) {
-        video.currentTime = 0;
-        video.play().catch(() => { /* autoplay may be blocked by browser */ });
-      }
-    } else {
-      if (idleVideoRef.current) {
-        idleVideoRef.current.currentTime = 0;
-        idleVideoRef.current.play().catch(() => { /* autoplay may be blocked by browser */ });
-      }
-    }
-  };
-
   const handleRegenerate = () => {
     if (!cat) return;
 
     // 暂停所有视频
-    idleVideoRef.current?.pause();
-    (Object.values(actionRefs) as React.RefObject<HTMLVideoElement | null>[]).forEach(ref => ref.current?.pause());
+    v1Ref.current?.pause();
+    v2Ref.current?.pause();
+    v3Ref.current?.pause();
+    v4Ref.current?.pause();
     
     // 执行精准删除逻辑
     const remainingCats = storage.deleteCatById(cat.id);
@@ -362,7 +298,8 @@ export default function Home() {
       // 重置视频播放状态
       setIsInitialized(false);
       setIsVideoReady(false);
-      setVisibleLayer('idle');
+      setPlaybackState('READY');
+      setV2LoopCount(0);
       hasPlayedEntry.current = false;
       setShowRegenerateConfirm(false);
       
@@ -379,11 +316,11 @@ export default function Home() {
   const handleRetryPlay = () => {
     setLoadError(false);
     setIsInitialized(false);
-    idleVideoRef.current?.load();
-    idleVideoRef.current?.play().catch(() => { /* autoplay may be blocked by browser */ });
-    doubleClickVideoRef.current?.load();
-    swipeVideoRef.current?.load();
-    longPressVideoRef.current?.load();
+    v1Ref.current?.load();
+    v1Ref.current?.play().catch(() => {});
+    v2Ref.current?.load();
+    v3Ref.current?.load();
+    v4Ref.current?.load();
   };
 
   const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
@@ -410,95 +347,103 @@ export default function Home() {
     setIsInitialized(true);
   };
 
-  const handleTimeUpdate = useCallback((e: React.SyntheticEvent<HTMLVideoElement>, key: string) => {
-    const v = e.target as HTMLVideoElement;
-    if (v.currentTime > 0) {
-      if (!isVideoReady) setIsVideoReady(true);
-      if (visibleLayer !== key) {
-        setVisibleLayer(key);
-        if (key !== 'idle' && idleVideoRef.current) idleVideoRef.current.pause();
-        (Object.entries(actionRefs) as [string, React.RefObject<HTMLVideoElement | null>][]).forEach(([k, ref]) => {
-          if (k !== key && ref.current) ref.current.pause();
-        });
+  const handleV1Ended = () => {
+    const v2_url = cat?.videoPaths?.v2_wait || '';
+    if (v2_url) {
+      setPlaybackState('LOOPING_V2');
+      setV2LoopCount(0);
+      showFloatingBubble("喵呜？要把人家的毛球抢走吗？");
+      if (v2Ref.current) {
+        v2Ref.current.currentTime = 0;
+        v2Ref.current.play().catch(e => console.warn("V2 play block:", e));
+      }
+    } else {
+      // Loop V1
+      if (v1Ref.current) {
+        v1Ref.current.currentTime = 0;
+        v1Ref.current.play().catch(e => console.warn("V1 loop block:", e));
       }
     }
-  }, [isVideoReady, visibleLayer]);
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    touchStartPos.current = {
-      x: e.clientX,
-      y: e.clientY
-    };
-    
-    isLongPressTriggered.current = false;
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
-    longPressTimer.current = setTimeout(() => {
-      isLongPressTriggered.current = true;
-      triggerHeartAt(e.clientX, e.clientY);
-      triggerInteraction('逗猫棒玩耍', '小羽毛，抓不到～', 'blink');
-    }, 600);
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
-    if (!touchStartPos.current) return;
-
-    const touchEndPos = {
-      x: e.clientX,
-      y: e.clientY
-    };
-
-    const dx = touchEndPos.x - touchStartPos.current.x;
-    const dy = touchEndPos.y - touchStartPos.current.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-    const now = Date.now();
-
-    // 唤醒隐藏入口逻辑
-    const wakeupUI = () => {
-      setShowControls(true);
-      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-      tapTimeoutRef.current = setTimeout(() => setShowControls(false), 3000);
-    };
-
-    if (isLongPressTriggered.current) {
-      isLongPressTriggered.current = false;
-      touchStartPos.current = null;
-      return;
-    }
-
-    if (absDx > 50 || absDy > 50) {
-      // Swipe detected
-      e.preventDefault(); // 阻止默认行为
-      triggerHeartAt(e.clientX, e.clientY);
-      triggerInteraction('踩奶互动', '踩奶中，好舒服～', 'rubbing');
-      wakeupUI();
-    } else if (absDx < 10 && absDy < 10) {
-      triggerHeartAt(e.clientX, e.clientY);
-
-      if (now - lastTapTime.current < 300) {
-        // Double tap
-        if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-        triggerInteraction('摸头享受', '摸摸头，真乖～', 'tail');
-        wakeupUI();
-        lastTapTime.current = 0;
-      } else {
-        // Single tap
-        lastTapTime.current = now;
-        setTimeout(() => {
-          if (lastTapTime.current === now) {
-            triggerInteraction('蹭镜头互动', '蹭蹭你～', 'idle');
-            wakeupUI();
+  const handleV2Ended = () => {
+    const v3_url = cat?.videoPaths?.v3_return || '';
+    setV2LoopCount(prev => {
+      const nextCount = prev + 1;
+      if (nextCount >= 5) {
+        if (v3_url) {
+          setPlaybackState('PLAYING_V3');
+          showFloatingBubble("唔，不抢那我就把球抱回去自个儿玩啦...");
+          if (v3Ref.current) {
+            v3Ref.current.currentTime = 0;
+            v3Ref.current.play().catch(e => console.warn("V3 play block:", e));
           }
-        }, 300);
+        } else {
+          setPlaybackState('READY');
+          if (v1Ref.current) {
+            v1Ref.current.currentTime = 0;
+          }
+        }
+        return 0;
+      } else {
+        if (v2Ref.current) {
+          v2Ref.current.currentTime = 0;
+          v2Ref.current.play().catch(e => console.warn("V2 replay block:", e));
+        }
+        return nextCount;
       }
+    });
+  };
+
+  const handleV3Ended = () => {
+    setPlaybackState('READY');
+    if (v1Ref.current) {
+      v1Ref.current.currentTime = 0;
     }
-    
-    touchStartPos.current = null;
+  };
+
+  const handleV4Ended = () => {
+    setPlaybackState('READY');
+    if (v1Ref.current) {
+      v1Ref.current.currentTime = 0;
+    }
+  };
+
+  const handleMainClick = (clientX: number, clientY: number) => {
+    triggerHeartAt(clientX, clientY);
+
+    if (playbackState === 'READY') {
+      setPlaybackState('PLAYING_V1');
+      showFloatingBubble("它叼着一个毛球，渴望地朝你跑了过来！");
+      handleInteraction('开始寻找毛球流');
+      if (v1Ref.current) {
+        v1Ref.current.currentTime = 0;
+        v1Ref.current.play().catch(e => console.warn("V1 play failure:", e));
+      }
+    } else if (playbackState === 'LOOPING_V2') {
+      const v4_url = cat?.videoPaths?.v4_fetch || '';
+      if (!v4_url) {
+        if (cat?.isUnlocking) {
+          showFloatingBubble("还在生成有趣的后续结局哦，请耐心等候～");
+        } else {
+          showFloatingBubble("快去解锁完整的“毛球互动剧情流”吧～");
+        }
+        return;
+      }
+
+      if (v2Ref.current) {
+        v2Ref.current.pause();
+      }
+      setPlaybackState('PLAYING_V4');
+      showFloatingBubble("好耶！把它的毛球投掷到远处～它跑去抢落点捡球了！");
+      handleInteraction('投掷毛球接球动作');
+      if (v4Ref.current) {
+        v4Ref.current.currentTime = 0;
+        v4Ref.current.play().catch(e => console.warn("V4 play failure:", e));
+      }
+    } else {
+      showFloatingBubble("静静观赏它的可爱故事演出吧～");
+    }
   };
 
   const handleResetCat = () => {
@@ -528,32 +473,6 @@ export default function Home() {
     secretTapTimer.current = setTimeout(() => setSecretTapCount(0), 2000);
   };
 
-  const actionVideoEntries = useMemo(() => {
-    if (!canLoadActions || !cat?.videoPaths) return null;
-    
-    return Object.entries(cat.videoPaths).map(([key, url]) => {
-      // 确保 key 在 actionRefs 中存在
-      if (!actionRefs[key]) return null;
-      
-      return (
-        <video
-          key={key}
-          ref={actionRefs[key]}
-          src={url}
-          muted
-          playsInline
-          preload="metadata"
-          onTimeUpdate={(e) => handleTimeUpdate(e, key)}
-          onEnded={(e) => {
-            const video = e.target as HTMLVideoElement;
-            video.pause();
-          }}
-          className={`absolute inset-0 w-full h-full z-20 object-cover pointer-events-none ${visibleLayer === key ? 'opacity-100' : 'opacity-0'}`}
-        />
-      );
-    });
-  }, [canLoadActions, cat?.videoPaths, visibleLayer, handleTimeUpdate]);
-
   if (!cat || !cat.name) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-black">
@@ -576,16 +495,15 @@ export default function Home() {
 
       {/* 视频播放器区域 - 采用 Stack 堆叠布局实现无缝切换 */}
       <div className="absolute inset-0 flex items-center justify-center bg-transparent overflow-hidden z-10">
-        {/* 1. 待机视频层 (Idle) */}
+        {/* Video 1: V1 Approach */}
         <video
-          ref={idleVideoRef}
-          src={cat?.videoPaths?.idle || cat?.videoPath || cat?.remoteVideoUrl || ''}
+          ref={v1Ref}
+          src={v1_url}
           muted
           playsInline
           preload="auto"
-          onTimeUpdate={(e) => handleTimeUpdate(e, 'idle')}
           onLoadedMetadata={(e) => {
-            const video = e.target as HTMLVideoElement;
+            const video = e.currentTarget;
             if (video.videoWidth && video.videoHeight) {
               setVideoAspectRatio(video.videoWidth / video.videoHeight);
             }
@@ -594,21 +512,53 @@ export default function Home() {
             setIsInitialized(true);
             setIsVideoReady(true);
             setLoadError(false);
-            setCanLoadActions(true);
-            if (idleVideoRef.current) {
-              idleVideoRef.current.currentTime = 0;
-            }
           }}
-          onEnded={(e) => {
-            const video = e.target as HTMLVideoElement;
-            video.pause();
-          }}
+          onEnded={handleV1Ended}
           onError={handleVideoError}
-          className={`absolute inset-0 w-full h-full z-10 object-cover ${visibleLayer === 'idle' ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 w-full h-full z-10 object-cover ${(playbackState === 'READY' || playbackState === 'PLAYING_V1') ? 'opacity-100' : 'opacity-0'}`}
         />
 
-        {/* 2. 互动视频层 (Actions) - 延迟加载并覆盖在待机层之上 */}
-        {actionVideoEntries}
+        {/* Video 2: V2 Wait Loop */}
+        {v2_url && (
+          <video
+            ref={v2Ref}
+            src={v2_url}
+            muted
+            playsInline
+            preload="auto"
+            onEnded={handleV2Ended}
+            onError={handleVideoError}
+            className={`absolute inset-0 w-full h-full z-10 object-cover ${playbackState === 'LOOPING_V2' ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+
+        {/* Video 3: V3 Return Disappointed */}
+        {v3_url && (
+          <video
+            ref={v3Ref}
+            src={v3_url}
+            muted
+            playsInline
+            preload="auto"
+            onEnded={handleV3Ended}
+            onError={handleVideoError}
+            className={`absolute inset-0 w-full h-full z-10 object-cover ${playbackState === 'PLAYING_V3' ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+
+        {/* Video 4: V4 Fetch Interrupt */}
+        {v4_url && (
+          <video
+            ref={v4Ref}
+            src={v4_url}
+            muted
+            playsInline
+            preload="auto"
+            onEnded={handleV4Ended}
+            onError={handleVideoError}
+            className={`absolute inset-0 w-full h-full z-10 object-cover ${playbackState === 'PLAYING_V4' ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
         
         {/* 初始加载状态 */}
         {!isInitialized && !loadError && (
@@ -648,8 +598,18 @@ export default function Home() {
         {/* 交互层 */}
         <div 
           className="absolute inset-0 z-30 touch-none cursor-pointer"
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
+          onPointerDown={(e) => {
+            touchStartPos.current = { x: e.clientX, y: e.clientY };
+          }}
+          onPointerUp={(e) => {
+            if (!touchStartPos.current) return;
+            const dx = Math.abs(e.clientX - touchStartPos.current.x);
+            const dy = Math.abs(e.clientY - touchStartPos.current.y);
+            if (dx < 10 && dy < 10) {
+              handleMainClick(e.clientX, e.clientY);
+            }
+            touchStartPos.current = null;
+          }}
           onContextMenu={(e) => e.preventDefault()}
         />
       </div>

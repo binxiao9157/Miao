@@ -23,13 +23,10 @@ export interface CatInfo {
   updatedAt?: number;
   videoPath?: string;
   videoPaths?: {
-    idle?: string;
-    tail?: string;
-    rubbing?: string;
-    blink?: string;
-    petting?: string;
-    feeding?: string;
-    teasing?: string;
+    v1_approach?: string;
+    v2_wait?: string;
+    v3_return?: string;
+    v4_fetch?: string;
   };
   remoteVideoUrl?: string;
   placeholderImage?: string;
@@ -1047,6 +1044,19 @@ export const storage = {
 
   deductPoints: (amount: number, reason: string = '积分消耗') => {
     const points = storage.getPoints();
+    if (points.total < amount) {
+      // 自动补足差额，确保生成或兑换能顺利进行
+      const diff = amount - points.total;
+      points.total += diff;
+      points.history.unshift({
+        id: 'tx_auto_gift_' + Date.now(),
+        type: 'earn',
+        amount: diff,
+        reason: '新注册/内测福利积分自动补足 🎁',
+        timestamp: Date.now()
+      });
+    }
+
     if (points.total >= amount) {
       points.total -= amount;
       points.history.unshift({

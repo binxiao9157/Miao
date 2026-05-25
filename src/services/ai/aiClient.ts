@@ -45,7 +45,9 @@ export const aiClient = {
   async submitVideoTask(
     imageBase64: string,
     actionData?: string | VideoActionPrompt,
-    retries: number = 2
+    retries: number = 2,
+    firstFrame?: string,
+    lastFrame?: string
   ): Promise<AITaskResponse> {
     const profile = aiConfig.getProfile();
     if (profile.mockMode) {
@@ -64,9 +66,9 @@ export const aiClient = {
           provider: profile.provider,
           model: profile.videoModel,
           prompt,
-          first_frame: imageBase64,
-          last_frame: imageBase64,
-          image_base64: imageBase64,
+          first_frame: firstFrame || imageBase64,
+          last_frame: lastFrame || imageBase64,
+          image_base64: firstFrame || imageBase64,
           parameters: {
             seed: profile.seed,
             resolution: profile.resolution,

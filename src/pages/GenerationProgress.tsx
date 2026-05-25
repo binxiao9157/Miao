@@ -9,6 +9,53 @@ import { GenerationDraft, storage } from "../services/storage";
 import { useAuthContext } from "../context/AuthContext";
 // 移除旧的视频帧提取工具，统一使用首帧确认图
 
+function extractLastFrame(videoUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    // Use proxied URL to bypass CORS!
+    video.src = `/api/proxy-video?url=${encodeURIComponent(videoUrl)}`;
+    video.muted = true;
+    video.playsInline = true;
+    
+    const timeout = setTimeout(() => {
+      video.src = '';
+      reject(new Error("提取尾帧超时"));
+    }, 15000);
+
+    video.addEventListener('loadedmetadata', () => {
+      video.currentTime = Math.max(0, video.duration - 0.1);
+    });
+    
+    video.addEventListener('seeked', () => {
+      clearTimeout(timeout);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 480;
+        canvas.height = video.videoHeight || 854;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+          resolve(dataUrl);
+        } else {
+          reject(new Error("无法创建2D画布渲染上下文"));
+        }
+      } catch (e) {
+        reject(e);
+      } finally {
+        video.src = '';
+        video.load();
+      }
+    });
+    
+    video.addEventListener('error', (e) => {
+      clearTimeout(timeout);
+      reject(new Error("视频加载失败，无法提取尾帧: " + e.message));
+    });
+  });
+}
+
 export default function GenerationProgress() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -141,7 +188,7 @@ export default function GenerationProgress() {
       if (!taskId) {
         setStatus("正在编织它的动作姿态...");
         setProgress(10);
-        const idleTask = await VolcanoService.submitTask(optimizedImg, ACTION_PROMPTS.idle);
+        const idleTask = await VolcanoService.submitTask(optimizedImg, ACTION_PROMPTS.v1_approach);
         taskId = idleTask.id;
         localStorage.setItem(recoveryKey, taskId);
       } else {
@@ -169,7 +216,7 @@ export default function GenerationProgress() {
 
       // 物理入库，确保跳转首页时数据已存在
       await FileManager.downloadVideos(
-        { idle: url }, 
+        { v1_approach: url }, 
         newCatId, 
         name || breed || "我的 AI 猫咪", 
         image || anchorImage || optimizedImg,
@@ -231,32 +278,58 @@ export default function GenerationProgress() {
     // 标记为正在解锁
     await FileManager.updateCatVideos(newCatId, {}, true);
 
-    // 后台静默发起剩余任务 (串行执行以避免 429 报错)
-    const secondaryActions = ['tail', 'rubbing', 'blink'] as const;
-    
+    // 后台静默发起剩余任务 (串行执行以避免 429 报错，同步阻塞串联Waterfall)
     (async () => {
       try {
         const anchorFrame = anchorImage || image;
         
-        for (const action of secondaryActions) {
-           console.log(`[Background] Starting generation for action: ${action}`);
-           try {
-             const task = await VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS[action]);
-             const url = await VolcanoService.pollTaskResult(task.id);
-             await FileManager.updateCatVideos(newCatId, { [action]: url }, true);
-             console.log(`[Background] Success generating action: ${action}`);
-           } catch (err) {
-             console.error(`[Background] Failed to generate action ${action}:`, err);
-           }
-           
-           // 动作之间强制等待 5s，给 API 喘息时间
-           await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log(`[Waterfall] Step 1: Extracting last frame of V1...`);
+        let v1LastFrame = anchorFrame;
+        try {
+          if (idleVideoUrl) {
+            v1LastFrame = await extractLastFrame(idleVideoUrl);
+          }
+        } catch (err) {
+          console.warn("[Waterfall] Failed to extract V1 last frame, using initial frame as fallback:", err);
         }
+
+        console.log(`[Waterfall] Step 2: Generating V2 (期待)...`);
+        const taskV2 = await VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS.v2_wait, 2, v1LastFrame, undefined);
+        const urlV2 = await VolcanoService.pollTaskResult(taskV2.id);
+        console.log("[Waterfall] V2 URL generated:", urlV2);
+        
+        await FileManager.updateCatVideos(newCatId, { v2_wait: urlV2 }, true);
+
+        // 动作之间强制等待 5s，给 API 喘息时间
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        console.log(`[Waterfall] Step 3: Extracting last frame of V2...`);
+        let v2LastFrame = anchorFrame;
+        try {
+          v2LastFrame = await extractLastFrame(urlV2);
+        } catch (err) {
+          console.warn("[Waterfall] Failed to extract V2 last frame, using initial frame as fallback:", err);
+        }
+
+        console.log(`[Waterfall] Step 4: Generating V3 (失望返回)...`);
+        const taskV3 = await VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS.v3_return, 2, v2LastFrame, anchorFrame);
+        const urlV3 = await VolcanoService.pollTaskResult(taskV3.id);
+        console.log("[Waterfall] V3 URL generated:", urlV3);
+        await FileManager.updateCatVideos(newCatId, { v3_return: urlV3 }, true);
+
+        // 动作之间强制等待 5s，给 API 喘息时间
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        console.log(`[Waterfall] Step 5: Generating V4 (捡球)...`);
+        const taskV4 = await VolcanoService.submitTask(anchorFrame, ACTION_PROMPTS.v4_fetch, 2, v2LastFrame, anchorFrame);
+        const urlV4 = await VolcanoService.pollTaskResult(taskV4.id);
+        console.log("[Waterfall] V4 URL generated:", urlV4);
+        await FileManager.updateCatVideos(newCatId, { v4_fetch: urlV4 }, true);
 
         // 全部动作尝试完成后，清除解锁标记
         await FileManager.updateCatVideos(newCatId, {}, false);
       } catch (e) {
-        console.error("后台生成任务总体异常:", e);
+        console.error("后台/串联视频生成任务总体异常:", e);
         await FileManager.updateCatVideos(newCatId, {}, false);
       }
     })();
