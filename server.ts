@@ -1880,7 +1880,7 @@ async function startServer() {
   };
 
   const generateVolcVideo = async (body: any) => {
-    const { prompt, parameters: clientParams, negative_prompt } = body;
+    const { prompt, parameters: clientParams, negative_prompt, has_last_frame } = body;
     const firstFrame = body.first_frame || body.image_base64;
     const lastFrame = body.last_frame || firstFrame;
     if (!firstFrame) {
@@ -1934,9 +1934,9 @@ async function startServer() {
         }
       ];
 
-      // Seedance first-frame and first+last-frame modes are mutually exclusive.
-      // For the initial idle clip the two frames are identical, so submit only a first-frame request.
-      if (lastFrameUrl !== firstFrameUrl) {
+      // Seedance first-frame and first+last-frame modes can be used.
+      // If the client explicitly requests last_frame or if they are different, we send both.
+      if (has_last_frame || lastFrameUrl !== firstFrameUrl) {
         contentArray.push({
           type: "image_url",
           image_url: { url: lastFrameUrl },

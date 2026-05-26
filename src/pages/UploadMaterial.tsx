@@ -164,7 +164,7 @@ export default function UploadMaterial() {
 采用柔和的室内自然光。整体色调偏暖，色温约3500K，营造温馨、宁静、治愈的家庭氛围。
 
 构图与技术参数：
-构图： 中心构图，猫咪位于画面正中央，占据画面约1/4高度。
+构图： 中心构图，猫咪位于画面正中央，占据画面约1/8高度。
 视角： 平视视角，摄像头高度与猫咪眼睛齐平。
 镜头： 固定摄像头，焦距50mm，模拟人眼视角，无明显畸变。
 画质： 超写实风格，细节清晰，毛发纹理、地毯纤维可见。
@@ -172,8 +172,8 @@ export default function UploadMaterial() {
 景深： 浅景深，背景适度虚化（f/2.8光圈效果），突出猫咪主体。
 
 风格与限制：
-风格： 照片级真实感，避免卡通化、绘画感或艺术化处理。
-限制： 禁止添加额外元素（如玩具、食物、其他动物或人物）；禁止改变猫咪原始姿态、品种特征或表情；禁止在画面上添加任何文字、水印或名字；保持光影逻辑一致，无违和感。`.trim();
+风格： 照片级真实感，避免卡通化、绘画感 or 艺术化处理。
+限制： 禁止添加额外元素（如玩具、食物、其他动物 or 人物）；禁止改变猫咪原始姿态、品种特征 or 表情；禁止在画面上添加任何文字、水印 or 名字；保持光影逻辑一致，无违和感。`.trim();
       const task = await VolcanoService.submitImageTask(prompt, selectedImage); 
       const imageUrl = await VolcanoService.pollImageResult(task.id, task.image_url);
       setFirstFrameUrl(imageUrl);

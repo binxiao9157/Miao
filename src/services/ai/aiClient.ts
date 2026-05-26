@@ -69,6 +69,7 @@ export const aiClient = {
           first_frame: firstFrame || imageBase64,
           last_frame: lastFrame || imageBase64,
           image_base64: firstFrame || imageBase64,
+          has_last_frame: !!lastFrame,
           parameters: {
             seed: profile.seed,
             resolution: profile.resolution,
