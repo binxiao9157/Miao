@@ -13,6 +13,7 @@ import { createTokenService } from "./server/utils/authToken";
 import { createAiImageRequestError, createMissingApiKeyError, createMockTaskPollResponse, isMockServerTaskId } from "./server/utils/aiTaskErrors";
 import { checkMediaSafety, checkTextSafety } from "./server/utils/contentSafety";
 import { ensureDirectory, readJSON, writeJSON } from "./server/utils/jsonStore";
+import { createReleaseHealth } from "./server/utils/releaseInfo";
 
 dotenv.config();
 
@@ -1438,12 +1439,11 @@ async function startServer() {
 
   // Health check endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      env: process.env.NODE_ENV,
-      hasApiKey: !!process.env.DASHSCOPE_API_KEY
-    });
+    res.json(createReleaseHealth({
+      nodeEnv: process.env.NODE_ENV,
+      dashScopeApiKey: process.env.DASHSCOPE_API_KEY,
+      volcApiKey: process.env.VOLC_API_KEY,
+    }));
   });
 
   // ── 阿里灵积 (DashScope) 配置 ──
