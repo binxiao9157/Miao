@@ -10,6 +10,8 @@ import { fileURLToPath } from 'url';
 import FormData from 'form-data';
 import { clientTypeMiddleware } from "./server/middleware/clientType";
 import { createTokenService } from "./server/utils/authToken";
+import { createAiImageRequestError, createMissingApiKeyError, createMockTaskPollResponse, isMockServerTaskId } from "./server/utils/aiTaskErrors";
+import { checkMediaSafety, checkTextSafety } from "./server/utils/contentSafety";
 import { ensureDirectory, readJSON, writeJSON } from "./server/utils/jsonStore";
 
 dotenv.config();
@@ -1398,6 +1400,42 @@ async function startServer() {
     res.json({ url });
   });
 
+  // ── 内容安全 API（小程序上架闭环）──
+  app.post("/api/v1/security/text", authRequired, (req, res) => {
+    const result = checkTextSafety(req.body?.content, req.body?.scene || "unknown");
+    res.json(result);
+  });
+
+  app.post("/api/v1/security/media", authRequired, (req, res) => {
+    const result = checkMediaSafety({
+      mediaUrl: req.body?.mediaUrl,
+      mediaType: req.body?.mediaType,
+      scene: req.body?.scene || "unknown",
+    });
+    res.json(result);
+  });
+
+  app.post("/api/v1/security/media-file", authRequired, upload.single('media'), (req, res) => {
+    if (!req.file) {
+      return res.json({
+        passed: false,
+        safe: false,
+        code: "MISSING_MEDIA_FILE",
+        message: "缺少媒体文件",
+        labels: ["media"],
+        scene: String(req.body?.scene || "unknown"),
+        checkedAt: Date.now(),
+      });
+    }
+
+    const result = checkMediaSafety({
+      mediaType: req.body?.mediaType,
+      scene: req.body?.scene || "unknown",
+      file: req.file,
+    });
+    res.json(result);
+  });
+
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ 
@@ -1611,6 +1649,15 @@ async function startServer() {
       });
     }
 
+    if (errorCode === "MISSING_VOLC_API_KEY") {
+      return res.status(500).json({
+        error: "火山引擎未配置",
+        message: "服务器未配置 VOLC_API_KEY，请在 .env 中配置有效的火山引擎 API Key 后重启服务。",
+        code: "MISSING_VOLC_API_KEY",
+        details: JSON.stringify(detailedError)
+      });
+    }
+
     if (errorCode === "Arrearage" || errorMessage?.toLowerCase().includes("balance")) {
       return res.status(403).json({
         error: "账户欠费",
@@ -1690,8 +1737,7 @@ async function startServer() {
 
   const generateDashScopeImage = async (body: any) => {
     if (!ARK_API_KEY || ARK_API_KEY.trim() === "") {
-      console.warn("[Server] DASHSCOPE_API_KEY is missing, falling back to secure mock generation");
-      return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'dashscope' };
+      throw createMissingApiKeyError('dashscope');
     }
     const { prompt, image_base64 } = body;
     if (!prompt || typeof prompt !== 'string') {
@@ -1737,8 +1783,8 @@ async function startServer() {
       if (taskId) return { id: taskId, status: 'pending', provider: 'dashscope' };
       throw new Error("DashScope 未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[VolcanoService Fallback] DashScope Image creation error, falling back:", e.message);
-      return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'dashscope' };
+      console.error("[DashScope Image] creation error:", JSON.stringify(e.response?.data || e.message));
+      throw createAiImageRequestError('dashscope', e);
     }
   };
 
@@ -1750,8 +1796,7 @@ async function startServer() {
       throw err;
     }
     if (!VOLC_CONFIG.API_KEY || VOLC_CONFIG.API_KEY.trim() === "") {
-      console.warn("[Server] VOLC_API_KEY is missing, falling back to secure mock generation");
-      return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'volcengine' };
+      throw createMissingApiKeyError('volcengine');
     }
 
     try {
@@ -1777,8 +1822,8 @@ async function startServer() {
       if (taskId) return { id: taskId, status: 'pending', provider: 'volcengine' };
       throw new Error("火山引擎未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[VolcanoService Fallback] Volc Image creation error, falling back:", e.message);
-      return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'volcengine' };
+      console.error("[Volc Image] creation error:", JSON.stringify(e.response?.data || e.message));
+      throw createAiImageRequestError('volcengine', e);
     }
   };
 
@@ -2132,16 +2177,23 @@ async function startServer() {
     if (!req.file) return res.status(400).json({ error: "缺少图片文件", code: "INVALID_PARAMETER" });
     const mime = req.file.mimetype || 'image/jpeg';
     const imageData = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+    const parseOptionalBool = (value: unknown): boolean | undefined => {
+      if (value === undefined || value === null || value === '') return undefined;
+      return value === true || value === 'true' || value === '1';
+    };
+    const hasLastFrame = parseOptionalBool(req.body.has_last_frame) || !!req.body.last_frame;
     const body = {
       ...req.body,
       image_base64: imageData,
       first_frame: imageData,
-      last_frame: imageData,
+      ...(hasLastFrame ? { last_frame: req.body.last_frame || imageData, has_last_frame: true } : {}),
       parameters: {
         seed: req.body.seed ? Number(req.body.seed) : undefined,
         resolution: req.body.resolution,
         duration: req.body.duration ? Number(req.body.duration) : undefined,
-        audio: req.body.audio === 'true',
+        prompt_extend: parseOptionalBool(req.body.prompt_extend),
+        audio: parseOptionalBool(req.body.audio) === true,
+        ratio: req.body.ratio,
       }
     };
     try {
@@ -2160,6 +2212,10 @@ async function startServer() {
     const type = req.query.type === "image" ? "image" : "video";
     const { taskId } = req.params;
     try {
+      if (isMockServerTaskId(taskId)) {
+        const failure = createMockTaskPollResponse(taskId, type, provider);
+        return res.status(failure.status).json(failure.body);
+      }
       if (taskId.startsWith('sync:')) {
         return res.status(400).json({ status: 'failed', message: '同步任务无需轮询' });
       }
