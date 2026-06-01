@@ -1378,26 +1378,41 @@ async function startServer() {
     }
   });
 
-  // ── 文件上传 API（头像等） ──
+  // ── 文件上传 API（头像、日记媒体等） ──
   const avatarUploadsDir = path.resolve(__dirname, 'uploads', 'avatars');
+  const mediaUploadsDir = path.resolve(__dirname, 'uploads', 'media');
   fs.mkdirSync(avatarUploadsDir, { recursive: true });
+  fs.mkdirSync(mediaUploadsDir, { recursive: true });
 
   app.post("/api/v1/upload", authRequired, upload.single('file'), (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ error: "No file uploaded", code: "MISSING_FILE" });
 
-    const ext = path.extname(file.originalname || '.jpg').toLowerCase() || '.jpg';
-    const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const extensionFromMime = (mime: string) => {
+      if (mime === 'video/mp4') return '.mp4';
+      if (mime === 'video/quicktime') return '.mov';
+      if (mime === 'video/webm') return '.webm';
+      if (mime === 'image/png') return '.png';
+      if (mime === 'image/gif') return '.gif';
+      if (mime === 'image/webp') return '.webp';
+      return '.jpg';
+    };
+    const ext = path.extname(file.originalname || '').toLowerCase() || extensionFromMime(file.mimetype || '');
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.m4v', '.webm'];
     if (!allowedExts.includes(ext)) {
       return res.status(400).json({ error: "Unsupported file type", code: "INVALID_FILE_TYPE" });
     }
 
+    const isVideo = (file.mimetype || '').startsWith('video/') || ['.mp4', '.mov', '.m4v', '.webm'].includes(ext);
+    const isDiaryMedia = req.body?.purpose === 'diary' || req.body?.mediaType === 'video';
+    const uploadDir = isVideo || isDiaryMedia ? mediaUploadsDir : avatarUploadsDir;
+    const uploadSegment = isVideo || isDiaryMedia ? 'media' : 'avatars';
     const filename = `${getAuthedUsername(req)}_${Date.now()}${ext}`;
-    const filePath = path.join(avatarUploadsDir, filename);
+    const filePath = path.join(uploadDir, filename);
     fs.writeFileSync(filePath, file.buffer);
 
-    const url = `/uploads/avatars/${filename}`;
-    console.log(`[Upload] Avatar saved: ${url}`);
+    const url = `/uploads/${uploadSegment}/${filename}`;
+    console.log(`[Upload] File saved: ${url}`);
     res.json({ url });
   });
 
