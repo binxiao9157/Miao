@@ -2680,7 +2680,7 @@ async function startServer() {
   app.post("/api/persist-video", persistVideoHandler);
   app.post("/api/v1/assets/persist-video", authRequired, persistVideoHandler);
 
-  app.post("/api/v1/diagnostics/client-log", (req, res) => {
+  app.post("/api/v1/diagnostics/client-log", authRequired, (req, res) => {
     const payload = req.body || {};
     const safe = (value: unknown, max = 160) => String(value ?? '-').replace(/[\r\n"]/g, ' ').slice(0, max);
     const bool = (value: unknown) => value ? '1' : '0';
