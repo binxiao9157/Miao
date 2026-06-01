@@ -2665,7 +2665,35 @@ async function startServer() {
   app.post("/api/persist-video", persistVideoHandler);
   app.post("/api/v1/assets/persist-video", authRequired, persistVideoHandler);
 
-  app.use('/uploads', express.static(path.resolve(__dirname, 'uploads'), {
+  const logUploadVideoAccess: express.RequestHandler = (req, res, next) => {
+    const originalUrl = req.originalUrl || req.url;
+    const isVideoRequest = (req.method === 'GET' || req.method === 'HEAD') && originalUrl.includes('/uploads/videos/');
+    if (!isVideoRequest) return next();
+
+    const startedAt = Date.now();
+    const headerValue = (value: string | string[] | number | undefined) => (
+      Array.isArray(value) ? value.join(',') : String(value || '-')
+    ).replace(/"/g, "'");
+    const range = headerValue(req.headers.range);
+    const userAgent = headerValue(req.headers['user-agent']).slice(0, 180);
+    const forwardedFor = headerValue(req.headers['x-forwarded-for']).split(',')[0].trim();
+    const ip = forwardedFor !== '-' ? forwardedFor : (req.socket.remoteAddress || '-');
+
+    res.on('finish', () => {
+      console.log(
+        `[VideoAccess] ${req.method} ${originalUrl} status=${res.statusCode} durationMs=${Date.now() - startedAt}` +
+        ` range="${range}" contentLength="${headerValue(res.getHeader('content-length') as any)}"` +
+        ` contentRange="${headerValue(res.getHeader('content-range') as any)}"` +
+        ` acceptRanges="${headerValue(res.getHeader('accept-ranges') as any)}"` +
+        ` contentType="${headerValue(res.getHeader('content-type') as any)}"` +
+        ` ip="${ip}" ua="${userAgent}"`
+      );
+    });
+
+    next();
+  };
+
+  app.use('/uploads', logUploadVideoAccess, express.static(path.resolve(__dirname, 'uploads'), {
     maxAge: '30d',
     immutable: true,
   }));
