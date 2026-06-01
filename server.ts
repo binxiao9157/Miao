@@ -2665,6 +2665,30 @@ async function startServer() {
   app.post("/api/persist-video", persistVideoHandler);
   app.post("/api/v1/assets/persist-video", authRequired, persistVideoHandler);
 
+  app.post("/api/v1/diagnostics/client-log", (req, res) => {
+    const payload = req.body || {};
+    const safe = (value: unknown, max = 160) => String(value ?? '-').replace(/[\r\n"]/g, ' ').slice(0, max);
+    const bool = (value: unknown) => value ? '1' : '0';
+
+    console.log(
+      `[MiniClient] event="${safe(payload.event, 80)}"` +
+      ` route="${safe(payload.route, 80)}"` +
+      ` catId="${safe(payload.catId, 80)}"` +
+      ` action="${safe(payload.action, 40)}"` +
+      ` playbackState="${safe(payload.playbackState, 40)}"` +
+      ` srcKind="${safe(payload.srcKind, 40)}"` +
+      ` srcHost="${safe(payload.srcHost, 120)}"` +
+      ` srcPath="${safe(payload.srcPath, 220)}"` +
+      ` hasVideo=${bool(payload.hasVideo)}` +
+      ` hasV1=${bool(payload.hasV1)}` +
+      ` hasV2=${bool(payload.hasV2)}` +
+      ` hasV3=${bool(payload.hasV3)}` +
+      ` hasV4=${bool(payload.hasV4)}` +
+      ` isUnlocking=${bool(payload.isUnlocking)}`
+    );
+    res.json({ ok: true });
+  });
+
   const logUploadVideoAccess: express.RequestHandler = (req, res, next) => {
     const originalUrl = req.originalUrl || req.url;
     const isVideoRequest = (req.method === 'GET' || req.method === 'HEAD') && originalUrl.includes('/uploads/videos/');
