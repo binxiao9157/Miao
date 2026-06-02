@@ -31,6 +31,10 @@ test("server does not expose legacy unauthenticated persist-video route", () => 
   assert.match(serverSource, /app\.post\("\/api\/v1\/assets\/persist-video", authRequired, persistVideoHandler\)/);
 });
 
+test("video last-frame extraction route is authenticated", () => {
+  assert.match(serverSource, /app\.post\("\/api\/v1\/assets\/video-last-frame", authRequired, videoLastFrameHandler\)/);
+});
+
 test("production security defaults are not embedded in server startup", () => {
   assert.equal(serverSource.includes('"miao-dev-secret-change-me"'), false);
   assert.equal(serverSource.includes('"miao_admin_8888"'), false);

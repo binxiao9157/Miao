@@ -6,6 +6,8 @@ import https from "https";
 import dotenv from "dotenv";
 import crypto from "crypto";
 import multer from "multer";
+import { spawn } from "child_process";
+import ffmpegPath from "ffmpeg-static";
 import { fileURLToPath } from 'url';
 import FormData from 'form-data';
 import { clientTypeMiddleware } from "./server/middleware/clientType";
@@ -2453,7 +2455,87 @@ async function startServer() {
 
   // ── 视频持久化：将临时 URL 下载到服务器本地，返回永久可访问的 URL ──
   const uploadsDir = path.resolve(__dirname, 'uploads', 'videos');
+  const videoFramesDir = path.resolve(__dirname, 'uploads', 'video-frames');
   fs.mkdirSync(uploadsDir, { recursive: true });
+  fs.mkdirSync(videoFramesDir, { recursive: true });
+
+  const sanitizeAssetSegment = (value: unknown, fallback: string) => {
+    const raw = String(value || '').trim();
+    const safe = raw.replace(/[^\w.-]/g, '_').slice(0, 80);
+    return safe || fallback;
+  };
+
+  const getRequestOrigin = (req: express.Request) => {
+    const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+    const proto = forwardedProto || req.protocol || 'http';
+    return `${proto}://${req.get('host')}`;
+  };
+
+  const runFfmpegExtractLastFrame = (inputPath: string, outputPath: string): Promise<void> => {
+    if (!ffmpegPath) {
+      return Promise.reject(new Error("FFmpeg binary is unavailable"));
+    }
+
+    return new Promise((resolve, reject) => {
+      const ffmpeg = spawn(ffmpegPath, [
+        '-y',
+        '-sseof',
+        '-0.12',
+        '-i',
+        inputPath,
+        '-frames:v',
+        '1',
+        '-q:v',
+        '2',
+        outputPath,
+      ]);
+      let stderr = '';
+      ffmpeg.stderr.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
+      ffmpeg.on('error', reject);
+      ffmpeg.on('close', (code) => {
+        if (code === 0 && fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(`FFmpeg failed with code ${code}: ${stderr.slice(-800)}`));
+      });
+    });
+  };
+
+  const getLocalUploadedVideoPath = (videoUrl: string): string | null => {
+    if (!videoUrl.startsWith('/uploads/videos/')) return null;
+    const localPath = path.resolve(__dirname, videoUrl.replace(/^\//, ''));
+    return localPath.startsWith(uploadsDir + path.sep) && fs.existsSync(localPath) ? localPath : null;
+  };
+
+  const downloadRemoteVideoToTempFile = async (videoUrl: string, tempDir: string) => {
+    const safeVideoUrl = parseSafeRemoteUrl(videoUrl);
+    if (!safeVideoUrl) return null;
+
+    const tempPath = path.join(tempDir, `source_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.mp4`);
+    const finalVideoUrl = ensureUrlEncoding(safeVideoUrl);
+    const response = await axios({
+      method: 'get',
+      url: finalVideoUrl,
+      responseType: 'arraybuffer',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'video/*,*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      httpsAgent,
+      maxRedirects: 0,
+      timeout: 120000,
+      maxContentLength: 80 * 1024 * 1024,
+      maxBodyLength: 80 * 1024 * 1024,
+    });
+    fs.writeFileSync(tempPath, Buffer.from(response.data));
+    return tempPath;
+  };
 
   const persistVideoHandler: express.RequestHandler = async (req, res) => {
     const { videoUrl, catId, action } = req.body;
@@ -2514,6 +2596,57 @@ async function startServer() {
   };
 
   app.post("/api/v1/assets/persist-video", authRequired, persistVideoHandler);
+
+  const videoLastFrameHandler: express.RequestHandler = async (req, res) => {
+    const { videoUrl, catId } = req.body || {};
+    if (!videoUrl || typeof videoUrl !== 'string') {
+      return res.status(400).json({ error: "Missing videoUrl", code: "INVALID_PARAMETER" });
+    }
+
+    const catSegment = sanitizeAssetSegment(catId, 'shared');
+    const outputDir = path.join(videoFramesDir, catSegment);
+    const tempDir = path.join(outputDir, 'tmp');
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    let inputPath: string | null = null;
+    let shouldCleanupInput = false;
+    try {
+      inputPath = getLocalUploadedVideoPath(videoUrl);
+      if (!inputPath) {
+        inputPath = await downloadRemoteVideoToTempFile(videoUrl, tempDir);
+        shouldCleanupInput = !!inputPath;
+      }
+      if (!inputPath) {
+        return res.status(400).json({ error: "Invalid videoUrl", code: "INVALID_VIDEO_URL" });
+      }
+
+      const filename = `last_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.jpg`;
+      const outputPath = path.join(outputDir, filename);
+      await runFfmpegExtractLastFrame(inputPath, outputPath);
+
+      const framePath = `/uploads/video-frames/${catSegment}/${filename}`;
+      const frameUrl = `${getRequestOrigin(req)}${framePath}`;
+      res.json({ frameUrl, url: frameUrl, path: framePath });
+    } catch (error: any) {
+      console.error("[VideoFrame] Failed to extract last frame:", {
+        message: error.message,
+        videoUrl: typeof videoUrl === 'string' ? videoUrl.slice(0, 160) : '-',
+      });
+      res.status(502).json({
+        error: "Failed to extract video last frame",
+        code: "VIDEO_FRAME_EXTRACTION_FAILED",
+        message: error.message,
+      });
+    } finally {
+      if (shouldCleanupInput && inputPath) {
+        try {
+          fs.unlinkSync(inputPath);
+        } catch {}
+      }
+    }
+  };
+
+  app.post("/api/v1/assets/video-last-frame", authRequired, videoLastFrameHandler);
 
   app.post("/api/v1/diagnostics/client-log", authRequired, (req, res) => {
     const payload = req.body || {};
