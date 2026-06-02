@@ -35,6 +35,14 @@ test("video last-frame extraction route is authenticated", () => {
   assert.match(serverSource, /app\.post\("\/api\/v1\/assets\/video-last-frame", authRequired, videoLastFrameHandler\)/);
 });
 
+test("image generation requests explicitly disable provider watermarks", () => {
+  const dashScopeImageRequest = serverSource.match(/const generateDashScopeImage = async[\s\S]*?const generateVolcImage = async/)?.[0] || "";
+  const volcImageRequest = serverSource.match(/const generateVolcImage = async[\s\S]*?const getDashScopeVideoFrameUrl = async/)?.[0] || "";
+
+  assert.match(dashScopeImageRequest, /watermark:\s*false/);
+  assert.match(volcImageRequest, /watermark:\s*false/);
+});
+
 test("production security defaults are not embedded in server startup", () => {
   assert.equal(serverSource.includes('"miao-dev-secret-change-me"'), false);
   assert.equal(serverSource.includes('"miao_admin_8888"'), false);

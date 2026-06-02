@@ -1677,7 +1677,8 @@ async function startServer() {
       const requestBody: any = {
         model: body.model || VOLC_CONFIG.IMAGE_MODEL,
         prompt,
-        size: body.parameters?.size || "1920x1920"
+        size: body.parameters?.size || "1920x1920",
+        watermark: false
       };
       if (image_base64) requestBody.image = image_base64;
 
