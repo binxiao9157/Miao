@@ -13,6 +13,7 @@ import { friendService } from "../services/friendService";
 import { PrivateMessageShare } from "../components/PrivateMessageShare";
 import CommentInput from "../components/CommentInput";
 import { ShareSheet } from "../components/ShareSheet";
+import ImageViewer from "../components/ImageViewer";
 
 export default function Diary() {
   const { user } = useAuthContext();
@@ -23,7 +24,9 @@ export default function Diary() {
   const [showWeChatGuide, setShowWeChatGuide] = useState(false);
   const [showPrivateShare, setShowPrivateShare] = useState(false);
   const [newContent, setNewContent] = useState("");
-  const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video'; file?: File } | null>(null);
+  const [selectedMediaList, setSelectedMediaList] = useState<{ url: string; type: 'image' | 'video'; file?: File }[]>([]);
+  const [viewerImages, setViewerImages] = useState<string[] | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number>(0);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
@@ -232,12 +235,14 @@ export default function Diary() {
 
   const closePostingModal = () => {
     // 释放 URL 对象
-    if (selectedMedia?.url && selectedMedia.url.startsWith('blob:')) {
-      URL.revokeObjectURL(selectedMedia.url);
-    }
+    selectedMediaList.forEach(m => {
+      if (m.url && m.url.startsWith('blob:')) {
+        URL.revokeObjectURL(m.url);
+      }
+    });
     setIsPosting(false);
     setNewContent("");
-    setSelectedMedia(null);
+    setSelectedMediaList([]);
     setIsReadingFile(false);
     setIsLoading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -265,7 +270,7 @@ export default function Diary() {
   };
 
   const handlePost = async () => {
-    if ((!newContent.trim() && !selectedMedia) || isLoading) return;
+    if ((!newContent.trim() && selectedMediaList.length === 0) || isLoading) return;
 
     try {
       setIsLoading(true);
@@ -277,24 +282,58 @@ export default function Diary() {
       await new Promise(resolve => setTimeout(resolve, 1200));
 
       const diaryId = 'diary_' + Date.now();
-      let mediaUrl = selectedMedia?.url;
-      
-      // 如果有文件，则将其转换为 Base64 并存入 IndexedDB
-      if (selectedMedia?.file) {
-        const reader = new FileReader();
-        const base64 = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(selectedMedia.file!);
-        });
-        
-        // 存入 IndexedDB，失败时降级为 inline base64（兼容隐私模式）
-        try {
-          await mediaStorage.saveMedia(diaryId, base64);
-          mediaUrl = `indexeddb:${diaryId}`;
-        } catch {
-          mediaUrl = base64;
+      let mediaUrl: string | undefined = undefined;
+      let mediaType: 'image' | 'video' | undefined = undefined;
+      let imagesList: string[] = [];
+
+      const isVideo = selectedMediaList.some(m => m.type === 'video');
+
+      if (isVideo) {
+        const videoMedia = selectedMediaList.find(m => m.type === 'video')!;
+        mediaType = 'video';
+        if (videoMedia.file) {
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(videoMedia.file!);
+          });
+          
+          try {
+            await mediaStorage.saveMedia(diaryId, base64);
+            mediaUrl = `indexeddb:${diaryId}`;
+          } catch {
+            mediaUrl = base64;
+          }
+        } else {
+          mediaUrl = videoMedia.url;
         }
+      } else if (selectedMediaList.length > 0) {
+        mediaType = 'image';
+        
+        for (let i = 0; i < selectedMediaList.length; i++) {
+          const m = selectedMediaList[i];
+          if (m.file) {
+            const reader = new FileReader();
+            const base64 = await new Promise<string>((resolve, reject) => {
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(m.file!);
+            });
+
+            const imgKey = `${diaryId}_img_${i}`;
+            try {
+              await mediaStorage.saveMedia(imgKey, base64);
+              imagesList.push(`indexeddb:${imgKey}`);
+            } catch {
+              imagesList.push(base64);
+            }
+          } else {
+            imagesList.push(m.url);
+          }
+        }
+
+        mediaUrl = imagesList[0];
       }
 
       const newEntry: DiaryEntry = {
@@ -302,7 +341,8 @@ export default function Diary() {
         catId: activeCatId,
         content: newContent,
         media: mediaUrl,
-        mediaType: selectedMedia?.type,
+        mediaType: mediaType,
+        images: imagesList,
         createdAt: Date.now(),
         likes: 0,
         isLiked: false,
@@ -444,29 +484,72 @@ export default function Diary() {
   }, []);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const type = file.type.startsWith('video') ? 'video' : 'image';
+    const fileArray = Array.from(files);
 
-    // 预检大小
-    const sizeLimit = type === 'video' ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
-    if (file.size > sizeLimit) {
-      alert(`${type === 'video' ? '视频' : '图片'}文件太大啦，请选择 ${sizeLimit / (1024 * 1024)}MB 以内的文件哦`);
+    // If there is any video in the chosen list, we only accept that first video
+    const firstVideo = fileArray.find(file => file.type.startsWith('video'));
+    if (firstVideo) {
+      const sizeLimit = 20 * 1024 * 1024;
+      if (firstVideo.size > sizeLimit) {
+        alert("视频文件太大啦，请选择 20MB 以内的文件哦");
+        e.target.value = '';
+        return;
+      }
+      selectedMediaList.forEach(m => {
+        if (m.url && m.url.startsWith('blob:')) {
+          URL.revokeObjectURL(m.url);
+        }
+      });
+      setSelectedMediaList([{ url: URL.createObjectURL(firstVideo), type: 'video', file: firstVideo }]);
       e.target.value = '';
       return;
     }
 
-    // 释放旧的预览 URL
-    if (selectedMedia?.url && selectedMedia.url.startsWith('blob:')) {
-      URL.revokeObjectURL(selectedMedia.url);
+    // Process of images selection
+    let currentImages = selectedMediaList.filter(item => item.type === 'image');
+    const hasVideo = selectedMediaList.some(item => item.type === 'video');
+    if (hasVideo) {
+      selectedMediaList.forEach(m => {
+        if (m.url && m.url.startsWith('blob:')) {
+          URL.revokeObjectURL(m.url);
+        }
+      });
+      currentImages = [];
     }
 
-    // 使用 URL.createObjectURL 进行即时预览，不阻塞 UI
-    const previewUrl = URL.createObjectURL(file);
-    setSelectedMedia({ url: previewUrl, type, file });
-    
-    // 重置 input
+    const maxAllowed = 9 - currentImages.length;
+    if (maxAllowed <= 0) {
+      alert("最多只能上传 9 张图片哦");
+      e.target.value = '';
+      return;
+    }
+
+    const sizeLimit = 10 * 1024 * 1024;
+    const addedImages: typeof selectedMediaList = [];
+
+    for (const file of fileArray) {
+      if (addedImages.length >= maxAllowed) {
+        alert("最多只能选择 9 张图片库，超出部分已忽略");
+        break;
+      }
+      if (file.size > sizeLimit) {
+        alert(`图片 ${file.name} 太大啦，请选择 10MB 以内的图片哦`);
+        continue;
+      }
+      addedImages.push({
+        url: URL.createObjectURL(file),
+        type: 'image',
+        file
+      });
+    }
+
+    if (addedImages.length > 0) {
+      setSelectedMediaList([...currentImages, ...addedImages]);
+    }
+
     e.target.value = '';
   };
 
@@ -647,10 +730,10 @@ export default function Diary() {
                             const allDiaries = storage.getDiaries();
                             const updatedAll = allDiaries.map(d => {
                               if (d.id === dId) {
-                                return {
-                                  ...d,
-                                  comments: d.comments.filter(c => c.id !== cId)
-                                };
+                                  return {
+                                    ...d,
+                                    comments: d.comments.filter(c => c.id !== cId)
+                                  };
                               }
                               return d;
                             });
@@ -782,7 +865,7 @@ export default function Diary() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="backdrop-overlay !z-[450] flex items-end sm:items-center justify-center sm:p-6"
+                className="backdrop-overlay !z-[450] flex items-end sm:items-center justify-center p-[100px]"
                 onClick={closePostingModal}
               >
                 <motion.div 
@@ -790,125 +873,167 @@ export default function Diary() {
                   animate={{ y: 0 }}
                   exit={{ y: "100%" }}
                   transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                  className="bg-background w-full max-w-lg rounded-t-[32px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden"
-                  style={{ 
-                    paddingBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : 'env(safe-area-inset-bottom)',
-                    transition: 'padding-bottom 0.2s ease-out'
-                  }}
-                  onClick={e => {
-                    e.stopPropagation();
-                    // 点击非输入区域收起键盘
-                    if ((e.target as HTMLElement).tagName !== 'TEXTAREA' && (e.target as HTMLElement).tagName !== 'INPUT') {
-                      (document.activeElement as HTMLElement)?.blur();
-                    }
-                  }}
+                  className="bg-background w-full max-w-lg rounded-t-[32px] sm:rounded-[40px] shadow-2xl flex flex-col h-[75vh] sm:h-[70vh] max-h-[85vh] sm:max-h-[80vh] overflow-hidden"
+                  onClick={e => e.stopPropagation()}
                 >
-                  {/* 弹窗头部 (固定) */}
-                  <div className="flex justify-between items-center p-6 pb-2 shrink-0">
+                  {/* 头部标题区域 */}
+                  <div className="p-6 pb-4 flex items-center justify-between border-b border-outline-variant/30 shrink-0">
                     <div>
-                      <h2 className="text-2xl font-black text-on-surface">记录此刻</h2>
-                      <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">Capture the moment</p>
+                      <h3 className="text-xl font-black text-on-surface">记录此刻</h3>
+                      <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-0.5">Share a warm moment</p>
                     </div>
-                    <button onClick={closePostingModal} className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-transform">
+                    <button 
+                      onClick={closePostingModal}
+                      className="w-10 h-10 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant active:scale-90 transition-all cursor-pointer"
+                    >
                       <X size={20} />
                     </button>
                   </div>
-    
-                  {/* 弹窗内容区 (可滚动) */}
-                  <div className="flex-grow overflow-y-auto custom-scrollbar p-6 pt-4">
-                    <textarea 
-                      autoFocus
+
+                  {/* 中间编辑区域 */}
+                  <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
+                    <textarea
                       value={newContent}
                       onChange={(e) => setNewContent(e.target.value)}
-                      placeholder="这一刻在想什么..."
-                      className="w-full min-h-[120px] h-32 p-5 bg-surface-container rounded-[28px] border-none focus:ring-2 focus:ring-primary/20 outline-none resize-none mb-6 text-on-surface font-medium placeholder:text-on-surface-variant/40"
+                      placeholder={activeCat ? `分享关于 ${activeCat.name} 的第一个温暖瞬间吧～` : "写下你和猫咪的温暖日常吧..."}
+                      className="w-full min-h-[120px] bg-transparent text-on-surface placeholder-on-surface-variant/40 resize-none outline-none text-base border-0 focus:ring-0 p-0 leading-relaxed font-semibold"
+                      disabled={isLoading}
                     />
 
-                    {selectedMedia && (
-                  <div className="relative w-32 h-32 rounded-3xl overflow-hidden mb-2 group shadow-lg bg-black">
-                    {selectedMedia.type === 'video' ? (
-                      <video 
-                        src={selectedMedia.url} 
-                        className="w-full h-full object-cover" 
-                        muted 
-                        playsInline 
-                        autoPlay 
-                        loop 
-                      />
-                    ) : (
-                      <img src={selectedMedia.url} className="w-full h-full object-cover" />
+                    {/* 多图/视频预览区域 */}
+                    {selectedMediaList.length > 0 && (
+                      <div className="mb-6">
+                        {selectedMediaList[0].type === 'video' ? (
+                          <div className="relative w-32 h-32 rounded-3xl overflow-hidden shadow-lg bg-black group">
+                            <video 
+                              src={selectedMediaList[0].url} 
+                              className="w-full h-full object-cover" 
+                              muted 
+                              playsInline 
+                              autoPlay 
+                              loop 
+                            />
+                            <button 
+                              onClick={() => setSelectedMediaList([])}
+                              className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center backdrop-blur-sm active:scale-95 transition-transform z-10"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-3">
+                            {selectedMediaList.map((media, idx) => (
+                              <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden shadow-md bg-stone-100 group">
+                                <img src={media.url} className="w-full h-full object-cover" alt="" />
+                                <button 
+                                  onClick={() => {
+                                    const updatedList = [...selectedMediaList];
+                                    if (media.url.startsWith('blob:')) {
+                                      URL.revokeObjectURL(media.url);
+                                    }
+                                    updatedList.splice(idx, 1);
+                                    setSelectedMediaList(updatedList);
+                                  }}
+                                  className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center backdrop-blur-xs active:scale-95 transition-transform z-10"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                            {selectedMediaList.length < 9 && (
+                              <button
+                                onClick={() => {
+                                  if (fileInputRef.current) {
+                                    fileInputRef.current.accept = "image/*";
+                                    fileInputRef.current.click();
+                                  }
+                                }}
+                                className="aspect-square border-2 border-dashed border-[#5D4037]/20 hover:border-[#FF9D76]/50 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-[#5D4037]/45 hover:text-[#FF9D76] bg-[#5D4037]/2 transition-colors duration-200 cursor-pointer"
+                              >
+                                <ImageIcon size={22} />
+                                <span className="text-[10px] font-bold">添加图片</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
+                    {isReadingFile && (
+                      <div className="w-32 h-32 rounded-3xl bg-surface-container flex flex-col items-center justify-center mb-2 animate-pulse">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary mb-2" />
+                        <span className="text-[10px] font-bold text-on-surface-variant">读取中...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 弹窗底部操作栏 (固定) */}
+                  <div className="flex items-center justify-between p-6 pt-4 border-t border-outline-variant/30 shrink-0 bg-background">
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => {
+                          if (fileInputRef.current) {
+                            fileInputRef.current.accept = "image/*";
+                            fileInputRef.current.click();
+                          }
+                        }}
+                        className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
+                        title="上传图片"
+                        disabled={selectedMediaList.some(m => m.type === 'video') || selectedMediaList.length >= 9}
+                      >
+                        <ImageIcon size={24} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (fileInputRef.current) {
+                            fileInputRef.current.accept = "video/*";
+                            fileInputRef.current.click();
+                          }
+                        }}
+                        className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
+                        title="上传视频"
+                        disabled={selectedMediaList.length > 0}
+                      >
+                        <Video size={24} />
+                      </button>
+                      <button 
+                        onClick={handleAutoWriteDiary}
+                        className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center transition-all active:scale-90"
+                        style={{ color: '#FF9D76' }}
+                        title="喵咪智写"
+                        type="button"
+                      >
+                        <Sparkles size={24} className="animate-pulse" />
+                      </button>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        hidden 
+                        multiple 
+                        accept="image/*,video/*" 
+                        onChange={handleFileChange} 
+                      />
+                    </div>
+                    {/* [FIX] 发布按钮位置：确保在右下角，并使用品牌色 */}
                     <button 
-                      onClick={() => setSelectedMedia(null)}
-                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center backdrop-blur-sm active:scale-90 transition-transform z-10"
+                      onClick={handlePost}
+                      disabled={(!newContent.trim() && selectedMediaList.length === 0) || isLoading}
+                      className="px-8 h-12 rounded-full font-bold flex items-center gap-2 transition-all disabled:opacity-30 disabled:scale-100 active:scale-95 cursor-pointer"
+                      style={{ backgroundColor: '#FF9D76', color: 'white' }}
                     >
-                      <X size={16} />
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>发布中...</span>
+                        </>
+                      ) : (
+                        "发布"
+                      )}
                     </button>
                   </div>
-                )}
-                {isReadingFile && (
-                  <div className="w-32 h-32 rounded-3xl bg-surface-container flex flex-col items-center justify-center mb-2 animate-pulse">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary mb-2" />
-                    <span className="text-[10px] font-bold text-on-surface-variant">读取中...</span>
-                  </div>
-                )}
-              </div>
-
-              {/* 弹窗底部操作栏 (固定) */}
-              <div className="flex items-center justify-between p-6 pt-4 border-t border-outline-variant/30 shrink-0 bg-background">
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
-                    title="上传图片"
-                  >
-                    <ImageIcon size={24} />
-                  </button>
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
-                    title="上传视频"
-                  >
-                    <Video size={24} />
-                  </button>
-                  <button 
-                    onClick={handleAutoWriteDiary}
-                    className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center transition-all active:scale-90"
-                    style={{ color: '#FF9D76' }}
-                    title="喵咪智写"
-                    type="button"
-                  >
-                    <Sparkles size={24} className="animate-pulse" />
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    hidden 
-                    accept="image/*,video/*" 
-                    onChange={handleFileChange} 
-                  />
-                </div>
-                {/* [FIX] 发布按钮位置：确保在右下角，并使用品牌色 */}
-                <button 
-                  onClick={handlePost}
-                  disabled={(!newContent.trim() && !selectedMedia) || isLoading}
-                  className="px-8 h-12 rounded-full font-bold flex items-center gap-2 transition-all disabled:opacity-30 disabled:scale-100 active:scale-95"
-                  style={{ backgroundColor: '#FF9D76', color: 'white' }}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>发布中...</span>
-                    </>
-                  ) : (
-                    "发布"
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
       {/* 添加好友菜单 */}
       <AnimatePresence>
@@ -917,7 +1042,7 @@ export default function Diary() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="backdrop-overlay !z-[110] !bg-black/60 flex items-end justify-center sm:p-6 pb-[10vh]"
+            className="backdrop-overlay !z-[110] !bg-black/60 flex items-end sm:items-center justify-center p-[100px]"
             onClick={() => {
               setShowAddFriendMenu(false);
               setAddFriendStep(1);

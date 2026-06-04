@@ -52,6 +52,7 @@ export interface DiaryEntry {
   content: string;
   media?: string;
   mediaType?: 'image' | 'video';
+  images?: string[];
   createdAt: number;
   likes: number;
   isLiked: boolean;
@@ -255,23 +256,46 @@ function deleteAllCatsFromServer(userId: string) {
 
 // ── 日记/信件/积分 双写辅助函数 ──
 async function resolveServerDiaryPayload(diary: DiaryEntry): Promise<DiaryEntry> {
-  const { media, ...rest } = diary;
+  let resolvedDiary = { ...diary };
+  const { media } = resolvedDiary;
 
   if (media?.startsWith('miao_media:')) {
-    return rest;
-  }
-
-  if (media?.startsWith('indexeddb:')) {
+    resolvedDiary.media = undefined;
+  } else if (media?.startsWith('indexeddb:')) {
     const mediaId = media.split(':')[1];
     try {
       const mediaData = await mediaStorage.getMedia(mediaId);
-      return mediaData ? { ...diary, media: mediaData } : rest;
+      if (mediaData) {
+        resolvedDiary.media = mediaData;
+      } else {
+        resolvedDiary.media = undefined;
+      }
     } catch {
-      return rest;
+      resolvedDiary.media = undefined;
     }
   }
 
-  return diary;
+  if (resolvedDiary.images && Array.isArray(resolvedDiary.images)) {
+    const resolvedImages: string[] = [];
+    for (const img of resolvedDiary.images) {
+      if (img.startsWith('indexeddb:')) {
+        const imgKey = img.split(':')[1];
+        try {
+          const imgData = await mediaStorage.getMedia(imgKey);
+          if (imgData) {
+            resolvedImages.push(imgData);
+          }
+        } catch {
+          // ignore
+        }
+      } else if (!img.startsWith('miao_media:')) {
+        resolvedImages.push(img);
+      }
+    }
+    resolvedDiary.images = resolvedImages;
+  }
+
+  return resolvedDiary;
 }
 
 async function syncDiaryToServer(userId: string, diary: DiaryEntry) {
@@ -1134,6 +1158,14 @@ export const storage = {
     const diary = diaries.find(d => d.id === id);
     if (diary?.media?.startsWith('indexeddb:')) {
       mediaStorage.deleteMedia(id);
+    }
+    if (diary?.images && Array.isArray(diary.images)) {
+      diary.images.forEach(img => {
+        if (img.startsWith('indexeddb:')) {
+          const imgKey = img.split(':')[1];
+          mediaStorage.deleteMedia(imgKey);
+        }
+      });
     }
     const updated = diaries.filter(d => d.id !== id);
     storage.saveDiaries(updated);

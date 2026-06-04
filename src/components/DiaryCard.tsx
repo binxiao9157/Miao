@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Share2, Trash2, Play } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { DiaryEntry, FriendDiaryEntry } from "../services/storage";
 import CommentItem from "./CommentItem";
+import DiaryImageGrid from "./DiaryImageGrid";
 
 import { mediaStorage } from "../services/mediaStorage";
 
@@ -16,6 +17,7 @@ interface DiaryCardProps {
   onShare: (entry: DiaryEntry | FriendDiaryEntry) => void;
   onDelete?: (id: string | null) => void;
   onDeleteComment?: (diaryId: string, commentId: string) => void;
+  onImageClick?: (images: string[], index: number) => void;
 }
 
 const DiaryCard: React.FC<DiaryCardProps> = ({
@@ -27,23 +29,27 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
   onComment,
   onShare,
   onDelete,
-  onDeleteComment
+  onDeleteComment,
+  onImageClick
 }) => {
-  const [displayMedia, setDisplayMedia] = useState<string | undefined>(entry.media);
+  const [displayVideoMedia, setDisplayVideoMedia] = useState<string | undefined>(undefined);
   const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    setDisplayMedia(undefined);
-    if (entry.media?.startsWith('indexeddb:')) {
-      const mediaId = entry.media.split(':')[1];
-      mediaStorage.getMedia(mediaId).then(data => {
-        if (data) setDisplayMedia(data);
-      });
+    if (entry.mediaType === 'video' && entry.media) {
+      if (entry.media.startsWith('indexeddb:')) {
+        const mediaId = entry.media.split(':')[1];
+        mediaStorage.getMedia(mediaId).then(data => {
+          if (data) setDisplayVideoMedia(data);
+        });
+      } else {
+        setDisplayVideoMedia(entry.media);
+      }
     } else {
-      setDisplayMedia(entry.media);
+      setDisplayVideoMedia(undefined);
     }
-  }, [entry.media]);
+  }, [entry.media, entry.mediaType]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -62,6 +68,17 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
   const nickname = isFriend ? friendEntry?.authorNickname : userNickname;
   const date = new Date(entry.createdAt).toLocaleDateString();
   const timeStr = new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  // Get resolved images list
+  const resolvedImages = entry.images && entry.images.length > 0
+    ? entry.images
+    : (entry.mediaType !== 'video' && entry.media ? [entry.media] : []);
+
+  const handleImageClick = (index: number) => {
+    if (onImageClick) {
+      onImageClick(resolvedImages, index);
+    }
+  };
 
   return (
     <motion.div 
@@ -115,52 +132,44 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
           </div>
         </div>
 
-        {/* 2. 核心媒体区：全宽大图 / 视频 (强制要求) */}
-        {displayMedia && (
+        {/* 2. 核心媒体区：视频或多图九宫格 */}
+        {entry.mediaType === 'video' && displayVideoMedia ? (
           <div 
             className="w-full mt-2 mb-3 overflow-hidden relative cursor-pointer group rounded-xl"
-            onClick={entry.mediaType === 'video' ? togglePlay : undefined}
+            onClick={togglePlay}
           >
-            {entry.mediaType === 'video' ? (
-              <>
-                <video 
-                  ref={videoRef}
-                  src={displayMedia} 
-                  playsInline
-                  muted
-                  loop
-                  disablePictureInPicture
-                  webkit-playsinline="true"
-                  className="w-full object-cover rounded-xl" 
-                  style={{ maxHeight: '400px' }}
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                />
-                <AnimatePresence>
-                  {!isPlaying && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-xl"
-                    >
-                      <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 shadow-xl">
-                        <Play size={24} className="text-white fill-white ml-0.5" />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </>
-            ) : (
-              <img 
-                className="w-full object-cover rounded-xl" 
-                style={{ maxHeight: '400px' }}
-                src={displayMedia} 
-                referrerPolicy="no-referrer"
-                alt="Diary media" 
-              />
-            )}
+            <video 
+              ref={videoRef}
+              src={displayVideoMedia} 
+              playsInline
+              muted
+              loop
+              disablePictureInPicture
+              webkit-playsinline="true"
+              className="w-full object-cover rounded-xl" 
+              style={{ maxHeight: '400px' }}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+            />
+            <AnimatePresence>
+              {!isPlaying && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-xl"
+                >
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 shadow-xl">
+                    <Play size={24} className="text-white fill-white ml-0.5" />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+        ) : (
+          resolvedImages.length > 0 && (
+            <DiaryImageGrid images={resolvedImages} onImageClick={handleImageClick} />
+          )
         )}
 
         {/* 3. 正文区 */}
