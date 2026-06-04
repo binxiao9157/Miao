@@ -119,6 +119,71 @@ const fallbackWithFileReader = (file: File, resolve: (val: string) => void) => {
   reader.readAsDataURL(file);
 };
 
+const MAX_INLINE_IMAGE_DATA_URL_LENGTH = 350 * 1024;
+
+const dataUrlToBlob = (dataUrl: string): Blob => {
+  const [meta, data] = dataUrl.split(',');
+  if (!meta || !data) throw new Error('图片数据格式异常');
+  const mime = meta.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mime });
+};
+
+const uploadDiaryImage = async (dataUrl: string, fileName: string): Promise<string> => {
+  const token = typeof localStorage !== 'undefined'
+    ? localStorage.getItem('miao_auth_token')
+    : '';
+  const formData = new FormData();
+  formData.append('purpose', 'diary');
+  formData.append('file', dataUrlToBlob(dataUrl), fileName);
+
+  const resp = await fetch('/api/v1/upload', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok || !payload?.url) {
+    throw new Error(payload?.error || `图片云端备份失败 HTTP ${resp.status}`);
+  }
+  return payload.url;
+};
+
+const persistDiaryImage = async (
+  key: string,
+  dataUrl: string,
+  addLog: (message: string) => void
+): Promise<string> => {
+  try {
+    addLog(` ├─ 正在将图片写入 IndexedDB (key: ${key})...`);
+    await mediaStorage.saveMedia(key, dataUrl);
+    addLog(` ├─ 写入 IndexedDB 成功。`);
+    return `indexeddb:${key}`;
+  } catch (storageErr: any) {
+    addLog(` ├─ IndexedDB 写入失败: ${storageErr?.message || storageErr}。尝试上传云端备份...`);
+  }
+
+  try {
+    const uploadedUrl = await uploadDiaryImage(dataUrl, `${key}.jpg`);
+    addLog(` ├─ 云端备份成功: ${uploadedUrl}`);
+    return uploadedUrl;
+  } catch (uploadErr: any) {
+    addLog(` ├─ 云端备份失败: ${uploadErr?.message || uploadErr}`);
+  }
+
+  if (dataUrl.length <= MAX_INLINE_IMAGE_DATA_URL_LENGTH) {
+    addLog(` ├─ 图片较小，使用内联数据兜底。`);
+    return dataUrl;
+  }
+
+  throw new Error('图片存储失败。请检查登录状态和网络后重试，或减少图片数量后再发布。');
+};
+
 export default function Diary() {
   const { user } = useAuthContext();
   const [activeCat, setActiveCat] = useState<CatInfo | null>(null);
@@ -471,18 +536,10 @@ export default function Diary() {
           
           if (base64ToSave) {
             const imgKey = `${diaryId}_img_${i}`;
-            try {
-              addLog(` ├─ 正在将图片 [${i + 1}] 写入 IndexedDB (key: ${imgKey})...`);
-              await mediaStorage.saveMedia(imgKey, base64ToSave);
-              imagesList.push(`indexeddb:${imgKey}`);
-              addLog(` ├─ 写入 IndexedDB 成功。`);
-            } catch (storageErr: any) {
-              addLog(` ├─ 写入 IndexedDB 失败: ${storageErr?.message || storageErr}。退回 Base64 直写。`);
-              imagesList.push(base64ToSave);
-            }
+            const persistedUrl = await persistDiaryImage(imgKey, base64ToSave, addLog);
+            imagesList.push(persistedUrl);
           } else {
-            addLog(` ├─ 直接使用图片原生 URL: ${m.url}`);
-            imagesList.push(m.url);
+            throw new Error(`第 ${i + 1} 张图片处理失败，请重新选择该图片。`);
           }
         }
 
