@@ -61,18 +61,18 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
   const avatar = isFriend ? friendEntry?.authorAvatar : userAvatar;
   const nickname = isFriend ? friendEntry?.authorNickname : userNickname;
   const date = new Date(entry.createdAt).toLocaleDateString();
+  const timeStr = new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       id={entry.id}
-      className="flex w-full py-5 border-b border-[#5D4037]/5"
+      className="flex w-full py-5"
     >
       {/* 左侧：极简时间轴区 (固定宽度) */}
-      <div className="w-[40px] flex flex-col items-center shrink-0">
+      <div className="w-[32px] flex flex-col items-center shrink-0">
         <div className="w-2 h-2 rounded-full bg-[#FF9D76] mt-2 z-10"></div> {/* 极简小圆点，不要用复杂的猫爪图标 */}
-        <div className="w-[1px] flex-grow bg-[#5D4037]/10 mt-2"></div> {/* 垂直极细连接线 */}
       </div>
 
       {/* 右侧：沉浸式内容区 (占据剩余全部宽度) */}
@@ -80,30 +80,37 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
         
         {/* 1. 头部：作者与时间 (同行紧凑排列) */}
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <img 
-              className="w-8 h-8 rounded-full object-cover" 
-              src={avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
-              referrerPolicy="no-referrer"
-              alt="Avatar" 
-            />
-            <span className="text-sm font-bold text-[#5D4037]">{nickname || "喵星人"}</span>
-            {isFriend && friendEntry && (
-              <span className="px-2 py-0.5 bg-[#FF9D76]/10 text-[#FF9D76] text-[8px] font-black rounded-full uppercase tracking-tighter shrink-0">
-                {friendEntry.catName}
-              </span>
-            )}
-          </div>
+          {isFriend ? (
+            <div className="flex items-center gap-2">
+              <img 
+                className="w-8 h-8 rounded-full object-cover" 
+                src={avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
+                referrerPolicy="no-referrer"
+                alt="Avatar" 
+              />
+              <span className="text-sm font-bold text-[#5D4037]">{nickname || "喵星人"}</span>
+              {friendEntry && (
+                <span className="px-2 py-0.5 bg-[#FF9D76]/10 text-[#FF9D76] text-[8px] font-black rounded-full uppercase tracking-tighter shrink-0">
+                  {friendEntry.catName}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm font-bold text-[#5D4037]/60">{timeStr}</span>
+          )}
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-[#5D4037]/40">{date}</span>
-            {!isFriend && onDelete && (
-              <button 
-                onClick={() => onDelete(entry.id)}
-                className="w-6 h-6 flex items-center justify-center text-[#5D4037]/40 hover:text-red-500 rounded-full transition-colors"
-                title="删除记录"
-              >
-                <Trash2 size={14} />
-              </button>
+            {isFriend ? (
+              <span className="text-xs text-[#5D4037]/40">{date}</span>
+            ) : (
+              !isFriend && onDelete && (
+                <button 
+                  onClick={() => onDelete(entry.id)}
+                  className="w-6 h-6 flex items-center justify-center text-[#5D4037]/40 hover:text-red-500 rounded-full transition-colors"
+                  title="删除记录"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )
             )}
           </div>
         </div>

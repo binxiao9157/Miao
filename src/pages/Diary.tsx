@@ -40,7 +40,75 @@ export default function Diary() {
   const [catList, setCatList] = useState<CatInfo[]>([]);
   const [activeTab, setActiveTab] = useState<'mine' | 'friends'>('mine');
   const [friendDiaries, setFriendDiaries] = useState<FriendDiaryEntry[]>([]);
+  const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const formatDateHeader = (timestamp: number) => {
+    const dateObj = new Date(timestamp);
+    const today = new Date();
+    if (dateObj.toDateString() === today.toDateString()) {
+      return "今天";
+    }
+    const month = dateObj.getMonth() + 1;
+    const date = dateObj.getDate();
+    return `${month}月${date}日`;
+  };
+
+  const processDiaries = (entries: DiaryEntry[]) => {
+    const now = Date.now();
+    const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+    const recentList: DiaryEntry[] = [];
+    const olderList: DiaryEntry[] = [];
+
+    entries.forEach(entry => {
+      if (now - entry.createdAt <= ONE_MONTH_MS) {
+        recentList.push(entry);
+      } else {
+        olderList.push(entry);
+      }
+    });
+
+    const recentGroups: { dateLabel: string; items: DiaryEntry[] }[] = [];
+    const dateMap = new Map<string, DiaryEntry[]>();
+
+    recentList.forEach(entry => {
+      const label = formatDateHeader(entry.createdAt);
+      if (!dateMap.has(label)) {
+        dateMap.set(label, []);
+      }
+      dateMap.get(label)!.push(entry);
+    });
+
+    dateMap.forEach((items, label) => {
+      recentGroups.push({ dateLabel: label, items });
+    });
+
+    const olderGroups: { monthLabel: string; items: DiaryEntry[] }[] = [];
+    const monthMap = new Map<string, DiaryEntry[]>();
+
+    olderList.forEach(entry => {
+      const dateObj = new Date(entry.createdAt);
+      const label = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月`;
+      if (!monthMap.has(label)) {
+        monthMap.set(label, []);
+      }
+      monthMap.get(label)!.push(entry);
+    });
+
+    monthMap.forEach((items, label) => {
+      olderGroups.push({ monthLabel: label, items });
+    });
+
+    return { recentGroups, olderGroups };
+  };
+
+  const toggleMonth = (monthLabel: string) => {
+    setExpandedMonths(prev => ({
+      ...prev,
+      [monthLabel]: !prev[monthLabel]
+    }));
+  };
 
   const navigate = useNavigate();
 
@@ -80,7 +148,53 @@ export default function Diary() {
     const currentActiveCat = storage.getActiveCat();
     setActiveCat(currentActiveCat);
     
-    const allDiaries = storage.getDiaries();
+    let allDiaries = storage.getDiaries();
+    if (currentActiveCat) {
+      const mockIds = ['mock_diary_1_month', 'mock_diary_1_year', 'mock_diary_2_years'];
+      const hasMocks = allDiaries.some(d => mockIds.includes(d.id));
+      
+      if (!hasMocks) {
+        const now = Date.now();
+        const mockEntries: DiaryEntry[] = [
+          {
+            id: 'mock_diary_1_month',
+            catId: currentActiveCat.id,
+            content: "今天猫咪终于愿意躺在我的膝盖上睡觉了，它的呼吸好轻柔，像一个小小的暖水袋。那一刻时间仿佛静止了，希望这一秒能无限延长。💕",
+            media: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=1000&auto=format&fit=crop",
+            mediaType: 'image',
+            createdAt: now - 30 * 24 * 60 * 60 * 1000,
+            likes: 3,
+            isLiked: false,
+            comments: []
+          },
+          {
+            id: 'mock_diary_1_year',
+            catId: currentActiveCat.id,
+            content: "带小可爱去做了第一次全身健康体检！医生说它发育得非常好，比同龄猫咪更活泼。看它有些不知所措地趴在我怀里，我也暗暗发誓要给它最温暖安稳的一生。🩺❤️",
+            media: "https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=1000&auto=format&fit=crop",
+            mediaType: 'image',
+            createdAt: now - 365 * 24 * 60 * 60 * 1000,
+            likes: 8,
+            isLiked: true,
+            comments: []
+          },
+          {
+            id: 'mock_diary_2_years',
+            catId: currentActiveCat.id,
+            content: "迎来了家庭新成员的第一天！刚到家的时候它害怕得躲在床底不肯出来，我拿罐头和逗猫棒在外面轻轻叫它，直到凌晨它才探出小脑袋闻了闻。欢迎来到新家，我们的小天使。🐾✨",
+            media: "https://images.unsplash.com/photo-1533738363-b7f9aef128ce?q=80&w=1000&auto=format&fit=crop",
+            mediaType: 'image',
+            createdAt: now - 730 * 24 * 60 * 60 * 1000,
+            likes: 15,
+            isLiked: false,
+            comments: []
+          }
+        ];
+        allDiaries = [...allDiaries, ...mockEntries];
+        storage.saveDiaries(allDiaries);
+      }
+    }
+
     if (allDiaries.some(d => d.media?.startsWith('indexeddb:'))) {
       storage.saveDiaries(allDiaries);
     }
@@ -422,6 +536,8 @@ export default function Diary() {
     setTimeout(() => setShowShareToast(false), 3000);
   };
 
+  const { recentGroups, olderGroups } = processDiaries(diaries);
+
   return (
     <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
       <PageHeader 
@@ -479,80 +595,182 @@ export default function Diary() {
           </div>
         </div>
 
-        <div className="px-6 flex flex-col pb-24">
+        <div className="px-1 flex flex-col pb-24 relative">
+          {/* 全局极细时间轴背景线 (仅在'mine'标签且有数据时绘制) */}
+          {activeTab === 'mine' && diaries.length > 0 && (
+            <div className="absolute left-[16px] top-4 bottom-12 w-[1px] bg-[#5D4037]/10 pointer-events-none z-0" />
+          )}
+
           {activeTab === 'mine' ? (
-          diaries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-32 text-center">
-              <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
-                <ImageIcon size={40} />
+            diaries.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-32 text-center">
+                <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
+                  <ImageIcon size={40} />
+                </div>
+                <h3 className="text-xl font-black text-on-surface mb-2">还没有记录</h3>
+                <p className="text-sm text-on-surface-variant max-w-[200px]">
+                  还没有关于 {activeCat?.name || '猫咪'} 的记录，快去分享你们的第一个温暖瞬间吧～
+                </p>
               </div>
-              <h3 className="text-xl font-black text-on-surface mb-2">还没有记录</h3>
-              <p className="text-sm text-on-surface-variant max-w-[200px]">
-                还没有关于 {activeCat?.name || '猫咪'} 的记录，快去分享你们的第一个温暖瞬间吧～
-              </p>
-            </div>
-          ) : (
-            diaries.map((entry) => (
-              <DiaryCard
-                key={entry.id}
-                entry={entry}
-                userAvatar={user?.avatar}
-                userNickname={user?.nickname}
-                onLike={handleLike}
-                onComment={setCommentingId}
-                onShare={handleShare}
-                onDelete={(id) => setDeletingId(id)}
-                onDeleteComment={(dId, cId) => {
-                  // 1. 更新全量存储
-                  const allDiaries = storage.getDiaries();
-                  const updatedAll = allDiaries.map(d => {
-                    if (d.id === dId) {
-                      return {
-                        ...d,
-                        comments: d.comments.filter(c => c.id !== cId)
-                      };
-                    }
-                    return d;
-                  });
-                  storage.saveDiaries(updatedAll);
-                  
-                  // 2. 更新本地过滤列表
-                  setDiaries(prev => prev.map(d => {
-                    if (d.id === dId) {
-                      return {
-                        ...d,
-                        comments: d.comments.filter(c => c.id !== cId)
-                      };
-                    }
-                    return d;
-                  }));
-                }}
-              />
-            ))
-          )
-        ) : (
-          friendDiaries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-32 text-center">
-              <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
-                <UserPlus size={40} />
+            ) : (
+              <div className="w-full relative z-10">
+                {/* 1. 近期记录分组 */}
+                {recentGroups.map((group) => (
+                  <div key={group.dateLabel} className="w-full">
+                    {/* 日期断点标题 */}
+                    <div className="flex items-center w-full py-3">
+                      <div className="w-[32px] flex justify-center shrink-0">
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-[#FF9D76] bg-[#FFF9F5] flex items-center justify-center shadow-sm">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#FF9D76]"></div>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0 pl-2">
+                        <span className={`text-sm font-bold ${group.dateLabel === '今天' ? 'text-[#FF9D76] text-base font-extrabold' : 'text-[#5D4037]/80'}`}>
+                          {group.dateLabel}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* 该日期的日记列表 */}
+                    <div className="w-full">
+                      {group.items.map((entry) => (
+                        <DiaryCard
+                          key={entry.id}
+                          entry={entry}
+                          userAvatar={user?.avatar}
+                          userNickname={user?.nickname}
+                          onLike={handleLike}
+                          onComment={setCommentingId}
+                          onShare={handleShare}
+                          onDelete={(id) => setDeletingId(id)}
+                          onDeleteComment={(dId, cId) => {
+                            const allDiaries = storage.getDiaries();
+                            const updatedAll = allDiaries.map(d => {
+                              if (d.id === dId) {
+                                return {
+                                  ...d,
+                                  comments: d.comments.filter(c => c.id !== cId)
+                                };
+                              }
+                              return d;
+                            });
+                            storage.saveDiaries(updatedAll);
+                            setDiaries(prev => prev.map(d => {
+                              if (d.id === dId) {
+                                return {
+                                  ...d,
+                                  comments: d.comments.filter(c => c.id !== cId)
+                                };
+                              }
+                              return d;
+                            }));
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {/* 2. 超过一个月的日记折叠组 */}
+                {olderGroups.map((group) => {
+                  const isExpanded = !!expandedMonths[group.monthLabel];
+                  return (
+                    <div key={group.monthLabel} className="w-full">
+                      {/* 可点击的折叠节点 */}
+                      <button 
+                        onClick={() => toggleMonth(group.monthLabel)}
+                        className="w-full flex items-center py-4 relative z-10 hover:bg-[#5D4037]/5 transition-all text-left focus:outline-none rounded-xl"
+                      >
+                        <div className="w-[32px] flex justify-center shrink-0">
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-[#FF9D76]/50 bg-[#FFF9F5] flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#FF9D76]/60"></div>
+                          </div>
+                        </div>
+                        <div className="flex-1 flex items-center justify-between pr-4 pl-2">
+                          <span className="text-sm font-bold text-[#5D4037]">
+                            {group.monthLabel} (共 {group.items.length} 篇)
+                          </span>
+                          <span className="text-xs text-[#5D4037]/60 font-semibold">
+                            {isExpanded ? "▲ 收起" : "▼ 展开"}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* 展开的具体内容列表 */}
+                      <AnimatePresence initial={false}>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="overflow-hidden"
+                          >
+                            {group.items.map((entry) => (
+                              <DiaryCard
+                                key={entry.id}
+                                entry={entry}
+                                userAvatar={user?.avatar}
+                                userNickname={user?.nickname}
+                                onLike={handleLike}
+                                onComment={setCommentingId}
+                                onShare={handleShare}
+                                onDelete={(id) => setDeletingId(id)}
+                                onDeleteComment={(dId, cId) => {
+                                  const allDiaries = storage.getDiaries();
+                                  const updatedAll = allDiaries.map(d => {
+                                    if (d.id === dId) {
+                                      return {
+                                        ...d,
+                                        comments: d.comments.filter(c => c.id !== cId)
+                                      };
+                                    }
+                                    return d;
+                                  });
+                                  storage.saveDiaries(updatedAll);
+                                  setDiaries(prev => prev.map(d => {
+                                    if (d.id === dId) {
+                                      return {
+                                        ...d,
+                                        comments: d.comments.filter(c => c.id !== cId)
+                                      };
+                                    }
+                                    return d;
+                                  }));
+                                }}
+                              />
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
               </div>
-              <h3 className="text-xl font-black text-on-surface mb-2">还没有好友动态</h3>
-              <p className="text-sm text-on-surface-variant max-w-[200px]">快去添加好友，看看 TA 们的猫咪在做什么吧</p>
-            </div>
+            )
           ) : (
-            friendDiaries.map((entry) => (
-              <DiaryCard
-                key={entry.id}
-                entry={entry}
-                isFriend
-                onLike={handleLike}
-                onComment={setCommentingId}
-                onShare={handleShare}
-              />
-            ))
-          )
-        )}
-      </div>
+            friendDiaries.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-32 text-center">
+                <div className="w-24 h-24 bg-surface-container rounded-[40px] flex items-center justify-center mb-6 text-on-surface-variant/20">
+                  <UserPlus size={40} />
+                </div>
+                <h3 className="text-xl font-black text-on-surface mb-2">还没有好友动态</h3>
+                <p className="text-sm text-on-surface-variant max-w-[200px]">快去添加好友，看看 TA 们的猫咪在做什么吧</p>
+              </div>
+            ) : (
+              friendDiaries.map((entry) => (
+                <DiaryCard
+                  key={entry.id}
+                  entry={entry}
+                  isFriend
+                  onLike={handleLike}
+                  onComment={setCommentingId}
+                  onShare={handleShare}
+                />
+              ))
+            )
+          )}
+        </div>
       </div>
 
       {createPortal(
