@@ -50,6 +50,7 @@ async function startServer() {
   const notificationsFile = path.join(dataDir, 'notifications.json');
   const diaryLikesFile = path.join(dataDir, 'diary-likes.json');
   const diaryCommentsFile = path.join(dataDir, 'diary-comments.json');
+  const clientDiagnosticsFile = path.join(dataDir, 'client-diagnostics.json');
 
   interface ServerUser { username: string; nickname: string; avatar: string; password: string; phone?: string; openid?: string; unionid?: string; createdAt?: number; }
   interface ServerCat {
@@ -134,6 +135,14 @@ async function startServer() {
   };
 
   const getAuthedUsername = (req: express.Request) => (req as any).auth?.username as string;
+
+  const createReleaseHealth = () => ({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV,
+    hasApiKey: !!process.env.DASHSCOPE_API_KEY,
+    hasVolcApiKey: !!process.env.VOLC_API_KEY,
+  });
 
   const getUserPublicProfile = (username: string) => {
     const users = readJSON<ServerUser[]>(usersFile, []);
@@ -1261,14 +1270,94 @@ async function startServer() {
     res.json({ url });
   });
 
+  const checkTextSafety = async (params: { content?: unknown; scene?: unknown }) => {
+    const content = typeof params.content === 'string' ? params.content.trim() : '';
+    if (!content) {
+      return { passed: true, safe: true, provider: "local", skipped: true };
+    }
+    if (content.length > 5000) {
+      return {
+        passed: false,
+        safe: false,
+        code: "TEXT_TOO_LONG",
+        message: "内容过长，请精简后再提交",
+      };
+    }
+    return {
+      passed: true,
+      safe: true,
+      provider: "local",
+      scene: typeof params.scene === 'string' ? params.scene : undefined,
+    };
+  };
+
+  const checkMediaSafety = async (params: { mediaUrl?: unknown; mediaType?: unknown; scene?: unknown; file?: Express.Multer.File }) => {
+    const mediaType = params.mediaType === 'video' ? 'video' : 'image';
+    if (!params.file && typeof params.mediaUrl !== 'string') {
+      return {
+        passed: false,
+        safe: false,
+        code: "MISSING_MEDIA",
+        message: "缺少待检查的媒体内容",
+      };
+    }
+    return {
+      passed: true,
+      safe: true,
+      provider: "local",
+      mediaType,
+      scene: typeof params.scene === 'string' ? params.scene : undefined,
+    };
+  };
+
+  app.post("/api/v1/security/text", authRequired, async (req, res) => {
+    try {
+      res.json(await checkTextSafety({ content: req.body?.content, scene: req.body?.scene }));
+    } catch (err: any) {
+      res.status(500).json({ passed: false, safe: false, error: err.message, code: "SAFETY_CHECK_FAILED" });
+    }
+  });
+
+  app.post("/api/v1/security/media", authRequired, async (req, res) => {
+    try {
+      res.json(await checkMediaSafety({
+        mediaUrl: req.body?.mediaUrl,
+        mediaType: req.body?.mediaType,
+        scene: req.body?.scene,
+      }));
+    } catch (err: any) {
+      res.status(500).json({ passed: false, safe: false, error: err.message, code: "SAFETY_CHECK_FAILED" });
+    }
+  });
+
+  app.post("/api/v1/security/media-file", authRequired, upload.single('media'), async (req, res) => {
+    try {
+      res.json(await checkMediaSafety({
+        file: req.file,
+        mediaType: req.body?.mediaType,
+        scene: req.body?.scene,
+      }));
+    } catch (err: any) {
+      res.status(500).json({ passed: false, safe: false, error: err.message, code: "SAFETY_CHECK_FAILED" });
+    }
+  });
+
+  app.post("/api/v1/diagnostics/client-log", authRequired, (req, res) => {
+    const username = getAuthedUsername(req);
+    const allLogs = readJSON<any[]>(clientDiagnosticsFile, []);
+    allLogs.push({
+      userId: username,
+      createdAt: Date.now(),
+      payload: req.body || {},
+    });
+    const recentLogs = allLogs.slice(-200);
+    writeJSON(clientDiagnosticsFile, recentLogs);
+    res.json({ success: true });
+  });
+
   // Health check endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      env: process.env.NODE_ENV,
-      hasApiKey: !!process.env.DASHSCOPE_API_KEY
-    });
+    res.json(createReleaseHealth());
   });
 
   // ── 阿里灵积 (DashScope) 配置 ──
@@ -1507,6 +1596,44 @@ async function startServer() {
   };
 
   const toImageUrl = (imageSource: string) => imageSource;
+
+  const createMockTaskPollResponse = (taskId: string, type: "image" | "video") => {
+    if (!taskId.startsWith('mock-server-task-')) return null;
+
+    const elapsed = Date.now() - Number(taskId.split('-').pop() || Date.now());
+    if (elapsed < 3000) {
+      return { status: 'running' };
+    }
+
+    if (type === 'image') {
+      const catImages = [
+        'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
+        'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?auto=format&fit=crop&q=80&w=800',
+        'https://images.unsplash.com/photo-1513360309081-36f5e878fc11?auto=format&fit=crop&q=80&w=800',
+        'https://images.unsplash.com/photo-1618826411640-d6df44dd3f7a?auto=format&fit=crop&q=80&w=800',
+        'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?auto=format&fit=crop&q=80&w=800'
+      ];
+      const charSum = Array.from(taskId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+      const imageUrl = catImages[charSum % catImages.length];
+      return {
+        status: 'succeeded',
+        image_url: imageUrl,
+        output: { image_url: imageUrl }
+      };
+    }
+
+    const catVideos = [
+      'https://www.w3schools.com/html/mov_bbb.mp4',
+      'https://www.w3schools.com/html/movie.mp4'
+    ];
+    const charSum = Array.from(taskId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const videoUrl = catVideos[charSum % catVideos.length];
+    return {
+      status: 'succeeded',
+      video_url: videoUrl,
+      output: { video_url: videoUrl }
+    };
+  };
 
   const normalizeDashScopeStatus = (data: any) => {
     const output = data?.output;
@@ -1915,45 +2042,8 @@ async function startServer() {
     const provider = normalizeProvider(req.params.provider);
     const { taskId, type } = req.params;
 
-    // Graceful server-side fallback for simulated mock tasks
-    if (taskId && taskId.startsWith('mock-server-task-')) {
-      const elapsed = Date.now() - Number(taskId.split('-').pop() || Date.now());
-      if (elapsed < 3000) {
-        return res.json({ status: 'running' });
-      }
-      if (type === 'image') {
-        const catImages = [
-          'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
-          'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?auto=format&fit=crop&q=80&w=800',
-          'https://images.unsplash.com/photo-1513360309081-36f5e878fc11?auto=format&fit=crop&q=80&w=800',
-          'https://images.unsplash.com/photo-1618826411640-d6df44dd3f7a?auto=format&fit=crop&q=80&w=800',
-          'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?auto=format&fit=crop&q=80&w=800'
-        ];
-        // Select one based on index
-        const charSum = Array.from(taskId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-        const index = charSum % catImages.length;
-        const imageUrl = catImages[index];
-        return res.json({
-          status: 'succeeded',
-          image_url: imageUrl,
-          output: { image_url: imageUrl }
-        });
-      } else {
-        const catVideos = [
-          'https://www.w3schools.com/html/mov_bbb.mp4',
-          'https://www.w3schools.com/html/movie.mp4'
-        ];
-        // Select one based on the taskId characters sum
-        const charSum = Array.from(taskId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-        const index = charSum % catVideos.length;
-        const videoUrl = catVideos[index];
-        return res.json({
-          status: 'succeeded',
-          video_url: videoUrl,
-          output: { video_url: videoUrl }
-        });
-      }
-    }
+    const mockResponse = createMockTaskPollResponse(taskId, type as "image" | "video");
+    if (mockResponse) return res.json(mockResponse);
 
     try {
       if (taskId.startsWith('sync:')) {
@@ -2028,6 +2118,8 @@ async function startServer() {
       if (taskId.startsWith('sync:')) {
         return res.status(400).json({ status: 'failed', message: '同步任务无需轮询' });
       }
+      const mockResponse = createMockTaskPollResponse(taskId, type);
+      if (mockResponse) return res.json({ ...mockResponse, type, provider });
       if (provider === "volcengine") {
         const response = await axios.get(`${VOLC_CONFIG.BASE_URL}/${taskId}`, {
           headers: { 'Authorization': `Bearer ${VOLC_CONFIG.API_KEY}` },
