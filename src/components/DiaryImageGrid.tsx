@@ -64,13 +64,13 @@ export default function DiaryImageGrid({ images, onImageClick }: DiaryImageGridP
   if (count === 1) {
     return (
       <div 
-        className="w-full mt-2 mb-3 overflow-hidden rounded-xl cursor-pointer max-w-[85%]"
+        className="w-full mt-2 mb-3 overflow-hidden rounded-xl cursor-pointer"
         onClick={() => onImageClick(0)}
       >
         <ImageWithDbSource 
           src={images[0]} 
           className="w-full object-cover rounded-xl hover:scale-[1.02] transition-transform duration-300"
-          style={{ maxHeight: '300px' }}
+          style={{ maxHeight: '380px' }}
         />
       </div>
     );
