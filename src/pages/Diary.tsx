@@ -479,7 +479,7 @@ export default function Diary() {
           </div>
         </div>
 
-        <div className="px-6 space-y-8 pb-24">
+        <div className="px-6 flex flex-col pb-24">
           {activeTab === 'mine' ? (
           diaries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 text-center">

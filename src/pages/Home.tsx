@@ -241,9 +241,6 @@ export default function Home() {
   };
 
   const triggerHeartAt = (x: number, y: number) => {
-    const hId = Date.now() + Math.random();
-    setHearts(prev => [...prev, { id: hId, x, y }]);
-    
     // Select an adorable sound/state feedback phrase
     const sounds = ["喵呜~", "咕噜咕噜...", "啊咪~", "蹭蹭你~", "么么哒~", "喵~"];
     const sound = sounds[Math.floor(Math.random() * sounds.length)];
@@ -252,11 +249,6 @@ export default function Home() {
     const earned = Math.floor(Math.random() * 5) + 3;
     storage.addPoints(earned, "贴贴猫咪伙伴粉红回馈");
     setPoints(storage.getPoints().total);
-    triggerPointToast(`${sound} 积分 +${earned} 💖`);
-
-    setTimeout(() => {
-      setHearts(prev => prev.filter(h => h.id !== hId));
-    }, 1200);
   };
 
   const handleInteraction = (actionName: string) => {
@@ -281,7 +273,6 @@ export default function Home() {
       if (p.history.length > 50) p.history.pop();
       storage.savePoints(p);
       setPoints(p.total);
-      triggerPointToast(`互动任务达成！积分 +5 🌟`);
     }
   };
 
@@ -383,7 +374,7 @@ export default function Home() {
       if (nextCount >= 5) {
         if (v3_url) {
           setPlaybackState('PLAYING_V3');
-          showFloatingBubble("唔，不抢那我就把球抱回去自个儿玩啦...");
+          showFloatingBubble("你不理我，我走了...");
           if (v3Ref.current) {
             v3Ref.current.currentTime = 0;
             v3Ref.current.play().catch(e => console.warn("V3 play block:", e));
@@ -424,7 +415,7 @@ export default function Home() {
 
     if (playbackState === 'READY') {
       setPlaybackState('PLAYING_V1');
-      showFloatingBubble("它叼着一个毛球，渴望地朝你跑了过来！");
+      showFloatingBubble("我来啦～");
       handleInteraction('开始寻找毛球流');
       if (v1Ref.current) {
         v1Ref.current.currentTime = 0;
@@ -704,35 +695,6 @@ export default function Home() {
       )}
 
       {/* 悬浮互动绝对飞行爱心动画（固定在视口顶层，坐标系完全一致） */}
-      <div className="fixed inset-0 pointer-events-none z-[60] overflow-hidden">
-        <AnimatePresence>
-          {hearts.map(h => (
-            <motion.div
-              key={h.id}
-              initial={{ 
-                opacity: 1, 
-                scale: 0.4, 
-                rotate: 0,
-                x: h.x - 20, 
-                y: h.y - 20 
-              }}
-              animate={{ 
-                opacity: [1, 0.9, 0], 
-                scale: [0.4, 1.4, 2.4], 
-                rotate: (h.id % 60) - 30, // 随机左右旋转
-                x: h.x - 20 + ((h.id % 120) - 60), // 随时间左右摇摆漂移
-                y: h.y - 240 // 向上飘得更高更平滑
-              }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.1, ease: "easeOut" }}
-              className="absolute text-red-500 text-4xl select-none filter drop-shadow-[0_4px_12px_rgba(239,68,68,0.4)]"
-              style={{ left: 0, top: 0 }}
-            >
-              💖
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
     </div>
   );
 }

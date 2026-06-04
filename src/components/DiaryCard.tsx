@@ -67,126 +67,134 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       id={entry.id}
-      className="miao-card !p-0 overflow-hidden"
+      className="flex w-full py-5 border-b border-[#5D4037]/5"
     >
-      <div className="p-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 ${isFriend ? 'bg-secondary/10' : 'bg-primary/10'} rounded-full overflow-hidden border-2 border-white shadow-sm`}>
-            <img 
-              src={avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
-              alt="Avatar" 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-black text-on-surface">{nickname || "喵星人"}</p>
-              {isFriend && friendEntry && (
-                <span className="px-2 py-0.5 bg-secondary/10 text-secondary text-[8px] font-black rounded-full uppercase tracking-tighter">
-                  {friendEntry.catName}
-                </span>
-              )}
-            </div>
-            <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
-              {date}
-            </p>
-          </div>
-        </div>
-        {!isFriend && onDelete && (
-          <button 
-            onClick={() => onDelete(entry.id)}
-            className="w-8 h-8 flex items-center justify-center text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 rounded-full transition-all mr-2"
-          >
-            <Trash2 size={18} />
-          </button>
-        )}
+      {/* 左侧：极简时间轴区 (固定宽度) */}
+      <div className="w-[40px] flex flex-col items-center shrink-0">
+        <div className="w-2 h-2 rounded-full bg-[#FF9D76] mt-2 z-10"></div> {/* 极简小圆点，不要用复杂的猫爪图标 */}
+        <div className="w-[1px] flex-grow bg-[#5D4037]/10 mt-2"></div> {/* 垂直极细连接线 */}
       </div>
 
-      {displayMedia && (
-        <div 
-          className="aspect-square w-full bg-surface-container flex items-center justify-center overflow-hidden relative cursor-pointer group"
-          onClick={entry.mediaType === 'video' ? togglePlay : undefined}
-        >
-          {entry.mediaType === 'video' ? (
-            <>
-              <video 
-                ref={videoRef}
-                src={displayMedia} 
-                playsInline
-                muted
-                loop
-                disablePictureInPicture
-                webkit-playsinline="true"
-                className="w-full h-full object-cover diary-video" 
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-              />
-              <AnimatePresence>
-                {!isPlaying && (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="absolute inset-0 flex items-center justify-center bg-black/10"
-                  >
-                    <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 shadow-xl">
-                      <Play size={32} className="text-white fill-white ml-1" />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </>
-          ) : (
+      {/* 右侧：沉浸式内容区 (占据剩余全部宽度) */}
+      <div className="flex-1 pr-4 pb-2">
+        
+        {/* 1. 头部：作者与时间 (同行紧凑排列) */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
             <img 
-              src={displayMedia} 
-              alt="Diary media" 
-              className="w-full h-full object-cover" 
-              referrerPolicy="no-referrer" 
+              className="w-8 h-8 rounded-full object-cover" 
+              src={avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=miao_default"} 
+              referrerPolicy="no-referrer"
+              alt="Avatar" 
             />
-          )}
+            <span className="text-sm font-bold text-[#5D4037]">{nickname || "喵星人"}</span>
+            {isFriend && friendEntry && (
+              <span className="px-2 py-0.5 bg-[#FF9D76]/10 text-[#FF9D76] text-[8px] font-black rounded-full uppercase tracking-tighter shrink-0">
+                {friendEntry.catName}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-[#5D4037]/40">{date}</span>
+            {!isFriend && onDelete && (
+              <button 
+                onClick={() => onDelete(entry.id)}
+                className="w-6 h-6 flex items-center justify-center text-[#5D4037]/40 hover:text-red-500 rounded-full transition-colors"
+                title="删除记录"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
         </div>
-      )}
 
-      <div className="p-6">
-        <p className="text-on-surface text-base font-medium leading-relaxed mb-6 whitespace-pre-wrap">
+        {/* 2. 核心媒体区：全宽大图 / 视频 (强制要求) */}
+        {displayMedia && (
+          <div 
+            className="w-full mt-2 mb-3 overflow-hidden relative cursor-pointer group rounded-xl"
+            onClick={entry.mediaType === 'video' ? togglePlay : undefined}
+          >
+            {entry.mediaType === 'video' ? (
+              <>
+                <video 
+                  ref={videoRef}
+                  src={displayMedia} 
+                  playsInline
+                  muted
+                  loop
+                  disablePictureInPicture
+                  webkit-playsinline="true"
+                  className="w-full object-cover rounded-xl" 
+                  style={{ maxHeight: '400px' }}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                />
+                <AnimatePresence>
+                  {!isPlaying && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-xl"
+                    >
+                      <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 shadow-xl">
+                        <Play size={24} className="text-white fill-white ml-0.5" />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            ) : (
+              <img 
+                className="w-full object-cover rounded-xl" 
+                style={{ maxHeight: '400px' }}
+                src={displayMedia} 
+                referrerPolicy="no-referrer"
+                alt="Diary media" 
+              />
+            )}
+          </div>
+        )}
+
+        {/* 3. 正文区 */}
+        <p className="text-sm text-[#5D4037]/80 leading-relaxed mb-3 whitespace-pre-wrap">
           {entry.content}
         </p>
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <button 
-              onClick={() => onLike(entry.id)}
-              className={`flex items-center gap-2 transition-all ${entry.isLiked ? "text-red-500 scale-110" : "text-on-surface-variant hover:text-primary"}`}
-            >
-              <Heart size={24} fill={entry.isLiked ? "currentColor" : "none"} />
-              <span className="text-xs font-black">{entry.likes}</span>
-            </button>
-            <button 
-              onClick={() => onComment(entry.id)}
-              className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-all"
-            >
-              <MessageCircle size={24} />
-              <span className="text-xs font-black">{entry.comments.length}</span>
-            </button>
-          </div>
+
+        {/* 4. 极简操作区 (点赞、评论、分享) */}
+        <div className="flex items-center gap-6 text-[#5D4037]/40">
+          <button 
+            onClick={() => onLike(entry.id)}
+            className={`flex items-center gap-1 hover:text-[#FF9D76] transition-colors ${entry.isLiked ? "text-red-500 font-bold" : ""}`}
+          >
+            <Heart size={16} fill={entry.isLiked ? "currentColor" : "none"} />
+            <span className="text-xs">{entry.likes}</span>
+          </button>
+          <button 
+            onClick={() => onComment(entry.id)}
+            className="flex items-center gap-1 hover:text-[#FF9D76] transition-colors"
+          >
+            <MessageCircle size={16} />
+            <span className="text-xs">{entry.comments.length}</span>
+          </button>
           <button 
             onClick={() => onShare(entry)}
-            className="text-on-surface-variant hover:text-primary transition-all"
+            className="flex items-center gap-1 hover:text-[#FF9D76] transition-colors ml-auto pr-2"
+            title="分享"
           >
-            <Share2 size={24} />
+            <Share2 size={16} />
           </button>
         </div>
 
-        {/* 评论列表 */}
+        {/* 5. 评论列表 */}
         {entry.comments.length > 0 && (
-          <div className="mt-3 p-2 bg-[#FDF8F5]/80 rounded-xl space-y-0.5">
+          <div className="mt-3 p-3 bg-[#5D4037]/5 rounded-xl space-y-1">
             {entry.comments.map((comment) => (
               <div key={comment.id} className="last:mb-0">
                 {isFriend ? (
-                  <div className="flex gap-1.5 px-1.5 py-0.5">
-                    <span className="text-[12px] font-black text-[#633E1D] shrink-0">好友:</span>
-                    <p className="text-[12px] text-on-surface-variant/90 font-medium leading-[1.4]">{comment.content}</p>
+                  <div className="flex gap-1.5 px-1 py-0.5">
+                    <span className="text-xs font-black text-[#5D4037] shrink-0">好友:</span>
+                    <p className="text-xs text-[#5D4037]/80 font-medium leading-relaxed">{comment.content}</p>
                   </div>
                 ) : (
                   <CommentItem
@@ -199,6 +207,7 @@ const DiaryCard: React.FC<DiaryCardProps> = ({
             ))}
           </div>
         )}
+
       </div>
     </motion.div>
   );

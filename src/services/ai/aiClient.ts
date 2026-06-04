@@ -13,7 +13,7 @@ export const aiClient = {
     return aiConfig.getProfile();
   },
 
-  async submitImageTask(prompt: string, imageBase64?: string): Promise<AITaskResponse> {
+  async submitImageTask(prompt: string, imageBase64?: string, negativePrompt?: string): Promise<AITaskResponse> {
     const profile = aiConfig.getProfile();
     if (profile.mockMode) {
       await delay(1000);
@@ -25,6 +25,7 @@ export const aiClient = {
       model: profile.imageModel,
       prompt,
       image_base64: imageBase64,
+      negative_prompt: negativePrompt,
       parameters: {
         seed: profile.seed,
       }

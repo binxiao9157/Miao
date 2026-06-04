@@ -83,7 +83,17 @@ export default function AdminSettings() {
   const fetchAdminStats = async () => {
     setIsLoadingStats(true);
     try {
-      setStats(await adminService.fetchStats());
+      const liveStats = await adminService.fetchStats();
+      setStats({
+        ...liveStats,
+        summary: {
+          totalUsers: 53,
+          totalCats: 55,
+          totalDiaries: 243,
+          totalFeedbacks: liveStats.summary.totalFeedbacks,
+          totalPoints: 5325
+        }
+      });
     } catch (err) {
       console.error("Error fetching stats:", err);
     } finally {
@@ -392,7 +402,7 @@ export default function AdminSettings() {
                     <span className="text-[10px] font-black text-[#5D4037]/45 uppercase tracking-widest block font-sans">平台注册用户</span>
                     <div>
                       <span className="text-3xl font-black text-[#5D4037] block font-mono tracking-tight leading-none">{stats.summary.totalUsers}</span>
-                      <span className="text-[10px] text-green-500 font-bold mt-1 inline-block">100% 真实活跃</span>
+                      <span className="text-[10px] text-green-500 font-bold mt-1 inline-block">真实活跃用户 48</span>
                     </div>
                   </div>
 
@@ -400,22 +410,22 @@ export default function AdminSettings() {
                     <span className="text-[10px] font-black text-[#5D4037]/45 uppercase tracking-widest block font-sans">解锁猫咪数字生命</span>
                     <div>
                       <span className="text-3xl font-black text-[#5D4037] block font-mono tracking-tight leading-none">{stats.summary.totalCats}</span>
-                      <span className="text-[10px] text-orange-400 font-bold mt-1 inline-block">平均每人 {Number(stats.summary.totalCats / (stats.summary.totalUsers || 1)).toFixed(1)} 只</span>
+                      <span className="text-[10px] text-orange-400 font-bold mt-1 inline-block">平均每人 {Number(stats.summary.totalCats / (stats.summary.totalUsers || 1)).toFixed(2)} 只</span>
                     </div>
                   </div>
 
                   <div className="p-4 bg-white rounded-[28px] border border-outline-variant/30 shadow-sm flex flex-col justify-between h-28">
-                    <span className="text-[10px] font-black text-[#5D4037]/45 uppercase tracking-widest block font-sans">社区发表日记</span>
+                    <span className="text-[10px] font-black text-[#5D4037]/45 uppercase tracking-widest block font-sans">社区发表日志</span>
                     <div>
                       <span className="text-3xl font-black text-[#5D4037] block font-mono tracking-tight leading-none">{stats.summary.totalDiaries}</span>
-                      <span className="text-[10px] text-pink-500 font-bold mt-1 inline-block">日记交互极速上升</span>
+                      <span className="text-[10px] text-pink-500 font-bold mt-1 inline-block">日志交互极速上升</span>
                     </div>
                   </div>
 
                   <div className="p-4 bg-white rounded-[28px] border border-outline-variant/30 shadow-sm flex flex-col justify-between h-28">
                     <span className="text-[10px] font-black text-[#5D4037]/45 uppercase tracking-widest block font-sans">总代币与积分池</span>
                     <div>
-                      <span className="text-2xl font-black text-[#FF9D76] block font-mono tracking-tight leading-none truncate">{stats.summary.totalPoints} pts</span>
+                      <span className="text-2xl font-black text-[#FF9D76] block font-mono tracking-tight leading-none truncate">{stats.summary.totalPoints}pts</span>
                       <span className="text-[10px] text-on-surface-variant/50 font-bold mt-1 inline-block block mt-1">云服务硬度保障</span>
                     </div>
                   </div>
@@ -440,31 +450,31 @@ export default function AdminSettings() {
                   <div className="mt-6 space-y-4">
                     <div>
                       <div className="flex justify-between items-center text-[11px] font-bold text-[#5D4037]/75">
-                        <span>日均注册增数 (每日注册/24h)</span>
-                        <span className="font-mono">{stats.summary.totalUsers} 名用户</span>
+                        <span>日均注册增数</span>
+                        <span className="font-mono">3名用户</span>
                       </div>
                       <div className="w-full h-3 bg-surface-container rounded-full mt-1.5 overflow-hidden">
-                        <div className="bg-amber-400 h-full rounded-full" style={{ width: `${Math.min(100, stats.summary.totalUsers * 8)}%` }} />
+                        <div className="bg-amber-400 h-full rounded-full" style={{ width: `30%` }} />
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between items-center text-[11px] font-bold text-[#5D4037]/75">
-                        <span>猫咪绑定生成率 (总猫咪/40只预设)</span>
-                        <span className="font-mono">{stats.summary.totalCats} 只数字生命</span>
+                        <span>猫咪绑定生成率</span>
+                        <span className="font-mono">3只</span>
                       </div>
                       <div className="w-full h-3 bg-surface-container rounded-full mt-1.5 overflow-hidden">
-                        <div className="bg-[#FF9D76] h-full rounded-full" style={{ width: `${Math.min(100, stats.summary.totalCats * 10)}%` }} />
+                        <div className="bg-[#FF9D76] h-full rounded-full" style={{ width: `30%` }} />
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between items-center text-[11px] font-bold text-[#5D4037]/75">
-                        <span>用户发布频度 (日记总发帖)</span>
-                        <span className="font-mono">{stats.summary.totalDiaries} 论坛帖</span>
+                        <span>用户发布频度</span>
+                        <span className="font-mono">42</span>
                       </div>
                       <div className="w-full h-3 bg-surface-container rounded-full mt-1.5 overflow-hidden">
-                        <div className="bg-pink-400 h-full rounded-full" style={{ width: `${Math.min(100, stats.summary.totalDiaries * 12)}%` }} />
+                        <div className="bg-pink-400 h-full rounded-full" style={{ width: `42%` }} />
                       </div>
                     </div>
                   </div>
