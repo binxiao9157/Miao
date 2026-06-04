@@ -15,6 +15,110 @@ import CommentInput from "../components/CommentInput";
 import { ShareSheet } from "../components/ShareSheet";
 import ImageViewer from "../components/ImageViewer";
 
+const compressImage = (file: File, maxSize = 1200, quality = 0.8): Promise<string> => {
+  return new Promise<string>((resolve) => {
+    console.log(`[Compression] Starting compression for file: name=${file.name}, size=${(file.size / 1024 / 1024).toFixed(2)}MB, type=${file.type}`);
+    
+    // Check if the URL capability exists
+    const useObjectURL = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
+    
+    if (useObjectURL) {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          console.log(`[Compression] Image loaded successfully via ObjectURL. Original dimensions: ${img.width}x${img.height}`);
+          const canvas = document.createElement('canvas');
+          let w = img.width;
+          let h = img.height;
+          
+          if (w > maxSize || h > maxSize) {
+            const ratio = Math.min(maxSize / w, maxSize / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+            console.log(`[Compression] Resizing image to: ${w}x${h}`);
+          }
+          
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            console.log(`[Compression] Compression succeeded. Output size: ${(dataUrl.length / 1024).toFixed(2)}KB`);
+            resolve(dataUrl);
+            return;
+          } else {
+            console.warn(`[Compression] Failed to get 2D context from canvas.`);
+          }
+        } catch (err) {
+          console.error("[Compression] Error during canvas processing:", err);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+        
+        // Fallback to FileReader if something fails
+        console.log(`[Compression] Falling back to FileReader due to canvas/context error`);
+        fallbackWithFileReader(file, resolve);
+      };
+      
+      img.onerror = (err) => {
+        console.error("[Compression] Image error via ObjectURL. Error details:", err);
+        URL.revokeObjectURL(objectUrl);
+        console.log(`[Compression] Falling back to FileReader due to image load error`);
+        fallbackWithFileReader(file, resolve);
+      };
+      
+      img.src = objectUrl;
+    } else {
+      console.log(`[Compression] ObjectURL not supported, using FileReader directly`);
+      fallbackWithFileReader(file, resolve);
+    }
+  });
+};
+
+const fallbackWithFileReader = (file: File, resolve: (val: string) => void) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const result = e.target?.result as string;
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        let w = img.width;
+        let h = img.height;
+        const maxSize = 1200;
+        if (w > maxSize || h > maxSize) {
+          const ratio = Math.min(maxSize / w, maxSize / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(dataUrl);
+          return;
+        }
+      } catch (err) {
+        console.error("[Compression] FileReader fallback: canvas processing error:", err);
+      }
+      resolve(result); // Fallback to original base64
+    };
+    img.onerror = () => {
+      resolve(result); // Fallback to original base64
+    };
+    img.src = result;
+  };
+  reader.onerror = (err) => {
+    console.error("[Compression] FileReader hard error:", err);
+    resolve("");
+  };
+  reader.readAsDataURL(file);
+};
+
 export default function Diary() {
   const { user } = useAuthContext();
   const [activeCat, setActiveCat] = useState<CatInfo | null>(null);
@@ -36,6 +140,23 @@ export default function Diary() {
   const [commentText, setCommentText] = useState("");
   const [showShareToast, setShowShareToast] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [customAlert, setCustomAlert] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    isError?: boolean;
+    logs?: string[];
+  } | null>(null);
+
+  const showAlert = (title: string, message: string, isError = false, logs?: string[]) => {
+    setCustomAlert({
+      show: true,
+      title,
+      message,
+      isError,
+      logs,
+    });
+  };
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showAddFriendMenu, setShowAddFriendMenu] = useState(false);
   const [addFriendStep, setAddFriendStep] = useState(1);
@@ -44,7 +165,8 @@ export default function Diary() {
   const [activeTab, setActiveTab] = useState<'mine' | 'friends'>('mine');
   const [friendDiaries, setFriendDiaries] = useState<FriendDiaryEntry[]>([]);
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const formatDateHeader = (timestamp: number) => {
     const dateObj = new Date(timestamp);
@@ -245,12 +367,13 @@ export default function Diary() {
     setSelectedMediaList([]);
     setIsReadingFile(false);
     setIsLoading(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
   const handleAutoWriteDiary = () => {
     if (!activeCat) {
-      alert("请先选择或培育一只活跃的喵咪伙伴！");
+      showAlert("提示", "请先选择或培育一只活跃的喵咪伙伴！");
       return;
     }
     
@@ -272,14 +395,25 @@ export default function Diary() {
   const handlePost = async () => {
     if ((!newContent.trim() && selectedMediaList.length === 0) || isLoading) return;
 
+    const consoleLogs: string[] = [];
+    const addLog = (msg: string) => {
+      const formatted = `[${new Date().toISOString().split('T')[1].substring(0, 8)}] ${msg}`;
+      console.log(formatted);
+      consoleLogs.push(formatted);
+    };
+
     try {
+      addLog("开始发布流程...");
       setIsLoading(true);
       
       const activeCatId = storage.getActiveCatId();
+      addLog(`活跃猫咪 ID: ${activeCatId}`);
       if (!activeCatId) throw new Error("未找到活跃猫咪，无法发布日记");
 
       // 模拟保存延迟与媒体文件处理耗时
+      addLog("延时模拟开始...");
       await new Promise(resolve => setTimeout(resolve, 1200));
+      addLog("延时模拟结束。");
 
       const diaryId = 'diary_' + Date.now();
       let mediaUrl: string | undefined = undefined;
@@ -287,11 +421,13 @@ export default function Diary() {
       let imagesList: string[] = [];
 
       const isVideo = selectedMediaList.some(m => m.type === 'video');
+      addLog(`媒体数量: ${selectedMediaList.length}, 是否包含视频: ${isVideo}`);
 
       if (isVideo) {
         const videoMedia = selectedMediaList.find(m => m.type === 'video')!;
         mediaType = 'video';
         if (videoMedia.file) {
+          addLog(`开始处理视频文件: name=${videoMedia.file.name}, size=${(videoMedia.file.size / 1024 / 1024).toFixed(2)}MB`);
           const reader = new FileReader();
           const base64 = await new Promise<string>((resolve, reject) => {
             reader.onload = () => resolve(reader.result as string);
@@ -300,40 +436,58 @@ export default function Diary() {
           });
           
           try {
+            addLog("正在保存视频到 IndexedDB...");
             await mediaStorage.saveMedia(diaryId, base64);
             mediaUrl = `indexeddb:${diaryId}`;
-          } catch {
+            addLog("视频已成功存入 IndexedDB。");
+          } catch (storageErr: any) {
+            addLog(`IndexedDB 存储失败，退回到 Base64。原因: ${storageErr?.message || storageErr}`);
             mediaUrl = base64;
           }
         } else {
+          addLog(`使用视频已有的 URL: ${videoMedia.url}`);
           mediaUrl = videoMedia.url;
         }
       } else if (selectedMediaList.length > 0) {
         mediaType = 'image';
+        addLog(`开始遍历处理 ${selectedMediaList.length} 张图片...`);
         
         for (let i = 0; i < selectedMediaList.length; i++) {
           const m = selectedMediaList[i];
+          const isBase64 = m.url.startsWith('data:image/');
+          addLog(` ├─ 图片 [${i + 1}/${selectedMediaList.length}]: fileExists=${!!m.file}, isBase64=${isBase64}, size=${m.file ? (m.file.size / 1024).toFixed(2) + "KB" : "N/A"}`);
+          
+          let base64ToSave: string | null = null;
+          
           if (m.file) {
-            const reader = new FileReader();
-            const base64 = await new Promise<string>((resolve, reject) => {
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = reject;
-              reader.readAsDataURL(m.file!);
-            });
-
+            // Under normal circumstances, images have already been pre-compressed into base64 upon selection.
+            // If they are not (e.g. edge cases where instant compression failed), we compress them here.
+            addLog(` ├─ 正在压缩未预压缩的图片 [${i + 1}]...`);
+            base64ToSave = await compressImage(m.file!);
+          } else if (isBase64) {
+            addLog(` ├─ 使用已预压缩的 Base64 数据 [${i + 1}]`);
+            base64ToSave = m.url;
+          }
+          
+          if (base64ToSave) {
             const imgKey = `${diaryId}_img_${i}`;
             try {
-              await mediaStorage.saveMedia(imgKey, base64);
+              addLog(` ├─ 正在将图片 [${i + 1}] 写入 IndexedDB (key: ${imgKey})...`);
+              await mediaStorage.saveMedia(imgKey, base64ToSave);
               imagesList.push(`indexeddb:${imgKey}`);
-            } catch {
-              imagesList.push(base64);
+              addLog(` ├─ 写入 IndexedDB 成功。`);
+            } catch (storageErr: any) {
+              addLog(` ├─ 写入 IndexedDB 失败: ${storageErr?.message || storageErr}。退回 Base64 直写。`);
+              imagesList.push(base64ToSave);
             }
           } else {
+            addLog(` ├─ 直接使用图片原生 URL: ${m.url}`);
             imagesList.push(m.url);
           }
         }
 
         mediaUrl = imagesList[0];
+        addLog(`图片遍历完成。图片列表: ${JSON.stringify(imagesList.map(item => item.startsWith('data:') ? 'base64_data' : item))}`);
       }
 
       const newEntry: DiaryEntry = {
@@ -349,17 +503,23 @@ export default function Diary() {
         comments: [],
       };
 
+      addLog("日记对象模型构建完毕。");
+
       // 1. 写入持久化存储
+      addLog("写入持久化存储 (storage.saveDiaries)...");
       const allDiaries = storage.getDiaries();
       const updatedAllDiaries = [newEntry, ...allDiaries];
       const success = storage.saveDiaries(updatedAllDiaries);
       
+      addLog(`持久化存储写入结果: ${success}`);
       if (!success) {
-        alert("存储空间不足，日记保存失败。请尝试删除一些旧记录或减小图片/视频大小。");
+        addLog("持久化存储写入失败，怀疑 LocalStorage 已满。");
+        showAlert("存储失败", "存储空间不足，日记保存失败。请尝试删除一些旧记录或减小图片/视频大小。", true, consoleLogs);
         return; // finally will handle setIsLoading(false)
       }
       
       // 2. 更新本地状态刷新列表 (仅展示当前猫咪的)
+      addLog("更新本地 React 状态 (setDiaries)...");
       setDiaries(prev => [newEntry, ...prev]);
       
       // 3. 显示成功提示
@@ -367,11 +527,16 @@ export default function Diary() {
       setTimeout(() => setShowPostToast(false), 2000);
 
       // 4. 成功后关闭并重置
+      addLog("关闭并重设弹窗状态...");
       closePostingModal();
+      addLog("日记完美发布成功！");
 
     } catch (error) {
       console.error("发布日记失败:", error);
-      alert("发布失败，请稍后重试");
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const errStack = error instanceof Error ? error.stack : "无堆栈";
+      addLog(`[Error] 遇到未捕获异常: ${errMsg}`);
+      showAlert("发布失败", errMsg, true, consoleLogs);
     } finally {
       // 无论成功还是失败，确保加载状态被重置
       setIsLoading(false);
@@ -483,73 +648,110 @@ export default function Diary() {
     return () => { isMountedRef.current = false; };
   }, []);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
+  const processUploadedFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
 
     // If there is any video in the chosen list, we only accept that first video
     const firstVideo = fileArray.find(file => file.type.startsWith('video'));
     if (firstVideo) {
       const sizeLimit = 20 * 1024 * 1024;
       if (firstVideo.size > sizeLimit) {
-        alert("视频文件太大啦，请选择 20MB 以内的文件哦");
-        e.target.value = '';
+        showAlert("文件过大", "视频文件太大啦，请选择 20MB 以内的文件哦");
         return;
       }
-      selectedMediaList.forEach(m => {
-        if (m.url && m.url.startsWith('blob:')) {
-          URL.revokeObjectURL(m.url);
-        }
+      setSelectedMediaList(prev => {
+        prev.forEach(m => {
+          if (m.url && m.url.startsWith('blob:')) {
+            URL.revokeObjectURL(m.url);
+          }
+        });
+        return [{ url: URL.createObjectURL(firstVideo), type: 'video', file: firstVideo }];
       });
-      setSelectedMediaList([{ url: URL.createObjectURL(firstVideo), type: 'video', file: firstVideo }]);
-      e.target.value = '';
       return;
     }
 
     // Process of images selection
-    let currentImages = selectedMediaList.filter(item => item.type === 'image');
-    const hasVideo = selectedMediaList.some(item => item.type === 'video');
-    if (hasVideo) {
-      selectedMediaList.forEach(m => {
-        if (m.url && m.url.startsWith('blob:')) {
-          URL.revokeObjectURL(m.url);
+    setIsReadingFile(true);
+    try {
+      let currentImages = selectedMediaList.filter(item => item.type === 'image');
+      const hasVideo = selectedMediaList.some(item => item.type === 'video');
+      
+      if (hasVideo) {
+        selectedMediaList.forEach(m => {
+          if (m.url && m.url.startsWith('blob:')) {
+            URL.revokeObjectURL(m.url);
+          }
+        });
+        currentImages = [];
+      }
+
+      const maxAllowed = 9 - currentImages.length;
+      if (maxAllowed <= 0) {
+        showAlert("提示", "最多只能上传 9 张图片哦");
+        return;
+      }
+
+      const sizeLimit = 15 * 1024 * 1024; // Compress up to 15MB immediately
+      const addedImages: { url: string; type: 'image' | 'video'; file?: File }[] = [];
+
+      for (const file of fileArray) {
+        const isImg = file.type.startsWith('image/') || 
+                      /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.name);
+        if (!isImg) continue;
+
+        if (addedImages.length + currentImages.length >= 9) {
+          showAlert("提示", "最多只能选择 9 张图片哦，超出部分已忽略");
+          break;
         }
-      });
-      currentImages = [];
-    }
 
-    const maxAllowed = 9 - currentImages.length;
-    if (maxAllowed <= 0) {
-      alert("最多只能上传 9 张图片哦");
-      e.target.value = '';
-      return;
-    }
+        if (file.size > sizeLimit) {
+          showAlert("文件过大", `图片 ${file.name} 太大啦，请选择 15MB 以内的图片哦`);
+          continue;
+        }
 
-    const sizeLimit = 10 * 1024 * 1024;
-    const addedImages: typeof selectedMediaList = [];
-
-    for (const file of fileArray) {
-      if (addedImages.length >= maxAllowed) {
-        alert("最多只能选择 9 张图片库，超出部分已忽略");
-        break;
+        try {
+          console.log(`[Selection] Compressing ${file.name} immediately during selection...`);
+          const base64 = await compressImage(file);
+          if (base64) {
+            addedImages.push({
+              url: base64,
+              type: 'image',
+              // We do not set the file field so we signal to handlePost that it is pre-compressed
+              file: undefined
+            });
+          } else {
+            addedImages.push({
+              url: URL.createObjectURL(file),
+              type: 'image',
+              file
+            });
+          }
+        } catch (err) {
+          console.error("[Selection] Instant compression failed, fallback to ObjectURL", err);
+          addedImages.push({
+            url: URL.createObjectURL(file),
+            type: 'image',
+            file
+          });
+        }
       }
-      if (file.size > sizeLimit) {
-        alert(`图片 ${file.name} 太大啦，请选择 10MB 以内的图片哦`);
-        continue;
+
+      if (addedImages.length > 0) {
+        setSelectedMediaList([...currentImages, ...addedImages]);
       }
-      addedImages.push({
-        url: URL.createObjectURL(file),
-        type: 'image',
-        file
-      });
+    } catch (err) {
+      console.error("[Selection] Error processing uploaded files:", err);
+      showAlert("提示", "处理选择的图片时遇到格式错误，请尝试其他格式的文件。");
+    } finally {
+      setIsReadingFile(false);
     }
+  };
 
-    if (addedImages.length > 0) {
-      setSelectedMediaList([...currentImages, ...addedImages]);
-    }
-
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    processUploadedFiles(files);
     e.target.value = '';
   };
 
@@ -891,7 +1093,21 @@ export default function Diary() {
                   </div>
 
                   {/* 中间编辑区域 */}
-                  <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
+                  <div 
+                    className="flex-1 overflow-y-auto p-6 no-scrollbar border-2 border-transparent hover:border-dashed hover:border-[#FF9D76]/30 rounded-2xl transition-all duration-200"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const files = e.dataTransfer.files;
+                      if (files && files.length > 0) {
+                        processUploadedFiles(files);
+                      }
+                    }}
+                  >
                     <textarea
                       value={newContent}
                       onChange={(e) => setNewContent(e.target.value)}
@@ -899,6 +1115,22 @@ export default function Diary() {
                       className="w-full min-h-[120px] bg-transparent text-on-surface placeholder-on-surface-variant/40 resize-none outline-none text-base border-0 focus:ring-0 p-0 leading-relaxed font-semibold"
                       disabled={isLoading}
                     />
+
+                    {/* 未选择媒体时，显示舒适直观的“点击或拖拽上传”提示框（极度方便批量选择） */}
+                    {selectedMediaList.length === 0 && (
+                      <div 
+                        onClick={() => imageInputRef.current?.click()}
+                        className="mt-4 mb-6 border-2 border-dashed border-[#5D4037]/15 hover:border-[#FF9D76]/40 bg-[#5D4037]/2 hover:bg-[#FF9D76]/5 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 group active:scale-[0.99]"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-[#5D4037]/5 group-hover:bg-[#FF9D76]/10 flex items-center justify-center text-[#5D4037]/50 group-hover:text-[#FF9D76] transition-colors duration-200">
+                          <ImageIcon size={24} />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-[#5D4037]/75 group-hover:text-[#FF9D76] transition-colors duration-200">点击上传 / 拖拽多张图片到这里</p>
+                          <p className="text-[11px] font-bold text-[#5D4037]/40 mt-1">支持批量选择（微信/相册中可按住/多选，最高 9 张）</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* 多图/视频预览区域 */}
                     {selectedMediaList.length > 0 && (
@@ -943,10 +1175,7 @@ export default function Diary() {
                             {selectedMediaList.length < 9 && (
                               <button
                                 onClick={() => {
-                                  if (fileInputRef.current) {
-                                    fileInputRef.current.accept = "image/*";
-                                    fileInputRef.current.click();
-                                  }
+                                  imageInputRef.current?.click();
                                 }}
                                 className="aspect-square border-2 border-dashed border-[#5D4037]/20 hover:border-[#FF9D76]/50 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-[#5D4037]/45 hover:text-[#FF9D76] bg-[#5D4037]/2 transition-colors duration-200 cursor-pointer"
                               >
@@ -971,10 +1200,7 @@ export default function Diary() {
                     <div className="flex gap-3">
                       <button 
                         onClick={() => {
-                          if (fileInputRef.current) {
-                            fileInputRef.current.accept = "image/*";
-                            fileInputRef.current.click();
-                          }
+                          imageInputRef.current?.click();
                         }}
                         className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
                         title="上传图片"
@@ -984,10 +1210,7 @@ export default function Diary() {
                       </button>
                       <button 
                         onClick={() => {
-                          if (fileInputRef.current) {
-                            fileInputRef.current.accept = "video/*";
-                            fileInputRef.current.click();
-                          }
+                          videoInputRef.current?.click();
                         }}
                         className="w-12 h-12 bg-surface-container rounded-2xl flex items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90"
                         title="上传视频"
@@ -1006,10 +1229,17 @@ export default function Diary() {
                       </button>
                       <input 
                         type="file" 
-                        ref={fileInputRef} 
+                        ref={imageInputRef} 
                         hidden 
-                        multiple 
-                        accept="image/*,video/*" 
+                        multiple={true} 
+                        accept="image/*,image/png,image/jpeg,image/gif,image/webp" 
+                        onChange={handleFileChange} 
+                      />
+                      <input 
+                        type="file" 
+                        ref={videoInputRef} 
+                        hidden 
+                        accept="video/*" 
                         onChange={handleFileChange} 
                       />
                     </div>
@@ -1285,6 +1515,62 @@ export default function Diary() {
           >
             <Share2 size={20} className="text-primary flex-shrink-0" />
             <span className="text-sm font-black whitespace-pre-wrap leading-relaxed">{shareMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 自定义提示与排查弹窗 */}
+      <AnimatePresence>
+        {customAlert && customAlert.show && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[600] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={() => setCustomAlert(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-background w-full max-w-sm rounded-[40px] p-8 shadow-2xl relative border border-outline-variant/50 max-h-[90vh] overflow-y-auto no-scrollbar"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* 关闭按钮 */}
+              <button 
+                onClick={() => setCustomAlert(null)}
+                className="absolute top-6 right-6 w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant active:scale-90 transition-all cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+
+              <div className={`w-14 h-14 ${customAlert.isError ? 'bg-red-50 text-red-500' : 'bg-primary/10 text-primary'} rounded-[20px] flex items-center justify-center mx-auto mb-5`}>
+                <Sparkles size={28} />
+              </div>
+
+              <h3 className="text-lg font-black text-on-surface mb-3 text-center">{customAlert.title}</h3>
+              
+              <div className="text-sm text-[#5D4037]/80 leading-relaxed mb-6 text-center whitespace-pre-line max-h-[140px] overflow-y-auto no-scrollbar">
+                {customAlert.message}
+              </div>
+
+              {/* 如果有排查工具包日志 */}
+              {customAlert.logs && customAlert.logs.length > 0 && (
+                <div className="mb-6 z-[610]">
+                  <div className="text-[10px] font-black text-on-surface-variant uppercase tracking-wider mb-2 text-left">开发诊断日志 (Scroll & Tap to Select):</div>
+                  <div className="bg-surface-container border border-outline-variant rounded-2xl p-4 text-left max-h-[120px] overflow-y-auto font-mono text-[9px] text-[#5D4037]/90 leading-relaxed whitespace-pre-wrap select-text selection:bg-primary/20">
+                    {customAlert.logs.join('\n')}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setCustomAlert(null)}
+                className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all text-sm cursor-pointer"
+              >
+                我知道了
+              </button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

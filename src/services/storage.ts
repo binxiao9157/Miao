@@ -278,7 +278,7 @@ async function resolveServerDiaryPayload(diary: DiaryEntry): Promise<DiaryEntry>
   if (resolvedDiary.images && Array.isArray(resolvedDiary.images)) {
     const resolvedImages: string[] = [];
     for (const img of resolvedDiary.images) {
-      if (img.startsWith('indexeddb:')) {
+      if (typeof img === 'string' && img.startsWith('indexeddb:')) {
         const imgKey = img.split(':')[1];
         try {
           const imgData = await mediaStorage.getMedia(imgKey);
@@ -288,7 +288,7 @@ async function resolveServerDiaryPayload(diary: DiaryEntry): Promise<DiaryEntry>
         } catch {
           // ignore
         }
-      } else if (!img.startsWith('miao_media:')) {
+      } else if (typeof img === 'string' && !img.startsWith('miao_media:')) {
         resolvedImages.push(img);
       }
     }
@@ -1138,16 +1138,27 @@ export const storage = {
 
   saveDiaries: (diaries: DiaryEntry[]): boolean => {
     const trimmed = diaries.length > MAX_DIARIES ? diaries.slice(0, MAX_DIARIES) : diaries;
+    
+    // Get existing diaries to identify changed or newly added items
+    const prevDiaries = storage.getDiaries();
+    const prevMap = new Map(prevDiaries.map(d => [d.id, JSON.stringify(d)]));
+
     const success = storage.setItem(getUserKey(USER_DATA_KEYS.DIARIES), JSON.stringify(trimmed));
 
     if (success && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('diary-updated'));
     }
 
-    // 双写：逐条同步到服务端
+    // 双写：仅同步发生变化或新增的日记，避免大规模高并发上传大文件包
     const userId = getCurrentUsername();
     if (userId) {
-      for (const d of trimmed) syncDiaryToServer(userId, d);
+      for (const d of trimmed) {
+        const prevStr = prevMap.get(d.id);
+        if (!prevStr || prevStr !== JSON.stringify(d)) {
+          // 只把新增、点赞更改、或新内容更新的单个日记同步到服务端
+          syncDiaryToServer(userId, d);
+        }
+      }
     }
 
     return success;
@@ -1161,7 +1172,7 @@ export const storage = {
     }
     if (diary?.images && Array.isArray(diary.images)) {
       diary.images.forEach(img => {
-        if (img.startsWith('indexeddb:')) {
+        if (typeof img === 'string' && img.startsWith('indexeddb:')) {
           const imgKey = img.split(':')[1];
           mediaStorage.deleteMedia(imgKey);
         }
