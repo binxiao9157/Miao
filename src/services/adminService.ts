@@ -1,7 +1,6 @@
 import { requestJson } from "./httpClient";
 
-export const ADMIN_TOKEN = "miao_admin_8888";
-export const ADMIN_UNLOCK_CODES = new Set([ADMIN_TOKEN, "888888"]);
+const ADMIN_TOKEN_STORAGE_KEY = "miao_admin_token";
 
 export interface AdminUser {
   username: string;
@@ -48,13 +47,25 @@ export type AdminPointAdjustment = {
 };
 
 function adminHeaders() {
+  const token = getAdminSessionToken();
   return {
-    "X-Admin-Token": ADMIN_TOKEN,
+    ...(token ? { "X-Admin-Token": token } : {}),
   };
 }
 
-export function isAdminUnlockCode(value: string) {
-  return ADMIN_UNLOCK_CODES.has(value.trim());
+export function getAdminSessionToken() {
+  if (typeof sessionStorage === "undefined") return "";
+  return sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || "";
+}
+
+export function setAdminSessionToken(value: string) {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, value.trim());
+}
+
+export function clearAdminSessionToken() {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
 }
 
 export const adminService = {

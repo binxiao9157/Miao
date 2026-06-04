@@ -237,21 +237,22 @@ function hasMeaningfulCatDifference(a: CatInfo, b: CatInfo): boolean {
 }
 
 function syncCatToServer(userId: string, cat: CatInfo): Promise<void> {
-  return fetch('/api/cats', {
+  return fetch('/api/v1/cats', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, cat: { ...cat, placeholderImage: undefined, anchorFrame: undefined } }),
+    headers: buildJsonHeaders(),
+    body: JSON.stringify({ cat: { ...cat, placeholderImage: undefined, anchorFrame: undefined } }),
   }).then(() => undefined).catch(() => undefined);
 }
 
 function deleteCatFromServer(userId: string, catId: string) {
-  fetch(`/api/cats/${encodeURIComponent(userId)}/${encodeURIComponent(catId)}`, {
+  fetch(`/api/v1/cats/${encodeURIComponent(catId)}`, {
     method: 'DELETE',
+    headers: buildJsonHeaders(),
   }).catch(() => {});
 }
 
 function deleteAllCatsFromServer(userId: string) {
-  fetch(`/api/cats/${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => {});
+  fetch('/api/v1/cats', { method: 'DELETE', headers: buildJsonHeaders() }).catch(() => {});
 }
 
 // ── 日记/信件/积分 双写辅助函数 ──
@@ -300,38 +301,40 @@ async function resolveServerDiaryPayload(diary: DiaryEntry): Promise<DiaryEntry>
 
 async function syncDiaryToServer(userId: string, diary: DiaryEntry) {
   const payload = await resolveServerDiaryPayload(diary);
-  fetch('/api/diaries', {
+  fetch('/api/v1/diaries', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, diary: payload }),
+    headers: buildJsonHeaders(),
+    body: JSON.stringify({ diary: payload }),
   }).catch(() => {});
 }
 
 function deleteDiaryFromServer(userId: string, diaryId: string) {
-  fetch(`/api/diaries/${encodeURIComponent(userId)}/${encodeURIComponent(diaryId)}`, {
+  fetch(`/api/v1/diaries/${encodeURIComponent(diaryId)}`, {
     method: 'DELETE',
+    headers: buildJsonHeaders(),
   }).catch(() => {});
 }
 
 function syncLetterToServer(userId: string, letter: TimeLetter) {
-  fetch('/api/letters', {
+  fetch('/api/v1/letters', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, letter }),
+    headers: buildJsonHeaders(),
+    body: JSON.stringify({ letter }),
   }).catch(() => {});
 }
 
 function deleteLetterFromServer(userId: string, letterId: string) {
-  fetch(`/api/letters/${encodeURIComponent(userId)}/${encodeURIComponent(letterId)}`, {
+  fetch(`/api/v1/letters/${encodeURIComponent(letterId)}`, {
     method: 'DELETE',
+    headers: buildJsonHeaders(),
   }).catch(() => {});
 }
 
 function syncPointsToServer(userId: string, data: PointsInfo) {
-  fetch('/api/points', {
+  fetch('/api/v1/points', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, data }),
+    headers: buildJsonHeaders(),
+    body: JSON.stringify({ data }),
   }).catch(() => {});
 }
 
@@ -366,33 +369,20 @@ async function syncOfflineTransactions() {
 
   isSyncingOffline = true;
   const authHeaders = buildJsonHeaders();
-  const legacyHeaders = buildJsonHeaders({ auth: false });
 
   const remaining: OfflineTransaction[] = [];
 
   for (const tx of queue) {
     try {
-      let success = false;
-      let res = await fetch('/api/v1/points/transaction', {
+      const res = await fetch('/api/v1/points/transaction', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({ amount: tx.amount, type: tx.type, reason: tx.reason })
       }).catch(() => null);
 
       if (res && res.ok) {
-        success = true;
+        continue;
       } else {
-        const fallbackRes = await fetch(`/api/points/${encodeURIComponent(tx.userId)}/transaction`, {
-          method: 'POST',
-          headers: legacyHeaders,
-          body: JSON.stringify({ amount: tx.amount, type: tx.type, reason: tx.reason })
-        }).catch(() => null);
-        if (fallbackRes && fallbackRes.ok) {
-          success = true;
-        }
-      }
-
-      if (!success) {
         remaining.push(tx);
       }
     } catch {
@@ -406,7 +396,6 @@ async function syncOfflineTransactions() {
 
 function logTransactionToServer(userId: string, amount: number, type: 'earn' | 'spend', reason: string) {
   const authHeaders = buildJsonHeaders();
-  const legacyHeaders = buildJsonHeaders({ auth: false });
   
   fetch('/api/v1/points/transaction', {
     method: 'POST',
@@ -417,44 +406,14 @@ function logTransactionToServer(userId: string, amount: number, type: 'earn' | '
       // Success triggers queued transaction flushing
       syncOfflineTransactions();
     } else {
-      // Fallback
-      fetch(`/api/points/${encodeURIComponent(userId)}/transaction`, {
-        method: 'POST',
-        headers: legacyHeaders,
-        body: JSON.stringify({ amount, type, reason })
-      }).then(fallbackRes => {
-        if (fallbackRes.ok) {
-          syncOfflineTransactions();
-        } else {
-          // Add to offline queue
-          const queue = getOfflineQueue();
-          queue.push({ id: 'otx_' + Date.now() + Math.random().toString(36).substring(2, 5), userId, amount, type, reason });
-          saveOfflineQueue(queue);
-        }
-      }).catch(() => {
-        const queue = getOfflineQueue();
-        queue.push({ id: 'otx_' + Date.now() + Math.random().toString(36).substring(2, 5), userId, amount, type, reason });
-        saveOfflineQueue(queue);
-      });
-    }
-  }).catch(() => {
-    fetch(`/api/points/${encodeURIComponent(userId)}/transaction`, {
-      method: 'POST',
-      headers: legacyHeaders,
-      body: JSON.stringify({ amount, type, reason })
-    }).then(res => {
-      if (res.ok) {
-        syncOfflineTransactions();
-      } else {
-        const queue = getOfflineQueue();
-        queue.push({ id: 'otx_' + Date.now() + Math.random().toString(36).substring(2, 5), userId, amount, type, reason });
-        saveOfflineQueue(queue);
-      }
-    }).catch(() => {
       const queue = getOfflineQueue();
       queue.push({ id: 'otx_' + Date.now() + Math.random().toString(36).substring(2, 5), userId, amount, type, reason });
       saveOfflineQueue(queue);
-    });
+    }
+  }).catch(() => {
+    const queue = getOfflineQueue();
+    queue.push({ id: 'otx_' + Date.now() + Math.random().toString(36).substring(2, 5), userId, amount, type, reason });
+    saveOfflineQueue(queue);
   });
 }
 
@@ -815,10 +774,10 @@ export const storage = {
   },
 
   syncFromServer: async (username: string): Promise<void> => {
-    const enc = encodeURIComponent(username);
+    const authHeaders = buildJsonHeaders();
     try {
       // ── 猫咪同步 ──
-      const catResp = await fetch(`/api/cats/${enc}`);
+      const catResp = await fetch('/api/v1/cats', { headers: authHeaders });
       if (catResp.ok) {
         const serverCats: CatInfo[] = await catResp.json();
         if (!serverCats.length) {
@@ -857,7 +816,7 @@ export const storage = {
 
     // ── 日记同步 ──
     try {
-      const resp = await fetch(`/api/diaries/${enc}`);
+      const resp = await fetch('/api/v1/diaries', { headers: authHeaders });
       if (resp.ok) {
         const serverDiaries: DiaryEntry[] = await resp.json();
         const localDiaries = storage.getDiaries();
@@ -881,7 +840,7 @@ export const storage = {
 
     // ── 信件同步 ──
     try {
-      const resp = await fetch(`/api/letters/${enc}`);
+      const resp = await fetch('/api/v1/letters', { headers: authHeaders });
       if (resp.ok) {
         const serverLetters: TimeLetter[] = await resp.json();
         const localLetters = storage.getTimeLetters();
@@ -905,7 +864,7 @@ export const storage = {
 
     // ── 积分同步 ──
     try {
-      const resp = await fetch(`/api/points/${enc}`);
+      const resp = await fetch('/api/v1/points', { headers: authHeaders });
       if (resp.ok) {
         const serverPoints = await resp.json();
         if (serverPoints) {

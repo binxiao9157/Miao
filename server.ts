@@ -11,6 +11,9 @@ import FormData from 'form-data';
 import { clientTypeMiddleware } from "./server/middleware/clientType";
 import { createTokenService } from "./server/utils/authToken";
 import { ensureDirectory, readJSON, writeJSON } from "./server/utils/jsonStore";
+import { hashPassword, needsPasswordRehash, verifyPassword as verifyStoredPassword } from "./server/utils/password";
+import { parseSafeRemoteUrl } from "./server/utils/remoteUrl";
+import { DEV_ADMIN_TOKEN_FALLBACK, DEV_JWT_SECRET_FALLBACK, readSecret } from "./server/utils/runtimeConfig";
 
 dotenv.config();
 
@@ -69,7 +72,7 @@ async function startServer() {
   }
 
   const { signToken, verifyToken } = createTokenService({
-    secret: process.env.JWT_SECRET || process.env.SESSION_SECRET || "miao-dev-secret-change-me",
+    secret: readSecret("JWT_SECRET", process.env.JWT_SECRET || process.env.SESSION_SECRET, DEV_JWT_SECRET_FALLBACK),
     ttlMs: Number(process.env.SESSION_TTL_MS || 30 * 24 * 60 * 60 * 1000),
   });
 
@@ -108,6 +111,18 @@ async function startServer() {
     openidBound: !!user.openid,
     passwordSet: !!user.password
   });
+
+  const findUserByPassword = (users: ServerUser[], username: string, password: string) => {
+    const user = users.find(u => u.username === username);
+    if (!user || !verifyStoredPassword(password, user.password)) return null;
+
+    if (needsPasswordRehash(user.password)) {
+      user.password = hashPassword(password);
+      writeJSON(usersFile, users);
+    }
+
+    return user;
+  };
 
   const authRequired: express.RequestHandler = (req, res, next) => {
     const raw = String(req.headers.authorization || '');
@@ -176,7 +191,7 @@ async function startServer() {
     if (users.find(u => u.username === username)) {
       return res.status(409).json({ error: "Username already exists" });
     }
-    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
+    const user: ServerUser = { username, password: hashPassword(password), nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
     users.push(user);
     writeJSON(usersFile, users);
     console.log(`[Auth] Registered user: ${username}`);
@@ -189,7 +204,7 @@ async function startServer() {
     if (!username || !password) return res.status(400).json({ error: "Missing username or password" });
 
     const users = readJSON<ServerUser[]>(usersFile, []);
-    const user = users.find(u => u.username === username && u.password === password);
+    const user = findUserByPassword(users, username, password);
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
     console.log(`[Auth] Login: ${username}`);
     res.json({ username: user.username, nickname: user.nickname, avatar: user.avatar });
@@ -211,7 +226,7 @@ async function startServer() {
     if (users.find(u => u.username === username)) {
       return res.status(409).json({ error: "Username already exists", code: "USERNAME_EXISTS" });
     }
-    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
+    const user: ServerUser = { username, password: hashPassword(password), nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
     users.push(user);
     writeJSON(usersFile, users);
     res.json({ token: signToken({ username: user.username }), user: publicUser(user) });
@@ -223,7 +238,7 @@ async function startServer() {
     if (!username || !password) return res.status(400).json({ error: "Missing username or password", code: "INVALID_PARAMETER" });
 
     const users = readJSON<ServerUser[]>(usersFile, []);
-    const user = users.find(u => u.username === username && u.password === password);
+    const user = findUserByPassword(users, username, password);
     if (!user) return res.status(401).json({ error: "Invalid credentials", code: "INVALID_CREDENTIALS" });
     res.json({ token: signToken({ username: user.username }), user: publicUser(user) });
   });
@@ -426,7 +441,7 @@ async function startServer() {
     const user = users.find(u => u.phone === phone);
     if (!user) return res.status(404).json({ error: "Phone number not registered", code: "PHONE_NOT_FOUND" });
 
-    user.password = newPassword;
+    user.password = hashPassword(newPassword);
     writeJSON(usersFile, users);
     console.log(`[ResetPassword] Password reset for phone: ${maskPhone(phone)}`);
     res.json({ success: true });
@@ -450,11 +465,11 @@ async function startServer() {
       return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
     }
 
-    if (user.password && user.password !== currentPassword) {
+    if (user.password && !verifyStoredPassword(currentPassword, user.password)) {
       return res.status(401).json({ error: "Invalid current password", code: "INVALID_CURRENT_PASSWORD" });
     }
 
-    user.password = password;
+    user.password = hashPassword(password);
     writeJSON(usersFile, users);
     res.json({ success: true, user: publicUser(user) });
   });
@@ -557,55 +572,10 @@ async function startServer() {
     res.json(settings);
   });
 
-  // ── 猫咪 CRUD API ──
-  app.get("/api/cats/:userId", (req, res) => {
-    const cats = readJSON<ServerCat[]>(catsFile, []);
-    const userCats = cats.filter(c => c.userId === req.params.userId);
-    res.json(userCats);
-  });
-
-  app.post("/api/cats", (req, res) => {
-    const { userId, cat } = req.body;
-    if (!userId || !cat?.id) return res.status(400).json({ error: "Missing userId or cat.id" });
-
-    const cats = readJSON<ServerCat[]>(catsFile, []);
-    const entry: ServerCat = { ...cat, userId };
-    const idx = cats.findIndex(c => c.userId === userId && c.id === cat.id);
-    if (idx >= 0) {
-      // 深度合并 videoPaths，保留已有的动作
-      cats[idx] = {
-        ...entry,
-        videoPaths: {
-          ...cats[idx].videoPaths,
-          ...entry.videoPaths
-        }
-      };
-    } else {
-      cats.push(entry);
-    }
-    writeJSON(catsFile, cats);
-    res.json({ success: true });
-  });
-
-  app.delete("/api/cats/:userId/:catId", (req, res) => {
-    const { userId, catId } = req.params;
-    const cats = readJSON<ServerCat[]>(catsFile, []);
-    const filtered = cats.filter(c => !(c.userId === userId && c.id === catId));
-    writeJSON(catsFile, filtered);
-    res.json({ success: true });
-  });
-
-  app.delete("/api/cats/:userId", (req, res) => {
-    const cats = readJSON<ServerCat[]>(catsFile, []);
-    const filtered = cats.filter(c => c.userId !== req.params.userId);
-    writeJSON(catsFile, filtered);
-    res.json({ success: true });
-  });
-
   // ── 日记 CRUD API ──
   interface ServerDiary {
     id: string; userId: string; catId: string; content: string;
-    media?: string; mediaType?: string; createdAt: number;
+    media?: string; mediaType?: string; images?: string[]; createdAt: number;
     likes: number; isLiked: boolean; comments: any[];
   }
 
@@ -625,136 +595,23 @@ async function startServer() {
     }));
   }
 
-  app.get("/api/diaries/:userId", (req, res) => {
-    const all = readJSON<ServerDiary[]>(diariesFile, []);
-    res.json(all.filter(d => d.userId === req.params.userId));
-  });
-
-  app.post("/api/diaries", (req, res) => {
-    const { userId, diary } = req.body;
-    if (!userId || !diary?.id) return res.status(400).json({ error: "Missing userId or diary.id" });
-    const all = readJSON<ServerDiary[]>(diariesFile, []);
-    const entry: ServerDiary = { ...diary, userId };
-    const idx = all.findIndex(d => d.userId === userId && d.id === diary.id);
-    if (idx >= 0) all[idx] = entry; else all.push(entry);
-    writeJSON(diariesFile, all);
-    res.json({ success: true });
-  });
-
-  app.delete("/api/diaries/:userId/:diaryId", (req, res) => {
-    const { userId, diaryId } = req.params;
-    const all = readJSON<ServerDiary[]>(diariesFile, []);
-    writeJSON(diariesFile, all.filter(d => !(d.userId === userId && d.id === diaryId)));
-    res.json({ success: true });
-  });
-
   // ── 时光信件 CRUD API ──
   interface ServerLetter {
     id: string; userId: string; catId: string; catAvatar: string;
     title?: string; content: string; unlockAt: number; createdAt: number;
   }
 
-  app.get("/api/letters/:userId", (req, res) => {
-    const all = readJSON<ServerLetter[]>(lettersFile, []);
-    res.json(all.filter(l => l.userId === req.params.userId));
-  });
-
-  app.post("/api/letters", (req, res) => {
-    const { userId, letter } = req.body;
-    if (!userId || !letter?.id) return res.status(400).json({ error: "Missing userId or letter.id" });
-    const all = readJSON<ServerLetter[]>(lettersFile, []);
-    const entry: ServerLetter = { ...letter, userId };
-    const idx = all.findIndex(l => l.userId === userId && l.id === letter.id);
-    if (idx >= 0) all[idx] = entry; else all.push(entry);
-    writeJSON(lettersFile, all);
-    res.json({ success: true });
-  });
-
-  app.delete("/api/letters/:userId/:letterId", (req, res) => {
-    const { userId, letterId } = req.params;
-    const all = readJSON<ServerLetter[]>(lettersFile, []);
-    writeJSON(lettersFile, all.filter(l => !(l.userId === userId && l.id === letterId)));
-    res.json({ success: true });
-  });
-
   // ── 积分 API ──
   interface ServerPoints { userId: string; data: any; }
 
-  app.get("/api/points/:userId", (req, res) => {
-    const all = readJSON<ServerPoints[]>(pointsFile, []);
-    const entry = all.find(p => p.userId === req.params.userId);
-    res.json(entry?.data || null);
-  });
+  const legacyApiDisabled: express.RequestHandler = (_req, res) => {
+    res.status(410).json({
+      error: "Legacy API disabled. Please use /api/v1 with bearer authentication.",
+      code: "LEGACY_API_DISABLED",
+    });
+  };
 
-  app.post("/api/points", (req, res) => {
-    const { userId, data } = req.body;
-    if (!userId || !data) return res.status(400).json({ error: "Missing userId or data" });
-    const all = readJSON<ServerPoints[]>(pointsFile, []);
-    const idx = all.findIndex(p => p.userId === userId);
-    if (idx >= 0) all[idx].data = data; else all.push({ userId, data });
-    writeJSON(pointsFile, all);
-    res.json({ success: true });
-  });
-
-  app.post("/api/points/:userId/transaction", (req, res) => {
-    const { userId } = req.params;
-    const { amount, type, reason } = req.body;
-    if (typeof amount !== 'number' || !['earn', 'spend'].includes(type) || !reason) {
-      return res.status(400).json({ error: "Invalid transaction parameters", code: "INVALID_PARAMETER" });
-    }
-    const all = readJSON<ServerPoints[]>(pointsFile, []);
-    let userPoints = all.find(p => p.userId === userId);
-    if (!userPoints) {
-      userPoints = {
-        userId,
-        data: {
-          total: 100,
-          lastLoginDate: null,
-          dailyInteractionPoints: 0,
-          lastInteractionDate: null,
-          onlineMinutes: 0,
-          lastOnlineUpdate: Date.now(),
-          history: []
-        }
-      };
-      all.push(userPoints);
-    }
-    
-    // Server secure validation
-    if (type === 'spend' && userPoints.data.total < amount) {
-      return res.status(400).json({ error: "Insufficient points on server", code: "INSUFFICIENT_POINTS" });
-    }
-    
-    // Prevent client spam/cheat (e.g. max single gain limit 1000)
-    const maxSingleGain = 1000;
-    if (type === 'earn' && amount > maxSingleGain && !reason.includes('调试') && !reason.includes('Cheat')) {
-      console.warn(`[Security Alert] User ${userId} attempted to earn abnormal points amount: ${amount}`);
-      return res.status(400).json({ error: "Suspicious points increment blocked", code: "POINTS_SECURITY_BLOCK" });
-    }
-
-    if (type === 'earn') {
-      userPoints.data.total += amount;
-    } else {
-      userPoints.data.total -= amount;
-    }
-    
-    const txId = 'tx_' + Date.now() + Math.random().toString(36).substring(2, 7);
-    const transaction = {
-      id: txId,
-      type,
-      amount,
-      reason,
-      timestamp: Date.now()
-    };
-    
-    if (!userPoints.data.history) userPoints.data.history = [];
-    userPoints.data.history.unshift(transaction);
-    if (userPoints.data.history.length > 50) userPoints.data.history.pop();
-    
-    userPoints.data.updatedAt = Date.now();
-    writeJSON(pointsFile, all);
-    res.json({ success: true, total: userPoints.data.total, history: userPoints.data.history, transaction });
-  });
+  app.all(/^\/api\/(?:cats|diaries|letters|points)(?:\/.*)?$/, legacyApiDisabled);
 
   app.get("/api/v1/cats", authRequired, (req, res) => {
     const userId = getAuthedUsername(req);
@@ -991,7 +848,7 @@ async function startServer() {
     
     // Prevent client spam/cheat (e.g. max single gain limit 1000)
     const maxSingleGain = 1000;
-    if (type === 'earn' && amount > maxSingleGain && !reason.includes('调试') && !reason.includes('Cheat')) {
+    if (type === 'earn' && amount > maxSingleGain) {
       console.warn(`[Security Alert] Authed User ${userId} attempted to earn abnormal points amount: ${amount}`);
       return res.status(400).json({ error: "Suspicious points increment blocked", code: "POINTS_SECURITY_BLOCK" });
     }
@@ -1191,7 +1048,7 @@ async function startServer() {
   });
 
   // ── 管理员认证中间件 ──
-  const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "miao_admin_8888";
+  const ADMIN_TOKEN = readSecret("ADMIN_TOKEN", process.env.ADMIN_TOKEN, DEV_ADMIN_TOKEN_FALLBACK);
   const adminAuth: express.RequestHandler = (req, res, next) => {
     const adminToken = String(req.headers['x-admin-token'] || '');
     // 强制使用专属系统的管理员保密令牌 (不信赖数据库中任何名义是 admin 的普通账号)
@@ -1473,7 +1330,7 @@ async function startServer() {
     }
   }, 3600000);
 
-  app.get("/api/temp-file/:id", (req, res) => {
+  app.get("/api/temp-file/:id", authRequired, (req, res) => {
     const file = tempFiles.get(req.params.id);
     if (!file) return res.status(404).send("File not found or expired");
     res.setHeader('Content-Type', file.contentType);
@@ -1758,7 +1615,8 @@ async function startServer() {
       const requestBody: any = {
         model: body.model || VOLC_CONFIG.IMAGE_MODEL,
         prompt,
-        size: body.parameters?.size || "1920x1920"
+        size: body.parameters?.size || "1920x1920",
+        watermark: false
       };
       if (negative_prompt) requestBody.negative_prompt = negative_prompt;
       if (image_base64) requestBody.image = image_base64;
@@ -2023,7 +1881,7 @@ async function startServer() {
     }
   };
 
-  app.post("/api/ai/generate-image", async (req, res) => {
+  app.post("/api/ai/generate-image", authRequired, async (req, res) => {
     try {
       const provider = normalizeProvider(req.body.provider);
       const result = provider === "volcengine"
@@ -2035,7 +1893,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/ai/generate-video", async (req, res) => {
+  app.post("/api/ai/generate-video", authRequired, async (req, res) => {
     try {
       const provider = normalizeProvider(req.body.provider);
       const result = provider === "volcengine"
@@ -2047,7 +1905,7 @@ async function startServer() {
     }
   });
 
-  app.get("/api/ai/:type(image|video)-status/:provider/:taskId", async (req, res) => {
+  app.get("/api/ai/:type(image|video)-status/:provider/:taskId", authRequired, async (req, res) => {
     const provider = normalizeProvider(req.params.provider);
     const { taskId, type } = req.params;
 
@@ -2185,7 +2043,7 @@ async function startServer() {
   });
 
   // API Route for Image Generation (DashScope)
-  app.post("/api/generate-image", async (req, res) => {
+  app.post("/api/generate-image", authRequired, async (req, res) => {
     const { prompt, image_base64 } = req.body;
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: "缺少必要参数: prompt", code: "INVALID_PARAMETER" });
@@ -2277,7 +2135,7 @@ async function startServer() {
   });
 
   // DashScope task status polling (Unified for both image and video)
-  app.get("/api/:type(image|video)-status/:taskId", async (req, res) => {
+  app.get("/api/:type(image|video)-status/:taskId", authRequired, async (req, res) => {
     const { taskId } = req.params;
     try {
       const url = `${ARK_BASE_URL}/tasks/${taskId}`;
@@ -2324,7 +2182,7 @@ async function startServer() {
   });
 
   // API Route for Video Generation (DashScope)
-  app.post("/api/generate-video", async (req, res) => {
+  app.post("/api/generate-video", authRequired, async (req, res) => {
     const { prompt, image_base64, parameters: clientParams } = req.body;
     if (!image_base64) {
       return res.status(400).json({ error: "缺少必要参数: image_base64", code: "INVALID_PARAMETER" });
@@ -2427,29 +2285,6 @@ async function startServer() {
       });
     }
   });
-
-  const parseSafeRemoteUrl = (rawUrl: unknown): string | null => {
-    if (!rawUrl || typeof rawUrl !== 'string') return null;
-    try {
-      const parsed = new URL(rawUrl);
-      const hostname = parsed.hostname.toLowerCase();
-      const blockedHosts = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']);
-      const isBlockedPrivateHost =
-        blockedHosts.has(hostname) ||
-        hostname.startsWith('10.') ||
-        hostname.startsWith('192.168.') ||
-        /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname) ||
-        hostname.startsWith('169.254.');
-
-      if (!['http:', 'https:'].includes(parsed.protocol) || isBlockedPrivateHost) {
-        return null;
-      }
-
-      return parsed.toString();
-    } catch {
-      return null;
-    }
-  };
 
   const getRawUrlFromRequest = (req: express.Request): string | null => {
     const originalUrl = req.originalUrl || req.url || '';
@@ -2607,7 +2442,6 @@ async function startServer() {
     }
   };
 
-  app.post("/api/persist-video", persistVideoHandler);
   app.post("/api/v1/assets/persist-video", authRequired, persistVideoHandler);
 
   app.use('/uploads', express.static(path.resolve(__dirname, 'uploads'), {

@@ -3,7 +3,13 @@ import { aiConfig } from './aiConfig';
 import { AIProfile, AITaskResponse, VideoActionPrompt } from './types';
 
 function buildHeaders() {
-  return { 'Content-Type': 'application/json' };
+  const token = typeof localStorage !== 'undefined'
+    ? localStorage.getItem('miao_auth_token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
