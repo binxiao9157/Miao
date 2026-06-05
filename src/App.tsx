@@ -43,6 +43,7 @@ const SetNickname = lazyRetry(() => import("./pages/SetNickname"));
 const Download = lazyRetry(() => import("./pages/Download"));
 const Feedback = lazyRetry(() => import("./pages/Feedback"));
 const AdminSettings = lazyRetry(() => import("./pages/AdminSettings"));
+const FriendManage = lazyRetry(() => import("./pages/FriendManage"));
 
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 import SplashScreen from "./components/SplashScreen";
@@ -174,6 +175,7 @@ function AppRoutes() {
         <Route path="/join-friend" element={<ProtectedRoute><ScanFriend /></ProtectedRoute>} />
         <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
         <Route path="/admin-settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
+        <Route path="/friends-manage" element={<ProtectedRoute><FriendManage /></ProtectedRoute>} />
   
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />

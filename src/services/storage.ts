@@ -91,6 +91,7 @@ export interface FriendInfo {
   catName: string;
   catAvatar: string;
   addedAt: number;
+  visibleCats?: string[];
 }
 
 export interface PointsInfo {

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, QrCode, ScanQrCode, HardDrive } from "lucide-react";
+import { Settings, ChevronRight, LogOut, Shield, Bell, FileText, Lock, User as UserIcon, Heart, Calendar, Image as ImageIcon, Camera, Trash2, QrCode, ScanQrCode, HardDrive, Users } from "lucide-react";
 import { useAuthContext } from "../context/AuthContext";
 import { storage, CatInfo } from "../services/storage";
 import { computeNotifications } from "./NotificationList";
@@ -139,6 +139,7 @@ export default function Profile() {
 
   const menuItems = [
     { icon: UserIcon, label: "个人资料设置", path: "/edit-profile", color: "bg-blue-50 text-blue-500" },
+    { icon: Users, label: "好友管理", path: "/friends-manage", color: "bg-rose-50 text-rose-500" },
     { icon: Bell, label: "通知设置", path: "/notification-settings", color: "bg-orange-50 text-orange-500" },
     { icon: Shield, label: "隐私设置", path: "/privacy-settings", color: "bg-teal-50 text-teal-500" },
     { icon: FileText, label: "意见反馈", path: "/feedback", color: "bg-purple-50 text-purple-500" },
