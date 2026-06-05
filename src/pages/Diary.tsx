@@ -15,7 +15,33 @@ import CommentInput from "../components/CommentInput";
 import { ShareSheet } from "../components/ShareSheet";
 import ImageViewer from "../components/ImageViewer";
 
-const compressImage = (file: File, maxSize = 1200, quality = 0.8): Promise<string> => {
+const convertHeicToJpeg = async (file: File): Promise<File> => {
+  const isHeic = file.type === 'image/heic' || 
+                 file.type === 'image/heif' || 
+                 /\.(heic|heif)$/i.test(file.name);
+  if (!isHeic) return file;
+  
+  try {
+    console.log(`[Heic] Converting HEIC file: ${file.name}...`);
+    const heic2anyModule = await import('heic2any');
+    const heic2any = heic2anyModule.default;
+    const blob = await heic2any({
+      blob: file,
+      toType: 'image/jpeg',
+      quality: 0.7
+    });
+    const resolvedBlob = Array.isArray(blob) ? blob[0] : blob;
+    return new File([resolvedBlob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), {
+      type: 'image/jpeg',
+      lastModified: Date.now()
+    });
+  } catch (err) {
+    console.error("[Heic] Failed to convert HEIC to JPEG, using fallback.", err);
+    return file;
+  }
+};
+
+const compressImage = (file: File, maxSize = 1200, quality = 0.7): Promise<string> => {
   return new Promise<string>((resolve) => {
     console.log(`[Compression] Starting compression for file: name=${file.name}, size=${(file.size / 1024 / 1024).toFixed(2)}MB, type=${file.type}`);
     
@@ -59,25 +85,25 @@ const compressImage = (file: File, maxSize = 1200, quality = 0.8): Promise<strin
         
         // Fallback to FileReader if something fails
         console.log(`[Compression] Falling back to FileReader due to canvas/context error`);
-        fallbackWithFileReader(file, resolve);
+        fallbackWithFileReader(file, resolve, quality);
       };
       
       img.onerror = (err) => {
         console.error("[Compression] Image error via ObjectURL. Error details:", err);
         URL.revokeObjectURL(objectUrl);
         console.log(`[Compression] Falling back to FileReader due to image load error`);
-        fallbackWithFileReader(file, resolve);
+        fallbackWithFileReader(file, resolve, quality);
       };
       
       img.src = objectUrl;
     } else {
       console.log(`[Compression] ObjectURL not supported, using FileReader directly`);
-      fallbackWithFileReader(file, resolve);
+      fallbackWithFileReader(file, resolve, quality);
     }
   });
 };
 
-const fallbackWithFileReader = (file: File, resolve: (val: string) => void) => {
+const fallbackWithFileReader = (file: File, resolve: (val: string) => void, quality = 0.7) => {
   const reader = new FileReader();
   reader.onload = (e) => {
     const result = e.target?.result as string;
@@ -98,7 +124,7 @@ const fallbackWithFileReader = (file: File, resolve: (val: string) => void) => {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
           resolve(dataUrl);
           return;
         }
@@ -119,71 +145,6 @@ const fallbackWithFileReader = (file: File, resolve: (val: string) => void) => {
   reader.readAsDataURL(file);
 };
 
-const MAX_INLINE_IMAGE_DATA_URL_LENGTH = 350 * 1024;
-
-const dataUrlToBlob = (dataUrl: string): Blob => {
-  const [meta, data] = dataUrl.split(',');
-  if (!meta || !data) throw new Error('图片数据格式异常');
-  const mime = meta.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
-  const binary = atob(data);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return new Blob([bytes], { type: mime });
-};
-
-const uploadDiaryImage = async (dataUrl: string, fileName: string): Promise<string> => {
-  const token = typeof localStorage !== 'undefined'
-    ? localStorage.getItem('miao_auth_token')
-    : '';
-  const formData = new FormData();
-  formData.append('purpose', 'diary');
-  formData.append('file', dataUrlToBlob(dataUrl), fileName);
-
-  const resp = await fetch('/api/v1/upload', {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body: formData,
-  });
-
-  const payload = await resp.json().catch(() => ({}));
-  if (!resp.ok || !payload?.url) {
-    throw new Error(payload?.error || `图片云端备份失败 HTTP ${resp.status}`);
-  }
-  return payload.url;
-};
-
-const persistDiaryImage = async (
-  key: string,
-  dataUrl: string,
-  addLog: (message: string) => void
-): Promise<string> => {
-  try {
-    addLog(` ├─ 正在将图片写入 IndexedDB (key: ${key})...`);
-    await mediaStorage.saveMedia(key, dataUrl);
-    addLog(` ├─ 写入 IndexedDB 成功。`);
-    return `indexeddb:${key}`;
-  } catch (storageErr: any) {
-    addLog(` ├─ IndexedDB 写入失败: ${storageErr?.message || storageErr}。尝试上传云端备份...`);
-  }
-
-  try {
-    const uploadedUrl = await uploadDiaryImage(dataUrl, `${key}.jpg`);
-    addLog(` ├─ 云端备份成功: ${uploadedUrl}`);
-    return uploadedUrl;
-  } catch (uploadErr: any) {
-    addLog(` ├─ 云端备份失败: ${uploadErr?.message || uploadErr}`);
-  }
-
-  if (dataUrl.length <= MAX_INLINE_IMAGE_DATA_URL_LENGTH) {
-    addLog(` ├─ 图片较小，使用内联数据兜底。`);
-    return dataUrl;
-  }
-
-  throw new Error('图片存储失败。请检查登录状态和网络后重试，或减少图片数量后再发布。');
-};
-
 export default function Diary() {
   const { user } = useAuthContext();
   const [activeCat, setActiveCat] = useState<CatInfo | null>(null);
@@ -202,6 +163,7 @@ export default function Diary() {
   const [showPostToast, setShowPostToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isReadingFile, setIsReadingFile] = useState(false);
+  const [readingMessage, setReadingMessage] = useState("正在读取...");
   const [commentText, setCommentText] = useState("");
   const [showShareToast, setShowShareToast] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
@@ -536,10 +498,18 @@ export default function Diary() {
           
           if (base64ToSave) {
             const imgKey = `${diaryId}_img_${i}`;
-            const persistedUrl = await persistDiaryImage(imgKey, base64ToSave, addLog);
-            imagesList.push(persistedUrl);
+            try {
+              addLog(` ├─ 正在将图片 [${i + 1}] 写入 IndexedDB (key: ${imgKey})...`);
+              await mediaStorage.saveMedia(imgKey, base64ToSave);
+              imagesList.push(`indexeddb:${imgKey}`);
+              addLog(` ├─ 写入 IndexedDB 成功。`);
+            } catch (storageErr: any) {
+              addLog(` ├─ 写入 IndexedDB 失败: ${storageErr?.message || storageErr}。退回 Base64 直写。`);
+              imagesList.push(base64ToSave);
+            }
           } else {
-            throw new Error(`第 ${i + 1} 张图片处理失败，请重新选择该图片。`);
+            addLog(` ├─ 直接使用图片原生 URL: ${m.url}`);
+            imagesList.push(m.url);
           }
         }
 
@@ -730,6 +700,7 @@ export default function Diary() {
 
     // Process of images selection
     setIsReadingFile(true);
+    setReadingMessage("准备读取文件...");
     try {
       let currentImages = selectedMediaList.filter(item => item.type === 'image');
       const hasVideo = selectedMediaList.some(item => item.type === 'video');
@@ -746,17 +717,20 @@ export default function Diary() {
       const maxAllowed = 9 - currentImages.length;
       if (maxAllowed <= 0) {
         showAlert("提示", "最多只能上传 9 张图片哦");
+        setIsReadingFile(false);
         return;
       }
 
       const sizeLimit = 15 * 1024 * 1024; // Compress up to 15MB immediately
       const addedImages: { url: string; type: 'image' | 'video'; file?: File }[] = [];
 
-      for (const file of fileArray) {
-        const isImg = file.type.startsWith('image/') || 
-                      /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.name);
-        if (!isImg) continue;
+      const imageFiles = fileArray.filter(file => {
+        return file.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.name);
+      });
 
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        
         if (addedImages.length + currentImages.length >= 9) {
           showAlert("提示", "最多只能选择 9 张图片哦，超出部分已忽略");
           break;
@@ -768,20 +742,32 @@ export default function Diary() {
         }
 
         try {
-          console.log(`[Selection] Compressing ${file.name} immediately during selection...`);
-          const base64 = await compressImage(file);
+          const isHeic = file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name);
+          if (isHeic) {
+            if (isMountedRef.current) setReadingMessage(`转换苹果格式 (${i + 1}/${imageFiles.length})...`);
+          } else {
+            if (isMountedRef.current) setReadingMessage(`处理并压缩 (${i + 1}/${imageFiles.length})...`);
+          }
+
+          const convertedFile = await convertHeicToJpeg(file);
+          
+          if (isMountedRef.current && isHeic) {
+            setReadingMessage(`压缩图片 (${i + 1}/${imageFiles.length})...`);
+          }
+
+          console.log(`[Selection] Compressing ${convertedFile.name} immediately during selection...`);
+          const base64 = await compressImage(convertedFile);
           if (base64) {
             addedImages.push({
               url: base64,
               type: 'image',
-              // We do not set the file field so we signal to handlePost that it is pre-compressed
               file: undefined
             });
           } else {
             addedImages.push({
-              url: URL.createObjectURL(file),
+              url: URL.createObjectURL(convertedFile),
               type: 'image',
-              file
+              file: convertedFile
             });
           }
         } catch (err) {
@@ -1247,7 +1233,7 @@ export default function Diary() {
                     {isReadingFile && (
                       <div className="w-32 h-32 rounded-3xl bg-surface-container flex flex-col items-center justify-center mb-2 animate-pulse">
                         <Loader2 className="w-6 h-6 animate-spin text-primary mb-2" />
-                        <span className="text-[10px] font-bold text-on-surface-variant">读取中...</span>
+                        <span className="text-[10px] font-bold text-on-surface-variant text-center px-1">{readingMessage}</span>
                       </div>
                     )}
                   </div>

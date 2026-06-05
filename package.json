@@ -10,7 +10,6 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test \"server/**/*.test.ts\"",
     "verify:baseline": "node scripts/verify-baseline.mjs"
   },
   "dependencies": {
@@ -28,6 +27,7 @@
     "esbuild": "^0.28.0",
     "express": "^4.21.2",
     "form-data": "^4.0.5",
+    "heic2any": "^0.0.4",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.546.0",

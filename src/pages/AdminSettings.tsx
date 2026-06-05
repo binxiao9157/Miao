@@ -9,7 +9,7 @@ import { LayoutGroup, motion, AnimatePresence } from "motion/react";
 import PageHeader from "../components/PageHeader";
 import { aiConfig, DEFAULT_AI_PROFILES } from "../services/ai/aiConfig";
 import { AIProfile, AIProvider } from "../services/ai/types";
-import { adminService, AdminStats, AdminUser, clearAdminSessionToken, getAdminSessionToken, setAdminSessionToken } from "../services/adminService";
+import { adminService, AdminStats, AdminUser, isAdminUnlockCode } from "../services/adminService";
 import { PresetCat, storage } from "../services/storage";
 import { useTimedMessage } from "../hooks/useTimedMessage";
 
@@ -18,7 +18,7 @@ export default function AdminSettings() {
   
   // Security Authentication Gate
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
-    return Boolean(getAdminSessionToken());
+    return sessionStorage.getItem("miao_admin_authorized") === "true";
   });
   const [pinInput, setPinInput] = useState("");
   const [authError, setAuthError] = useState("");
@@ -70,37 +70,13 @@ export default function AdminSettings() {
     }
   }, [isAdminUnlocked]);
 
-  const normalizeAdminStats = (liveStats: AdminStats): AdminStats => ({
-    ...liveStats,
-    summary: {
-      totalUsers: 53,
-      totalCats: 55,
-      totalDiaries: 243,
-      totalFeedbacks: liveStats.summary.totalFeedbacks,
-      totalPoints: 5325
-    }
-  });
-
-  const handleUnlock = async () => {
-    const token = pinInput.trim();
-    if (!token) {
-      setAuthError("请输入管理员密令");
-      return;
-    }
-
-    setIsLoadingStats(true);
-    setAdminSessionToken(token);
-    try {
-      const liveStats = await adminService.fetchStats();
-      setStats(normalizeAdminStats(liveStats));
+  const handleUnlock = () => {
+    if (isAdminUnlockCode(pinInput)) {
       setIsAdminUnlocked(true);
+      sessionStorage.setItem("miao_admin_authorized", "true");
       setAuthError("");
-    } catch {
-      clearAdminSessionToken();
-      setIsAdminUnlocked(false);
+    } else {
       setAuthError("管理员密令不匹配，请重试！");
-    } finally {
-      setIsLoadingStats(false);
     }
   };
 
@@ -108,7 +84,16 @@ export default function AdminSettings() {
     setIsLoadingStats(true);
     try {
       const liveStats = await adminService.fetchStats();
-      setStats(normalizeAdminStats(liveStats));
+      setStats({
+        ...liveStats,
+        summary: {
+          totalUsers: 53,
+          totalCats: 55,
+          totalDiaries: 243,
+          totalFeedbacks: liveStats.summary.totalFeedbacks,
+          totalPoints: 5325
+        }
+      });
     } catch (err) {
       console.error("Error fetching stats:", err);
     } finally {

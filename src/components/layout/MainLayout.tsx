@@ -130,62 +130,38 @@ export default function MainLayout() {
         </div>
       )}
       
-      <div className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-50 h-16 flex items-center justify-center">
+      <div className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-50 h-[52px] flex items-center justify-center">
         {/* 底座背景 */}
-        <div className={`absolute inset-0 rounded-3xl border transition-all duration-300 ${
+        <div className={`absolute inset-0 rounded-2xl border transition-all duration-300 ${
           isHome ? "bg-white/20 backdrop-blur-lg border-white/20" : "bg-white/90 backdrop-blur-xl border-white/50 shadow-[0_10px_40px_rgba(0,0,0,0.1)]"
         }`} />
 
         {/* 导航内容 */}
         <div className="relative w-full h-full flex items-center justify-around px-2">
-          {navItems.map((item, index) => {
+          {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
             
-            // 首页按钮逻辑
-            if (item.path === "/") {
-              return (
-                <button
-                  key={item.path}
-                  onClick={() => navigate(item.path)}
-                  className="relative flex flex-col items-center justify-center w-12 h-12"
-                >
-                  <div className={`absolute inset-0 rounded-full backdrop-blur-md border border-white/20 transition-all duration-300 ${
-                    isActive ? "bg-[#D99B7A]/50 scale-110 rotate-12" : "bg-[#D99B7A]/40"
-                  }`}></div>
-                  <div className="relative z-10 text-white/60 flex flex-col items-center">
-                    <Icon size={20} strokeWidth={2.5} />
-                    <span className="text-[7px] font-black mt-0.5 uppercase tracking-tighter">{item.label}</span>
-                  </div>
-                  {isActive && (
-                    <motion.div 
-                      layoutId="nav-glow"
-                      className="absolute -inset-2 bg-[#FF9D76]/20 rounded-full blur-xl -z-10"
-                    />
-                  )}
-                </button>
-              );
-            }
-            
-            // 普通按钮逻辑
+            const activeColor = "text-[#FF9D76]";
+            const inactiveColor = isHome ? "text-white/40 hover:text-white/70" : "text-[#5D4037]/45 hover:text-[#5D4037]/75";
+            const bgColor = isActive 
+              ? (isHome ? "bg-white/10" : "bg-[#FF9D76]/10") 
+              : "bg-transparent active:scale-95";
+
             return (
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className={`relative flex flex-col items-center justify-center p-1.5 transition-all duration-300 ${
-                  isActive ? "text-primary scale-110" : "text-on-surface-variant opacity-60 hover:opacity-100"
+                className={`relative flex flex-col items-center justify-center px-4 py-1 rounded-xl transition-all duration-200 gap-0.5 ${bgColor} ${
+                  isActive ? activeColor : inactiveColor
                 }`}
               >
-                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                <span className={`text-[9px] mt-0.5 font-black uppercase tracking-tighter ${isActive ? "opacity-100" : "opacity-0"}`}>
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                <span className={`text-[9.5px] uppercase tracking-wider transition-colors ${
+                  isActive ? "font-semibold" : "font-normal"
+                }`}>
                   {item.label}
                 </span>
-                {isActive && (
-                  <motion.div 
-                    layoutId="nav-dot"
-                    className="absolute -bottom-1 w-1 h-1 bg-primary rounded-full"
-                  />
-                )}
               </button>
             );
           })}

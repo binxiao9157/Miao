@@ -1,13 +1,12 @@
 import { storage, CatInfo } from './storage';
-import { buildJsonHeaders } from './httpClient';
 
 async function persistVideoUrl(url: string, catId: string, action: string): Promise<string> {
   if (url.startsWith('/uploads/') || url.includes('/uploads/videos/')) return url;
 
   try {
-    const resp = await fetch('/api/v1/assets/persist-video', {
+    const resp = await fetch('/api/persist-video', {
       method: 'POST',
-      headers: buildJsonHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ videoUrl: url, catId, action }),
     });
     if (!resp.ok) {
