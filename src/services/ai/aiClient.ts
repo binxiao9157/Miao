@@ -28,6 +28,7 @@ export const aiClient = {
       negative_prompt: negativePrompt,
       parameters: {
         seed: profile.seed,
+        size: "768x1344", // 显式请求竖屏高分辨率 9:16 比例
       }
     }, {
       timeout: 90000,

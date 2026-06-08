@@ -1818,7 +1818,7 @@ async function startServer() {
       console.warn("[Server] DASHSCOPE_API_KEY is missing, falling back to secure mock generation");
       return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'dashscope' };
     }
-    const { prompt, image_base64 } = body;
+    const { prompt, image_base64, negative_prompt } = body;
     if (!prompt || typeof prompt !== 'string') {
       const err: any = new Error("缺少必要参数: prompt");
       err.response = { status: 400, data: { code: "INVALID_PARAMETER", message: err.message } };
@@ -1829,7 +1829,12 @@ async function startServer() {
       const url = `${ARK_BASE_URL}/services/aigc/multimodal-generation/generation`;
       const messages = [{ role: "user", content: [] as any[] }];
       if (image_base64) messages[0].content.push({ image: image_base64 });
-      messages[0].content.push({ text: prompt });
+      
+      let finalPrompt = prompt;
+      if (negative_prompt && typeof negative_prompt === 'string' && negative_prompt.trim() !== "") {
+        finalPrompt += `\n\n【负向过滤约束（在生成的图片中绝对禁止、过滤并禁止出现以下内容）】：\n${negative_prompt}`;
+      }
+      messages[0].content.push({ text: finalPrompt });
 
       const requestBody = {
         model: body.model || DASHSCOPE_CONFIG.IMAGE_MODEL,
@@ -1862,8 +1867,8 @@ async function startServer() {
       if (taskId) return { id: taskId, status: 'pending', provider: 'dashscope' };
       throw new Error("DashScope 未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[VolcanoService Fallback] DashScope Image creation error, falling back:", e.message);
-      return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'dashscope' };
+      console.error("[Volco/DashScope Image] DashScope Image creation error:", e.response?.data || e.message);
+      throw new Error(`通义/DashScope 图像微调生成 API 报错: ${e.response?.data?.error?.message || e.response?.data?.message || e.message}`);
     }
   };
 
@@ -1880,10 +1885,19 @@ async function startServer() {
     }
 
     try {
+      let targetSize = body.parameters?.size;
+      if (!targetSize) {
+        if (prompt.includes("竖屏") || prompt.includes("9:16")) {
+          targetSize = "768x1344"; // 默认 9:16 竖屏大图比例
+        } else {
+          targetSize = "1920x1920"; // 默认方形限制
+        }
+      }
+
       const requestBody: any = {
         model: body.model || VOLC_CONFIG.IMAGE_MODEL,
         prompt,
-        size: body.parameters?.size || "1920x1920"
+        size: targetSize
       };
       if (negative_prompt) requestBody.negative_prompt = negative_prompt;
       if (image_base64) requestBody.image = image_base64;
@@ -1903,8 +1917,8 @@ async function startServer() {
       if (taskId) return { id: taskId, status: 'pending', provider: 'volcengine' };
       throw new Error("火山引擎未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[VolcanoService Fallback] Volc Image creation error, falling back:", e.message);
-      return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'volcengine' };
+      console.error("[Volco/DashScope Image] Volc Image creation error:", e.response?.data || e.message);
+      throw new Error(`火山图像生成 API 报错: ${e.response?.data?.error?.message || e.response?.data?.message || e.message}`);
     }
   };
 
