@@ -7,21 +7,15 @@ import dotenv from "dotenv";
 import crypto from "crypto";
 import multer from "multer";
 import { fileURLToPath } from 'url';
-import os from "os";
-import { execFile } from "child_process";
-import { promisify } from "util";
 import FormData from 'form-data';
 import { clientTypeMiddleware } from "./server/middleware/clientType";
 import { createTokenService } from "./server/utils/authToken";
 import { ensureDirectory, readJSON, writeJSON } from "./server/utils/jsonStore";
-import { hashPassword, needsPasswordRehash, verifyPassword as verifyStoredPassword } from "./server/utils/password";
-import { DEV_ADMIN_TOKEN_FALLBACK, DEV_JWT_SECRET_FALLBACK, readSecret } from "./server/utils/runtimeConfig";
 
 dotenv.config();
 
 const __dirname = process.cwd();
 const __filename = path.resolve(__dirname, 'server.ts');
-const execFileAsync = promisify(execFile);
 
 async function startServer() {
   const app = express();
@@ -53,7 +47,6 @@ async function startServer() {
   const notificationsFile = path.join(dataDir, 'notifications.json');
   const diaryLikesFile = path.join(dataDir, 'diary-likes.json');
   const diaryCommentsFile = path.join(dataDir, 'diary-comments.json');
-  const clientDiagnosticsFile = path.join(dataDir, 'client-diagnostics.json');
 
   interface ServerUser { username: string; nickname: string; avatar: string; password: string; phone?: string; openid?: string; unionid?: string; createdAt?: number; }
   interface ServerCat {
@@ -76,7 +69,7 @@ async function startServer() {
   }
 
   const { signToken, verifyToken } = createTokenService({
-    secret: readSecret("JWT_SECRET", process.env.JWT_SECRET || process.env.SESSION_SECRET, DEV_JWT_SECRET_FALLBACK),
+    secret: process.env.JWT_SECRET || process.env.SESSION_SECRET || "miao-dev-secret-change-me",
     ttlMs: Number(process.env.SESSION_TTL_MS || 30 * 24 * 60 * 60 * 1000),
   });
 
@@ -116,18 +109,6 @@ async function startServer() {
     passwordSet: !!user.password
   });
 
-  const findUserByPassword = (users: ServerUser[], username: string, password: string) => {
-    const user = users.find(u => u.username === username);
-    if (!user || !verifyStoredPassword(password, user.password)) return null;
-
-    if (needsPasswordRehash(user.password)) {
-      user.password = hashPassword(password);
-      writeJSON(usersFile, users);
-    }
-
-    return user;
-  };
-
   const authRequired: express.RequestHandler = (req, res, next) => {
     const raw = String(req.headers.authorization || '');
     const token = raw.startsWith('Bearer ') ? raw.slice(7).trim() : '';
@@ -138,26 +119,6 @@ async function startServer() {
   };
 
   const getAuthedUsername = (req: express.Request) => (req as any).auth?.username as string;
-
-  const createReleaseHealth = () => ({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-    commit: process.env.MIAO_COMMIT || process.env.GIT_COMMIT || "unknown",
-    version: process.env.MIAO_VERSION || process.env.npm_package_version || "0.0.0",
-    hasApiKey: !!process.env.DASHSCOPE_API_KEY,
-    hasVolcApiKey: !!process.env.VOLC_API_KEY,
-    capabilities: {
-      apiV1: true,
-      aiTasks: true,
-      aiTasksFile: true,
-      persistVideo: true,
-      videoLastFrame: true,
-      contentSafety: true,
-      clientDiagnostics: true,
-      friendManagement: true,
-    },
-  });
 
   const getUserPublicProfile = (username: string) => {
     const users = readJSON<ServerUser[]>(usersFile, []);
@@ -215,7 +176,7 @@ async function startServer() {
     if (users.find(u => u.username === username)) {
       return res.status(409).json({ error: "Username already exists" });
     }
-    const user: ServerUser = { username, password: hashPassword(password), nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
+    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
     users.push(user);
     writeJSON(usersFile, users);
     console.log(`[Auth] Registered user: ${username}`);
@@ -228,7 +189,7 @@ async function startServer() {
     if (!username || !password) return res.status(400).json({ error: "Missing username or password" });
 
     const users = readJSON<ServerUser[]>(usersFile, []);
-    const user = findUserByPassword(users, username, password);
+    const user = users.find(u => u.username === username && u.password === password);
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
     console.log(`[Auth] Login: ${username}`);
     res.json({ username: user.username, nickname: user.nickname, avatar: user.avatar });
@@ -250,7 +211,7 @@ async function startServer() {
     if (users.find(u => u.username === username)) {
       return res.status(409).json({ error: "Username already exists", code: "USERNAME_EXISTS" });
     }
-    const user: ServerUser = { username, password: hashPassword(password), nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
+    const user: ServerUser = { username, password, nickname: nickname || username, avatar: avatar || '', createdAt: Date.now() };
     users.push(user);
     writeJSON(usersFile, users);
     res.json({ token: signToken({ username: user.username }), user: publicUser(user) });
@@ -262,7 +223,7 @@ async function startServer() {
     if (!username || !password) return res.status(400).json({ error: "Missing username or password", code: "INVALID_PARAMETER" });
 
     const users = readJSON<ServerUser[]>(usersFile, []);
-    const user = findUserByPassword(users, username, password);
+    const user = users.find(u => u.username === username && u.password === password);
     if (!user) return res.status(401).json({ error: "Invalid credentials", code: "INVALID_CREDENTIALS" });
     res.json({ token: signToken({ username: user.username }), user: publicUser(user) });
   });
@@ -465,7 +426,7 @@ async function startServer() {
     const user = users.find(u => u.phone === phone);
     if (!user) return res.status(404).json({ error: "Phone number not registered", code: "PHONE_NOT_FOUND" });
 
-    user.password = hashPassword(newPassword);
+    user.password = newPassword;
     writeJSON(usersFile, users);
     console.log(`[ResetPassword] Password reset for phone: ${maskPhone(phone)}`);
     res.json({ success: true });
@@ -489,11 +450,11 @@ async function startServer() {
       return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
     }
 
-    if (user.password && !verifyStoredPassword(currentPassword, user.password)) {
+    if (user.password && user.password !== currentPassword) {
       return res.status(401).json({ error: "Invalid current password", code: "INVALID_CURRENT_PASSWORD" });
     }
 
-    user.password = hashPassword(password);
+    user.password = password;
     writeJSON(usersFile, users);
     res.json({ success: true, user: publicUser(user) });
   });
@@ -1230,7 +1191,7 @@ async function startServer() {
   });
 
   // ── 管理员认证中间件 ──
-  const ADMIN_TOKEN = readSecret("ADMIN_TOKEN", process.env.ADMIN_TOKEN, DEV_ADMIN_TOKEN_FALLBACK);
+  const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "miao_admin_8888";
   const adminAuth: express.RequestHandler = (req, res, next) => {
     const adminToken = String(req.headers['x-admin-token'] || '');
     // 强制使用专属系统的管理员保密令牌 (不信赖数据库中任何名义是 admin 的普通账号)
@@ -1414,11 +1375,9 @@ async function startServer() {
     }
   });
 
-  // ── 文件上传 API（头像、日记图片等） ──
+  // ── 文件上传 API（头像等） ──
   const avatarUploadsDir = path.resolve(__dirname, 'uploads', 'avatars');
-  const mediaUploadsDir = path.resolve(__dirname, 'uploads', 'media');
   fs.mkdirSync(avatarUploadsDir, { recursive: true });
-  fs.mkdirSync(mediaUploadsDir, { recursive: true });
 
   app.post("/api/v1/upload", authRequired, upload.single('file'), (req, res) => {
     const file = req.file;
@@ -1430,107 +1389,23 @@ async function startServer() {
       return res.status(400).json({ error: "Unsupported file type", code: "INVALID_FILE_TYPE" });
     }
 
-    const purpose = String(req.body?.purpose || '').trim().toLowerCase();
-    const isDiaryMedia = purpose === 'diary' || purpose === 'media';
-    const uploadDir = isDiaryMedia ? mediaUploadsDir : avatarUploadsDir;
-    const uploadPathPrefix = isDiaryMedia ? '/uploads/media' : '/uploads/avatars';
     const filename = `${getAuthedUsername(req)}_${Date.now()}${ext}`;
-    const filePath = path.join(uploadDir, filename);
+    const filePath = path.join(avatarUploadsDir, filename);
     fs.writeFileSync(filePath, file.buffer);
 
-    const url = `${uploadPathPrefix}/${filename}`;
-    console.log(`[Upload] File saved: ${url}`);
+    const url = `/uploads/avatars/${filename}`;
+    console.log(`[Upload] Avatar saved: ${url}`);
     res.json({ url });
-  });
-
-  const checkTextSafety = async (params: { content?: unknown; scene?: unknown }) => {
-    const content = typeof params.content === 'string' ? params.content.trim() : '';
-    if (!content) {
-      return { passed: true, safe: true, provider: "local", skipped: true };
-    }
-    if (content.length > 5000) {
-      return {
-        passed: false,
-        safe: false,
-        code: "TEXT_TOO_LONG",
-        message: "内容过长，请精简后再提交",
-      };
-    }
-    return {
-      passed: true,
-      safe: true,
-      provider: "local",
-      scene: typeof params.scene === 'string' ? params.scene : undefined,
-    };
-  };
-
-  const checkMediaSafety = async (params: { mediaUrl?: unknown; mediaType?: unknown; scene?: unknown; file?: Express.Multer.File }) => {
-    const mediaType = params.mediaType === 'video' ? 'video' : 'image';
-    if (!params.file && typeof params.mediaUrl !== 'string') {
-      return {
-        passed: false,
-        safe: false,
-        code: "MISSING_MEDIA",
-        message: "缺少待检查的媒体内容",
-      };
-    }
-    return {
-      passed: true,
-      safe: true,
-      provider: "local",
-      mediaType,
-      scene: typeof params.scene === 'string' ? params.scene : undefined,
-    };
-  };
-
-  app.post("/api/v1/security/text", authRequired, async (req, res) => {
-    try {
-      res.json(await checkTextSafety({ content: req.body?.content, scene: req.body?.scene }));
-    } catch (err: any) {
-      res.status(500).json({ passed: false, safe: false, error: err.message, code: "SAFETY_CHECK_FAILED" });
-    }
-  });
-
-  app.post("/api/v1/security/media", authRequired, async (req, res) => {
-    try {
-      res.json(await checkMediaSafety({
-        mediaUrl: req.body?.mediaUrl,
-        mediaType: req.body?.mediaType,
-        scene: req.body?.scene,
-      }));
-    } catch (err: any) {
-      res.status(500).json({ passed: false, safe: false, error: err.message, code: "SAFETY_CHECK_FAILED" });
-    }
-  });
-
-  app.post("/api/v1/security/media-file", authRequired, upload.single('media'), async (req, res) => {
-    try {
-      res.json(await checkMediaSafety({
-        file: req.file,
-        mediaType: req.body?.mediaType,
-        scene: req.body?.scene,
-      }));
-    } catch (err: any) {
-      res.status(500).json({ passed: false, safe: false, error: err.message, code: "SAFETY_CHECK_FAILED" });
-    }
-  });
-
-  app.post("/api/v1/diagnostics/client-log", authRequired, (req, res) => {
-    const username = getAuthedUsername(req);
-    const allLogs = readJSON<any[]>(clientDiagnosticsFile, []);
-    allLogs.push({
-      userId: username,
-      createdAt: Date.now(),
-      payload: req.body || {},
-    });
-    const recentLogs = allLogs.slice(-200);
-    writeJSON(clientDiagnosticsFile, recentLogs);
-    res.json({ success: true });
   });
 
   // Health check endpoint
   app.get("/api/health", (req, res) => {
-    res.json(createReleaseHealth());
+    res.json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      env: process.env.NODE_ENV,
+      hasApiKey: !!process.env.DASHSCOPE_API_KEY
+    });
   });
 
   // ── 阿里灵积 (DashScope) 配置 ──
@@ -2172,50 +2047,49 @@ async function startServer() {
     }
   });
 
-  const createMockTaskPollResponse = (taskId: string, type: "image" | "video") => {
-    if (!taskId || !taskId.startsWith('mock-server-task-')) return null;
-
-    const elapsed = Date.now() - Number(taskId.split('-').pop() || Date.now());
-    if (elapsed < 3000) {
-      return { status: 'running' };
-    }
-
-    if (type === 'image') {
-      const catImages = [
-        'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1513360309081-36f5e878fc11?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1618826411640-d6df44dd3f7a?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?auto=format&fit=crop&q=80&w=800'
-      ];
-      const charSum = Array.from(taskId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-      const imageUrl = catImages[charSum % catImages.length];
-      return {
-        status: 'succeeded',
-        image_url: imageUrl,
-        output: { image_url: imageUrl }
-      };
-    }
-
-    const catVideos = [
-      'https://www.w3schools.com/html/mov_bbb.mp4',
-      'https://www.w3schools.com/html/movie.mp4'
-    ];
-    const charSum = Array.from(taskId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-    const videoUrl = catVideos[charSum % catVideos.length];
-    return {
-      status: 'succeeded',
-      video_url: videoUrl,
-      output: { video_url: videoUrl }
-    };
-  };
-
   app.get("/api/ai/:type(image|video)-status/:provider/:taskId", async (req, res) => {
     const provider = normalizeProvider(req.params.provider);
     const { taskId, type } = req.params;
 
-    const mockResponse = createMockTaskPollResponse(taskId, type as "image" | "video");
-    if (mockResponse) return res.json(mockResponse);
+    // Graceful server-side fallback for simulated mock tasks
+    if (taskId && taskId.startsWith('mock-server-task-')) {
+      const elapsed = Date.now() - Number(taskId.split('-').pop() || Date.now());
+      if (elapsed < 3000) {
+        return res.json({ status: 'running' });
+      }
+      if (type === 'image') {
+        const catImages = [
+          'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1513360309081-36f5e878fc11?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1618826411640-d6df44dd3f7a?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?auto=format&fit=crop&q=80&w=800'
+        ];
+        // Select one based on index
+        const charSum = Array.from(taskId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+        const index = charSum % catImages.length;
+        const imageUrl = catImages[index];
+        return res.json({
+          status: 'succeeded',
+          image_url: imageUrl,
+          output: { image_url: imageUrl }
+        });
+      } else {
+        const catVideos = [
+          'https://www.w3schools.com/html/mov_bbb.mp4',
+          'https://www.w3schools.com/html/movie.mp4'
+        ];
+        // Select one based on the taskId characters sum
+        const charSum = Array.from(taskId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+        const index = charSum % catVideos.length;
+        const videoUrl = catVideos[index];
+        return res.json({
+          status: 'succeeded',
+          video_url: videoUrl,
+          output: { video_url: videoUrl }
+        });
+      }
+    }
 
     try {
       if (taskId.startsWith('sync:')) {
@@ -2290,9 +2164,6 @@ async function startServer() {
       if (taskId.startsWith('sync:')) {
         return res.status(400).json({ status: 'failed', message: '同步任务无需轮询' });
       }
-      const mockResponse = createMockTaskPollResponse(taskId, type);
-      if (mockResponse) return res.json({ ...mockResponse, type, provider });
-
       if (provider === "volcengine") {
         const response = await axios.get(`${VOLC_CONFIG.BASE_URL}/${taskId}`, {
           headers: { 'Authorization': `Bearer ${VOLC_CONFIG.API_KEY}` },
@@ -2677,87 +2548,7 @@ async function startServer() {
 
   // ── 视频持久化：将临时 URL 下载到服务器本地，返回永久可访问的 URL ──
   const uploadsDir = path.resolve(__dirname, 'uploads', 'videos');
-  const videoFramesDir = path.resolve(__dirname, 'uploads', 'video-frames');
   fs.mkdirSync(uploadsDir, { recursive: true });
-  fs.mkdirSync(videoFramesDir, { recursive: true });
-
-  const sanitizePathSegment = (value: unknown, fallback: string) => {
-    const sanitized = String(value || fallback).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
-    return sanitized || fallback;
-  };
-
-  const resolveLocalUploadPath = (rawUrl: string) => {
-    const uploadsRoot = path.resolve(__dirname, 'uploads');
-    let uploadPath = rawUrl;
-
-    try {
-      if (/^https?:\/\//i.test(rawUrl)) {
-        uploadPath = new URL(rawUrl).pathname;
-      }
-    } catch {
-      return null;
-    }
-
-    if (!uploadPath.startsWith('/uploads/')) return null;
-    const decodedPath = decodeURIComponent(uploadPath.replace(/^\/uploads\//, ''));
-    const resolved = path.resolve(uploadsRoot, decodedPath);
-    if (resolved !== uploadsRoot && !resolved.startsWith(`${uploadsRoot}${path.sep}`)) return null;
-    return fs.existsSync(resolved) ? resolved : null;
-  };
-
-  const downloadVideoToTempFile = async (videoUrl: string) => {
-    const safeVideoUrl = parseSafeRemoteUrl(videoUrl);
-    if (!safeVideoUrl) return null;
-
-    const finalVideoUrl = ensureUrlEncoding(safeVideoUrl);
-    const response = await axios({
-      method: 'get',
-      url: finalVideoUrl,
-      responseType: 'arraybuffer',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'video/*,*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      },
-      httpsAgent,
-      timeout: 120000,
-      maxContentLength: 80 * 1024 * 1024,
-      maxBodyLength: 80 * 1024 * 1024,
-    });
-
-    const tempPath = path.join(os.tmpdir(), `miao-last-frame-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.mp4`);
-    fs.writeFileSync(tempPath, Buffer.from(response.data));
-    return tempPath;
-  };
-
-  const extractVideoLastFrame = async (inputPath: string, outputPath: string) => {
-    const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
-    const commonArgs = ['-y', '-loglevel', 'error'];
-    try {
-      await execFileAsync(ffmpegPath, [
-        ...commonArgs,
-        '-sseof', '-0.1',
-        '-i', inputPath,
-        '-frames:v', '1',
-        '-q:v', '2',
-        outputPath,
-      ], { timeout: 60000 });
-    } catch {
-      await execFileAsync(ffmpegPath, [
-        ...commonArgs,
-        '-i', inputPath,
-        '-frames:v', '1',
-        '-q:v', '2',
-        outputPath,
-      ], { timeout: 60000 });
-    }
-
-    if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
-      throw new Error("ffmpeg did not produce a frame image");
-    }
-  };
 
   const persistVideoHandler: express.RequestHandler = async (req, res) => {
     const { videoUrl, catId, action } = req.body;
@@ -2818,55 +2609,6 @@ async function startServer() {
 
   app.post("/api/persist-video", persistVideoHandler);
   app.post("/api/v1/assets/persist-video", authRequired, persistVideoHandler);
-
-  const videoLastFrameHandler: express.RequestHandler = async (req, res) => {
-    const videoUrl = String(req.body?.videoUrl || '').trim();
-    const catId = sanitizePathSegment(req.body?.catId, 'unknown-cat');
-    if (!videoUrl) {
-      return res.status(400).json({ error: "Missing videoUrl", code: "INVALID_PARAMETER" });
-    }
-
-    let tempFile: string | null = null;
-    try {
-      const localInputPath = resolveLocalUploadPath(videoUrl);
-      const inputPath = localInputPath || await downloadVideoToTempFile(videoUrl);
-      if (!inputPath) {
-        return res.status(400).json({ error: "Invalid videoUrl", code: "INVALID_VIDEO_URL" });
-      }
-      if (!localInputPath) tempFile = inputPath;
-
-      const catFrameDir = path.join(videoFramesDir, catId);
-      fs.mkdirSync(catFrameDir, { recursive: true });
-      const filename = `last_${Date.now()}.jpg`;
-      const framePath = path.join(catFrameDir, filename);
-
-      await extractVideoLastFrame(inputPath, framePath);
-
-      const frameUrl = `/uploads/video-frames/${catId}/${filename}`;
-      console.log(`[VideoFrame] Extracted last frame for cat ${catId}: ${frameUrl}`);
-      res.json({ frameUrl, url: frameUrl });
-    } catch (error: any) {
-      console.error("[VideoFrame] Failed to extract last frame:", {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-      });
-      res.status(502).json({
-        error: "Failed to extract video last frame",
-        message: error.code === 'ENOENT'
-          ? "服务器未安装 ffmpeg，无法抽取视频末帧。"
-          : error.message,
-        code: "VIDEO_FRAME_EXTRACTION_FAILED",
-        upstreamStatus: error.response?.status,
-      });
-    } finally {
-      if (tempFile) {
-        fs.unlink(tempFile, () => {});
-      }
-    }
-  };
-
-  app.post("/api/v1/assets/video-last-frame", authRequired, videoLastFrameHandler);
 
   app.use('/uploads', express.static(path.resolve(__dirname, 'uploads'), {
     maxAge: '30d',

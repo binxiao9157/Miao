@@ -29,7 +29,6 @@ export default function AdminSettings() {
   // Data states from backend
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
-  const [statsError, setStatsError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Preset Cats state (local fallback sync)
@@ -83,7 +82,6 @@ export default function AdminSettings() {
 
   const fetchAdminStats = async () => {
     setIsLoadingStats(true);
-    setStatsError("");
     try {
       const liveStats = await adminService.fetchStats();
       setStats({
@@ -96,9 +94,8 @@ export default function AdminSettings() {
           totalPoints: 5325
         }
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error fetching stats:", err);
-      setStatsError(err?.message || "后台统计接口暂时不可用");
     } finally {
       setIsLoadingStats(false);
     }
@@ -245,64 +242,6 @@ export default function AdminSettings() {
       e.target.value = "";
     }
   };
-
-  const debugControlPanel = (
-    <section className="bg-white p-5 rounded-[32px] border border-outline-variant/40 shadow-sm">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center">
-          <Bug size={16} />
-        </div>
-        <h3 className="text-sm font-black text-[#5D4037]">实时快速调节与环境检查</h3>
-      </div>
-
-      {statsError && (
-        <div className="mb-4 rounded-[18px] bg-red-50 border border-red-100 px-4 py-3">
-          <p className="text-xs font-black text-red-600">运营统计加载失败</p>
-          <p className="mt-1 text-[10px] font-bold text-red-500/70 leading-relaxed">
-            {statsError}。本地调试开关仍可使用，请检查服务端 ADMIN_TOKEN 或 /api/v1/admin/stats。
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        <label className="flex items-center justify-between gap-3 rounded-[20px] bg-[#FDF9F6] px-4 py-3 border border-outline-variant/40">
-          <span className="min-w-0">
-            <span className="block text-xs font-black text-[#5D4037] tracking-normal mb-0.5">积分作弊(DEBUG)</span>
-            <span className="block text-[10px] font-bold text-[#5D4037]/45">免任务全无限增送</span>
-          </span>
-          <input
-            type="checkbox"
-            checked={isPointsCheat}
-            onChange={(e) => {
-              const next = e.target.checked;
-              setIsPointsCheat(next);
-              storage.setIsPointsCheat(next);
-              triggerToast(next ? "作弊积分阀门已敞开" : "已恢复标准积分机制");
-            }}
-            className="w-5 h-5 accent-[#FF9D76]"
-          />
-        </label>
-
-        <label className="flex items-center justify-between gap-3 rounded-[20px] bg-[#FDF9F6] px-4 py-3 border border-outline-variant/40">
-          <span className="min-w-0">
-            <span className="block text-xs font-black text-[#5D4037] tracking-normal mb-0.5">时光机快进模式</span>
-            <span className="block text-[10px] font-bold text-[#5D4037]/45">跳过交互CD与时隔</span>
-          </span>
-          <input
-            type="checkbox"
-            checked={isFastForward}
-            onChange={(e) => {
-              const next = e.target.checked;
-              setIsFastForward(next);
-              storage.setIsFastForward(next);
-              triggerToast(next ? "快进引擎点火成功" : "已归位标准时间流速");
-            }}
-            className="w-5 h-5 accent-[#FF9D76]"
-          />
-        </label>
-      </div>
-    </section>
-  );
 
   // Pre-filtered users list
   const filteredUsers = stats?.users.filter(u => {
@@ -455,12 +394,6 @@ export default function AdminSettings() {
               </div>
             )}
 
-            {!isLoadingStats && !stats && (
-              <div className="space-y-5">
-                {debugControlPanel}
-              </div>
-            )}
-
             {!isLoadingStats && stats && (
               <div className="space-y-5">
                 {/* Statistics bento grid layout */}
@@ -547,7 +480,53 @@ export default function AdminSettings() {
                   </div>
                 </section>
 
-                {debugControlPanel}
+                {/* Fast operational debug config logs */}
+                <section className="bg-white p-5 rounded-[32px] border border-outline-variant/40 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center">
+                      <Bug size={16} />
+                    </div>
+                    <h3 className="text-sm font-black text-[#5D4037]">实时快速调节与环境检查</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <label className="flex items-center justify-between gap-3 rounded-[20px] bg-[#FDF9F6] px-4 py-3 border border-outline-variant/40">
+                      <span className="min-w-0">
+                        <span className="block text-xs font-black text-[#5D4037] tracking-normal mb-0.5">积分作弊(DEBUG)</span>
+                        <span className="block text-[10px] font-bold text-[#5D4037]/45">免任务全无限增送</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={isPointsCheat}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setIsPointsCheat(next);
+                          storage.setIsPointsCheat(next);
+                          triggerToast(next ? "作弊积分阀门已敞开" : "已恢复标准积分机制");
+                        }}
+                        className="w-5 h-5 accent-[#FF9D76]"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between gap-3 rounded-[20px] bg-[#FDF9F6] px-4 py-3 border border-outline-variant/40">
+                      <span className="min-w-0">
+                        <span className="block text-xs font-black text-[#5D4037] tracking-normal mb-0.5">时光机快进模式</span>
+                        <span className="block text-[10px] font-bold text-[#5D4037]/45">跳过交互CD与时隔</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={isFastForward}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setIsFastForward(next);
+                          storage.setIsFastForward(next);
+                          triggerToast(next ? "快进引擎点火成功" : "已归位标准时间流速");
+                        }}
+                        className="w-5 h-5 accent-[#FF9D76]"
+                      />
+                    </label>
+                  </div>
+                </section>
               </div>
             )}
           </div>

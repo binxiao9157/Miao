@@ -56,8 +56,8 @@ const readBool = (key: string, fallback: boolean) => {
 export const aiConfig = {
   getProfile(): AIProfile {
     const provider = isProvider(localStorage.getItem(STORAGE_KEYS.PROVIDER))
-       ? localStorage.getItem(STORAGE_KEYS.PROVIDER) as AIProvider
-       : 'volcengine';
+      ? localStorage.getItem(STORAGE_KEYS.PROVIDER) as AIProvider
+      : 'dashscope';
     const defaults = DEFAULT_AI_PROFILES[provider];
     const imageKey = provider === 'dashscope'
       ? STORAGE_KEYS.DASHSCOPE_IMAGE_MODEL
