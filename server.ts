@@ -2383,6 +2383,7 @@ async function startServer() {
       last_frame: imageData,
       parameters: {
         seed: req.body.seed ? Number(req.body.seed) : undefined,
+        size: req.body.size,
         resolution: req.body.resolution,
         duration: req.body.duration ? Number(req.body.duration) : undefined,
         audio: req.body.audio === 'true',

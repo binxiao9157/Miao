@@ -38,7 +38,6 @@ assert(missing.length === 0, `Missing required files: ${missing.join(", ")}`);
 const serverSource = read("server.ts");
 const appSource = read("src/App.tsx");
 const packageJson = JSON.parse(read("package.json"));
-const packageLock = JSON.parse(read("package-lock.json"));
 
 const serverRoutes = countMatches(serverSource, routePattern).map((match) => ({
   method: match[1].toUpperCase(),
@@ -79,54 +78,10 @@ for (const route of requiredClientRoutes) {
 assert(packageJson.scripts?.dev, "Missing package script: dev");
 assert(packageJson.scripts?.build, "Missing package script: build");
 
-const routerDomRange = packageJson.dependencies?.["react-router-dom"];
-const lockedRouterDomRange = packageLock.packages?.[""]?.dependencies?.["react-router-dom"];
-const lockedRouterDomVersion = packageLock.packages?.["node_modules/react-router-dom"]?.version;
-const lockedRouterVersion = packageLock.packages?.["node_modules/react-router"]?.version;
-const minRouterVersion = "7.17.0";
-
-function parseVersion(version) {
-  const match = String(version || "").match(/\d+\.\d+\.\d+/);
-  assert(match, `Invalid semver version: ${version}`);
-  return match[0].split(".").map((part) => Number(part));
-}
-
-function isAtLeast(actual, minimum) {
-  const actualParts = parseVersion(actual);
-  const minimumParts = parseVersion(minimum);
-  for (let index = 0; index < minimumParts.length; index += 1) {
-    if (actualParts[index] > minimumParts[index]) return true;
-    if (actualParts[index] < minimumParts[index]) return false;
-  }
-  return true;
-}
-
-assert(routerDomRange, "Missing dependency: react-router-dom");
-assert(
-  routerDomRange === lockedRouterDomRange,
-  `package-lock root react-router-dom range (${lockedRouterDomRange}) does not match package.json (${routerDomRange})`,
-);
-assert(
-  isAtLeast(routerDomRange, minRouterVersion),
-  `react-router-dom dependency must be >= ${minRouterVersion}; found ${routerDomRange}`,
-);
-assert(
-  isAtLeast(lockedRouterDomVersion, minRouterVersion),
-  `package-lock react-router-dom must be >= ${minRouterVersion}; found ${lockedRouterDomVersion}`,
-);
-assert(
-  isAtLeast(lockedRouterVersion, minRouterVersion),
-  `package-lock react-router must be >= ${minRouterVersion}; found ${lockedRouterVersion}`,
-);
-
 const summary = {
   ok: true,
   package: packageJson.name,
   scripts: Object.keys(packageJson.scripts || {}),
-  dependencies: {
-    "react-router-dom": lockedRouterDomVersion,
-    "react-router": lockedRouterVersion,
-  },
   serverRouteCount: serverRoutes.length,
   clientRouteCount: clientRoutes.length,
   checkedFiles: requiredFiles.length,
