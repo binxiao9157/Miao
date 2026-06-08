@@ -167,7 +167,15 @@ export default function UploadMaterial() {
       setFirstFrameUrl(imageUrl);
     } catch (e: any) {
       console.error("Stage 1 Error:", e);
-      triggerToast(e.message || "形象生成失败，请重试");
+      let errorMsg = "形象生成失败，请稍后重试";
+      if (e.response?.data?.message) {
+        errorMsg = e.response.data.message;
+      } else if (e.response?.data?.error) {
+        errorMsg = typeof e.response.data.error === 'string' ? e.response.data.error : (e.response.data.error.message || errorMsg);
+      } else if (e.message) {
+        errorMsg = e.message;
+      }
+      triggerToast(errorMsg);
     } finally {
       setIsDrawing(false);
     }

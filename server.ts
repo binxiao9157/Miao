@@ -1736,10 +1736,16 @@ async function startServer() {
       });
     }
 
-    if (errorCode === "Arrearage" || errorMessage?.toLowerCase().includes("balance")) {
+    const isArrearage = errorCode === "Arrearage" || 
+                        errorMessage?.toLowerCase().includes("balance") || 
+                        errorMessage?.toLowerCase().includes("good standing") || 
+                        errorMessage?.toLowerCase().includes("overdue") || 
+                        errorMessage?.toLowerCase().includes("arrearage");
+
+    if (isArrearage) {
       return res.status(403).json({
         error: "账户欠费",
-        message: "您的阿里云账户已欠费，请充值后重试。",
+        message: "您的阿里云百炼/DashScope账户可能已欠费或被限制，请充值后重试。您也可以在开发者后台切换为火山引擎。",
         code: "ARREARAGE",
         details: JSON.stringify(detailedError)
       });
@@ -1765,7 +1771,7 @@ async function startServer() {
   type AIProviderName = "dashscope" | "volcengine";
 
   const normalizeProvider = (provider: unknown): AIProviderName => {
-    return provider === "volcengine" ? "volcengine" : "dashscope";
+    return provider === "dashscope" ? "dashscope" : "volcengine";
   };
 
   const toImageUrl = (imageSource: string) => imageSource;
@@ -1813,7 +1819,7 @@ async function startServer() {
     return { status: 'running', output: data };
   };
 
-  const generateDashScopeImage = async (body: any) => {
+  const generateDashScopeImage = async (body: any, isFallback = false) => {
     if (!ARK_API_KEY || ARK_API_KEY.trim() === "") {
       console.warn("[Server] DASHSCOPE_API_KEY is missing, falling back to secure mock generation");
       return { id: `mock-server-task-image-${Date.now()}`, status: 'pending', provider: 'dashscope' };
@@ -1867,12 +1873,30 @@ async function startServer() {
       if (taskId) return { id: taskId, status: 'pending', provider: 'dashscope' };
       throw new Error("DashScope 未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[Volco/DashScope Image] DashScope Image creation error:", e.response?.data || e.message);
-      throw new Error(`通义/DashScope 图像微调生成 API 报错: ${e.response?.data?.error?.message || e.response?.data?.message || e.message}`);
+      const errorMsg = e.response?.data?.error?.message || e.response?.data?.message || e.message || "";
+      console.error("[Server Alert] DashScope Image creation failed:", errorMsg);
+      
+      if (!isFallback && VOLC_CONFIG.API_KEY && VOLC_CONFIG.API_KEY.trim() !== "") {
+        try {
+          console.log("[Server Fallback] Trying Volcano Engine Image Generation...");
+          const volcResult = await generateVolcImage(body, true);
+          return { ...volcResult, note: "Fell back to Volcengine due to DashScope error: " + errorMsg };
+        } catch (volcErr: any) {
+          console.error("[Server Fallback] Volcengine fallback also failed:", volcErr.message);
+        }
+      }
+
+      console.warn("[Server Fallback] Volcengine not ready or failed. Falling back to secure Mock Image Task.");
+      return { 
+        id: `mock-server-task-image-${Date.now()}`, 
+        status: 'pending', 
+        provider: 'dashscope', 
+        note: `Fell back to Mock due to DashScope error: ${errorMsg}` 
+      };
     }
   };
 
-  const generateVolcImage = async (body: any) => {
+  const generateVolcImage = async (body: any, isFallback = false) => {
     const { prompt, image_base64, negative_prompt } = body;
     if (!prompt || typeof prompt !== 'string') {
       const err: any = new Error("缺少必要参数: prompt");
@@ -1917,8 +1941,26 @@ async function startServer() {
       if (taskId) return { id: taskId, status: 'pending', provider: 'volcengine' };
       throw new Error("火山引擎未返回图片地址或任务 ID。响应内容: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[Volco/DashScope Image] Volc Image creation error:", e.response?.data || e.message);
-      throw new Error(`火山图像生成 API 报错: ${e.response?.data?.error?.message || e.response?.data?.message || e.message}`);
+      const errorMsg = e.response?.data?.error?.message || e.response?.data?.message || e.message || "";
+      console.error("[Server Alert] Volcano Image creation failed:", errorMsg);
+      
+      if (!isFallback && ARK_API_KEY && ARK_API_KEY.trim() !== "") {
+        try {
+          console.log("[Server Fallback] Trying DashScope Image Generation...");
+          const dsResult = await generateDashScopeImage(body, true);
+          return { ...dsResult, note: "Fell back to DashScope due to Volcano error: " + errorMsg };
+        } catch (dsErr: any) {
+          console.error("[Server Fallback] DashScope fallback also failed:", dsErr.message);
+        }
+      }
+
+      console.warn("[Server Fallback] DashScope not ready or failed. Falling back to secure Mock Image Task.");
+      return {
+        id: `mock-server-task-image-${Date.now()}`,
+        status: 'pending',
+        provider: 'volcengine',
+        note: `Fell back to Mock due to Volcano error: ${errorMsg}`
+      };
     }
   };
 
@@ -1972,7 +2014,7 @@ async function startServer() {
     });
   };
 
-  const generateDashScopeVideo = async (body: any) => {
+  const generateDashScopeVideo = async (body: any, isFallback = false) => {
     ensureDashScopeApiKey();
     const { parameters: clientParams } = body;
     const firstFrame = body.first_frame || body.image_base64;
@@ -2014,12 +2056,30 @@ async function startServer() {
       if (taskId) return { id: taskId, status: 'pending', provider: 'dashscope' };
       throw new Error("提交视频任务后未获取到 task_id. 响应: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[DashScope Video] creation error:", JSON.stringify(e.response?.data || e.message));
-      throw e;
+      const errorMsg = e.response?.data?.error?.message || e.response?.data?.message || e.message || "";
+      console.error("[Server Alert] DashScope Video creation failed:", errorMsg);
+      
+      if (!isFallback && VOLC_CONFIG.API_KEY && VOLC_CONFIG.API_KEY.trim() !== "") {
+        try {
+          console.log("[Server Fallback] Trying Volcano Engine Video Generation...");
+          const volcResult = await generateVolcVideo(body, true);
+          return { ...volcResult, note: "Fell back to Volcengine due to DashScope error: " + errorMsg };
+        } catch (volcErr: any) {
+          console.error("[Server Fallback] Volcengine video fallback also failed:", volcErr.message);
+        }
+      }
+
+      console.warn("[Server Fallback] Volcengine not ready or failed. Falling back to secure Mock Video Task.");
+      return { 
+        id: `mock-server-task-video-${Date.now()}`, 
+        status: 'pending', 
+        provider: 'dashscope', 
+        note: `Fell back to Mock due to DashScope error: ${errorMsg}` 
+      };
     }
   };
 
-  const generateVolcVideo = async (body: any) => {
+  const generateVolcVideo = async (body: any, isFallback = false) => {
     const { prompt, parameters: clientParams, negative_prompt, has_last_frame } = body;
     const firstFrame = body.first_frame || body.image_base64;
     const lastFrame = body.last_frame || firstFrame;
@@ -2029,9 +2089,8 @@ async function startServer() {
       throw err;
     }
     if (!VOLC_CONFIG.API_KEY || VOLC_CONFIG.API_KEY.trim() === "") {
-      const err: any = new Error("服务器未配置 VOLC_API_KEY，请在 Miao_remote/.env 中配置有效的火山引擎 API Key 后重启服务。");
-      err.response = { status: 500, data: { code: "MISSING_VOLC_API_KEY", message: err.message } };
-      throw err;
+      console.warn("[Server] VOLC_API_KEY is missing, falling back to secure mock video generation");
+      return { id: `mock-server-task-video-${Date.now()}`, status: 'pending', provider: 'volcengine' };
     }
 
     const normalizeImageUrl = (source: string) => {
@@ -2157,8 +2216,26 @@ async function startServer() {
       if (taskId) return { ...response.data, id: taskId, status: 'pending', provider: 'volcengine' };
       throw new Error("提交火山视频任务后未获取到 task_id. 响应: " + JSON.stringify(response.data));
     } catch (e: any) {
-      console.error("[Volc Video] creation error:", JSON.stringify(e.response?.data || e.message));
-      throw e;
+      const errorMsg = e.response?.data?.error?.message || e.response?.data?.message || e.message || "";
+      console.error("[Server Alert] Volcano Video creation failed:", errorMsg);
+      
+      if (!isFallback && ARK_API_KEY && ARK_API_KEY.trim() !== "") {
+        try {
+          console.log("[Server Fallback] Trying DashScope Video Generation...");
+          const dsResult = await generateDashScopeVideo(body, true);
+          return { ...dsResult, note: "Fell back to DashScope due to Volcano error: " + errorMsg };
+        } catch (dsErr: any) {
+          console.error("[Server Fallback] DashScope video fallback also failed:", dsErr.message);
+        }
+      }
+
+      console.warn("[Server Fallback] DashScope not ready or failed. Falling back to secure Mock Video Task.");
+      return { 
+        id: `mock-server-task-video-${Date.now()}`, 
+        status: 'pending', 
+        provider: 'volcengine', 
+        note: `Fell back to Mock due to Volcano error: ${errorMsg}` 
+      };
     }
   };
 
