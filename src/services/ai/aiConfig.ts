@@ -57,7 +57,7 @@ export const aiConfig = {
   getProfile(): AIProfile {
     const provider = isProvider(localStorage.getItem(STORAGE_KEYS.PROVIDER))
       ? localStorage.getItem(STORAGE_KEYS.PROVIDER) as AIProvider
-      : 'dashscope';
+      : 'volcengine';
     const defaults = DEFAULT_AI_PROFILES[provider];
     const imageKey = provider === 'dashscope'
       ? STORAGE_KEYS.DASHSCOPE_IMAGE_MODEL
