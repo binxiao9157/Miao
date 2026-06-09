@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+*~
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# CocoaPods
+Pods/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# xcodegen 生成的工程文件（可选提交）
+# *.xcodeproj

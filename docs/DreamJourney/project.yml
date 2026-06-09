@@ -1,0 +1,41 @@
+name: DreamJourney
+options:
+  bundleIdPrefix: com.dreamjourney
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  developmentLanguage: zh-Hans
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_BITCODE: NO
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+
+targets:
+  DreamJourney:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: DreamJourney/Sources
+        includes:
+          - "**/*.swift"
+          - "**/*.m"
+          - "**/*.h"
+          - "**/*.xib"
+          - "**/*.storyboard"
+          - "**/*.mlmodel"
+      - path: DreamJourney/Resources
+      - path: DreamJourney/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dreamjourney.app
+        INFOPLIST_FILE: DreamJourney/Resources/Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
